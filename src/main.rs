@@ -5,6 +5,7 @@ mod engine;
 mod export;
 mod layouts;
 mod preferences;
+mod xkb;
 
 use eframe::egui;
 

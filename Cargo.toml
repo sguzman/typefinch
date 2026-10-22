@@ -10,3 +10,4 @@ repository = "https://github.com/sguzman/typefinch"
 eframe = { version = "=0.33.3", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+xkbcommon = "0.9"

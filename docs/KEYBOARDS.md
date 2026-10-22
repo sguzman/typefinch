@@ -29,3 +29,7 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 Acceptance: hotplug two keyboards; map both with differing layouts; verify focus, shift/AltGr, symbols, dead keys, IMEs, ANSI/ISO/JIS and no double-count of physical + committed events.
 
 [Wayland keyboard protocol](https://wayland.app/protocols/wayland) · [Hyprland devices](https://wiki.hypr.land/configuring/core/devices/) · [Hyprland keyboard-layout documentation](https://wiki.hypr.land/configuring/core/binds/keyboard-layouts/).
+
+## XKB compiler (new implementation)
+
+Where `xkeyboard-config` has a matching layout/variant, Typefinch can compile the installed keymap with `libxkbcommon` and remap common physical ANSI keys inside the application. This broadens *potentially emulatable* entries beyond the four built-in tables, with locale-specific symbols rather than guessed character mappings. This still is **not** complete emulation for AltGr, dead-key Compose, IMEs, ISO/JIS physical extras or per-device input attribution. An unavailable XKB preset remains recognition-only.

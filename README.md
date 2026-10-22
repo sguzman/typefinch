@@ -13,7 +13,7 @@
 - ⌨️ English timed word tests: 15, 30, 60 and 120 seconds; WPM, accuracy and corrections.
 - 🐦 Multiple local profiles and saved high-water statistics without online accounts.
 - 🌗 System/Light/Dark egui appearance and persisted preference.
-- 🗺️ Named keyboard-layout catalog with four initial ANSI emulation tables: QWERTY, Dvorak, Colemak and Colemak-DH. **Other catalog entries are recognition-only** until emulation is implemented and verified.
+- 🗺️ Named keyboard-layout catalog with four initial ANSI emulation tables: QWERTY, Dvorak, Colemak and Colemak-DH. Installed XKB layout/variant identities can also be compiled for provisional in-app ANSI-position emulation; unavailable identities remain recognition-only. AltGr/dead-key/IME and non-ANSI behavior still need QA.
 - 🔌 Read-only Hyprland device discovery with a chooser for device metadata. **Not yet a per-keyboard typing input filter.**
 - 🎨 Static XML-escaped SVG GitHub-card exporter.
 

@@ -4,6 +4,7 @@ use crate::{
     export,
     layouts::{self, Mode},
     preferences::{Preferences, Profile, Theme},
+    xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
 use std::time::Duration;
@@ -14,6 +15,7 @@ pub struct Typefinch {
     prefs: Preferences,
     session: Session,
     mode: Mode,
+    emulator: Option<Emulator>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
     device_error: Option<String>,
@@ -36,7 +38,8 @@ impl Typefinch {
         });
         let (keyboards, device_error) = Self::query_devices();
         let session = Session::new(prefs.duration_seconds);
-        Self { prefs, session, mode: Mode::System, keyboards, device_error,
+        let emulator = Emulator::compile(&prefs.layout).ok();
+        Self { prefs, session, mode: Mode::System, emulator, keyboards, device_error,
                device_index: 0, new_profile: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -72,9 +75,12 @@ impl Typefinch {
                     // Crucially use the physical key, not an OS-translated logical letter.
                     // If unavailable, do not silently claim emulation works.
                     if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
-                        if let Some(ch) = layouts::emulate(physical, &self.prefs.layout, modifiers.shift) {
-                            self.session.type_text(&ch.to_string());
-                        }
+                        let mapped = if let Some(emulator) = &self.emulator {
+                            emulator.translate(physical, modifiers.shift)
+                        } else {
+                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
+                        };
+                        if let Some(text) = mapped { self.session.type_text(&text); }
                     }
                 }
                 egui::Event::Text(text) if self.mode == Mode::System =>
@@ -155,17 +161,21 @@ impl Typefinch {
                 .selected_text(layouts::get(&self.prefs.layout).name)
                 .show_ui(ui, |ui| {
                     for l in layouts::CATALOG {
-                        let suffix = if l.rows.is_some() { " · emulatable" } else { " · recognized" };
+                        let suffix = if l.rows.is_some() { " · built-in" } else { " · XKB if installed" };
                         ui.selectable_value(&mut self.prefs.layout, l.id.to_owned(), format!("{}{}", l.name, suffix));
                     }
                 });
             if self.prefs.layout != last {
-                if layouts::get(&self.prefs.layout).rows.is_none() { self.mode = Mode::System; }
+                self.emulator = Emulator::compile(&self.prefs.layout).ok();
+                if self.emulator.is_none() && layouts::get(&self.prefs.layout).rows.is_none() {
+                    self.mode = Mode::System;
+                    self.message = "The selected XKB layout/variant is not installed; using OS input.".into();
+                }
                 self.save();
             }
             ui.separator();
             ui.selectable_value(&mut self.mode, Mode::System, "OS input");
-            if layouts::get(&self.prefs.layout).rows.is_some() {
+            if self.emulator.is_some() || layouts::get(&self.prefs.layout).rows.is_some() {
                 ui.selectable_value(&mut self.mode, Mode::Emulated, "Software emulation");
             } else {
                 ui.add_enabled(false, egui::Button::new("Software emulation (not available)"));
@@ -173,7 +183,7 @@ impl Typefinch {
         });
         if self.mode == Mode::Emulated {
             ui.colored_label(PERIWINKLE, "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
-            ui.small("Requires the native backend to supply physical keys. Dead keys, AltGr, Compose and IME are not supported by these starter tables.");
+            ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });
         }
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {

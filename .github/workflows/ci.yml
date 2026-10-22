@@ -27,6 +27,8 @@ jobs:
         with:
           name: typefinch-gui-smoke
           path: |
-            typefinch-gui-smoke.png
+            typefinch-window.png
+            typefinch-light.png
+            typefinch-dark.png
             typefinch-gui-smoke.log
           if-no-files-found: ignore

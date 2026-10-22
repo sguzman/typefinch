@@ -10,8 +10,10 @@ wm_pid=""
 cleanup() {
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
   if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
-  if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/typefinch-window.png" ]]; then
-    cp "$tmp/typefinch-window.png" "$GITHUB_WORKSPACE/typefinch-gui-smoke.png"
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+    for img in typefinch-window.png typefinch-light.png typefinch-dark.png; do
+      if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
+    done
   fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/app.log" ]]; then
     cp "$tmp/app.log" "$GITHUB_WORKSPACE/typefinch-gui-smoke.log"
@@ -75,3 +77,43 @@ if [[ ! -s "$tmp/typefinch-window.png" ]]; then
   echo "GUI screenshot missing"; exit 1
 fi
 echo "Native X11 window and synthetic typing session both verified."
+
+# Validate *explicit* appearance overrides on real native rendered frames.
+# System-default screenshot above is still separately preserved.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+for theme in light dark; do
+  python3 - "$XDG_CONFIG_HOME/typefinch/settings.json" "$theme" <<'PY'
+import json,sys
+path=sys.argv[1]
+with open(path,encoding="utf-8") as f: data=json.load(f)
+data["theme"]=sys.argv[2]
+with open(path,"w",encoding="utf-8") as f: json.dump(data,f)
+PY
+  ./target/debug/typefinch >"$tmp/app-$theme.log" 2>&1 &
+  app_pid=$!
+  window=""
+  for _ in $(seq 1 60); do
+    window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+    [[ -n "$window" ]] && break
+    if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-$theme.log"; exit 1; fi
+    sleep 0.25
+  done
+  [[ -n "$window" ]] || { echo "No $theme window"; exit 1; }
+  xdotool windowactivate --sync "$window"
+  sleep 0.5
+  import -window "$window" "$tmp/typefinch-$theme.png"
+  [[ -s "$tmp/typefinch-$theme.png" ]] || { echo "Missing $theme screenshot"; exit 1; }
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+  app_pid=""
+done
+light_luma="$(identify -format '%[fx:mean]' "$tmp/typefinch-light.png")"
+dark_luma="$(identify -format '%[fx:mean]' "$tmp/typefinch-dark.png")"
+python3 - "$light_luma" "$dark_luma" <<'PY'
+import sys
+light,dark=map(float,sys.argv[1:3])
+assert light > dark + 0.25,(light,dark)
+print(f"Theme render PASS: light luminance={light:.3f}, dark={dark:.3f}")
+PY

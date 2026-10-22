@@ -24,7 +24,11 @@ pub struct Typefinch {
 }
 impl Typefinch {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let prefs = Preferences::load();
+        let mut prefs = Preferences::load();
+        if std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+            // Opt-in synthetic GUI test process only, never persisted to a real profile.
+            prefs.duration_seconds = 2;
+        }
         cc.egui_ctx.set_theme(match prefs.theme {
             Theme::System => egui::ThemePreference::System,
             Theme::Light => egui::ThemePreference::Light,
@@ -58,9 +62,26 @@ impl Typefinch {
         profile.best_wpm = profile.best_wpm.max(result.wpm);
         profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
         self.save();
+        if let Err(err) = crate::qa::write_smoke_report(&self.session, profile.tests) {
+            self.message = format!("QA report failed: {err}");
+        }
+    }
+    fn start_test(&mut self, ctx: &egui::Context) {
+        self.session.begin();
+        ctx.memory_mut(|m| m.request_focus(egui::Id::new("typing_surface")));
     }
     fn apply_events(&mut self, ctx: &egui::Context) {
         if self.session.state != State::Running { return; }
+        if !ctx.input(|i| i.focused) {
+            // A window losing focus must not collect invisible typing events.
+            self.session.state = State::Ready;
+            self.message = "Session canceled on window focus loss. No result saved.".into();
+            return;
+        }
+        if !ctx.memory(|m| m.has_focus(egui::Id::new("typing_surface"))) {
+            // Deliberately do not count keystrokes aimed at settings/profile widgets.
+            return;
+        }
         let events = ctx.input(|i| i.events.clone());
         for event in events {
             match event {
@@ -215,7 +236,7 @@ impl Typefinch {
         ui.heading("⌨️  Typing test");
         ui.horizontal_wrapped(|ui| {
             let name = if self.session.state == State::Running { "↻ Restart" } else { "▶ Start test" };
-            if ui.button(name).clicked() { self.session.begin(); }
+            if ui.button(name).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
             ui.label(match self.session.state {
                 State::Ready=>"Ready · press Start to capture typing",
@@ -253,7 +274,19 @@ impl Typefinch {
                 ..Default::default()
             });
         }
-        ui.label(job);
+        let typing_area = egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| {
+                ui.set_min_height(135.0);
+                ui.label(job);
+                ui.small("Click here to refocus typing, or press F5 to start/restart.");
+            });
+        let response = ui.interact(
+            typing_area.response.rect,
+            egui::Id::new("typing_surface"),
+            egui::Sense::click()
+        );
+        if response.clicked() { response.request_focus(); }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
     fn show_export(&mut self, ui: &mut egui::Ui) {
@@ -270,6 +303,9 @@ impl Typefinch {
 }
 impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
+            self.start_test(ctx);
+        }
         let before = self.session.state;
         self.apply_events(ctx);
         self.session.tick();

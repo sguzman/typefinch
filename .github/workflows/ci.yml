@@ -11,10 +11,22 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils
       - name: Verify acceptance ledger
         run: python3 tools/verify_progress.py && python3 tools/render_roadmap.py --check
       - name: Build
         run: cargo check --all-targets
       - name: Test
         run: cargo test --all-targets
+      - name: Build graphical executable
+        run: cargo build
+      - name: X11 graphical smoke test (software-rendered)
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typefinch-gui-smoke
+          path: |
+            typefinch-gui-smoke.png
+            typefinch-gui-smoke.log
+          if-no-files-found: ignore

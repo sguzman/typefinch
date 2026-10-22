@@ -1,12 +1,35 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
 use std::time::{Duration, Instant};
+use serde::{Serialize, Deserialize};
 
 pub const WORDS: &str = "little finches practice every day with patient rhythm gentle wings make steady progress while fingers learn their keys accuracy grows through focused practice kind habits build confident typing and each new session brings another chance to improve";
 
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TestMode { #[default] Words, Quotes, Numbers, Punctuation }
+impl TestMode {
+    pub const ALL: [TestMode;4] = [Self::Words, Self::Quotes, Self::Numbers, Self::Punctuation];
+    pub fn label(self) -> &'static str {
+        match self { Self::Words=>"Words", Self::Quotes=>"Quotes", Self::Numbers=>"Numbers", Self::Punctuation=>"Punctuation" }
+    }
+    pub fn key(self) -> &'static str {
+        match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation" }
+    }
+}
+fn corpus(mode: TestMode) -> String {
+    let (text, repeats) = match mode {
+        TestMode::Words => (WORDS, 8),
+        TestMode::Quotes => ("A small improvement, repeated carefully, becomes a remarkable skill. Every key is another opportunity to learn.", 14),
+        TestMode::Numbers => ("17 42 63 85 91 24 56 78 30 49 12 75 64 83 29 50 04 68", 28),
+        TestMode::Punctuation => ("Wait, is that correct? Yes! Write clearly: commas, colons; parentheses (like these), and a final period.", 13),
+    };
+    std::iter::repeat_n(text, repeats).collect::<Vec<_>>().join(" ")
+}
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum State { Ready, Running, Finished }
 
 pub struct Session {
+    pub mode: TestMode,
     pub target: String,
     pub typed: String,
     pub duration: Duration,
@@ -25,9 +48,10 @@ pub struct Score {
 }
 
 impl Session {
-    pub fn new(seconds: u64) -> Self {
-        let target = std::iter::repeat_n(WORDS, 8).collect::<Vec<_>>().join(" ");
-        Self { target, typed: String::new(), duration: Duration::from_secs(seconds), state: State::Ready, started: None, elapsed: Duration::ZERO, corrections: 0 }
+    pub fn new(seconds: u64) -> Self { Self::new_with_mode(seconds, TestMode::Words) }
+    pub fn new_with_mode(seconds: u64, mode: TestMode) -> Self {
+        Self { mode, target:corpus(mode), typed:String::new(), duration:Duration::from_secs(seconds),
+            state:State::Ready, started:None, elapsed:Duration::ZERO, corrections:0 }
     }
     pub fn begin(&mut self) {
         self.typed.clear();
@@ -80,6 +104,13 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn distinct_content_modes_build_different_targets() {
+        let targets:Vec<_> = TestMode::ALL.iter().map(|mode|Session::new_with_mode(30,*mode).target).collect();
+        let mut unique=std::collections::HashSet::new();
+        for t in &targets { assert!(unique.insert(t)); assert!(t.len()>300); }
+        assert!(Session::new_with_mode(30,TestMode::Numbers).target.contains("42"));
+        assert!(Session::new_with_mode(30,TestMode::Punctuation).target.contains('?'));
+    }
     #[test] fn scoring_is_position_based() {
         let a = score("cat", "cut", Duration::from_secs(60));
         assert_eq!(a.correct, 2);

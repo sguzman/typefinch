@@ -137,7 +137,7 @@ impl Typefinch {
         ui.heading("Your perch");
         let previous = self.prefs.active_profile;
         ui.add_enabled_ui(self.session.state != State::Running, |ui| {
-          ui.horizontal_wrapped(|ui| {
+          ui.vertical(|ui| {
             egui::ComboBox::from_id_salt("profile").selected_text(&self.prefs.profiles[self.prefs.active_profile].name)
                 .show_ui(ui, |ui| {
                     for (i, profile) in self.prefs.profiles.iter().enumerate() {
@@ -172,7 +172,7 @@ impl Typefinch {
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading("Test setup");
-        ui.horizontal_wrapped(|ui| {
+        ui.vertical(|ui| {
             ui.label("Duration");
             let previous = self.prefs.duration_seconds;
             egui::ComboBox::from_id_salt("duration").selected_text(format!("{} seconds", previous))
@@ -189,7 +189,7 @@ impl Typefinch {
                     self.save();
                 }
             }
-            ui.separator();
+            ui.add_space(6.0);
             ui.label("Theme");
             let previous = self.prefs.theme;
             egui::ComboBox::from_id_salt("theme").selected_text(match previous {
@@ -208,14 +208,14 @@ impl Typefinch {
                 self.save();
             }
         });
-        ui.horizontal_wrapped(|ui| {
+        ui.vertical(|ui| {
             ui.label("Target layout");
             let last = self.prefs.layout.clone();
             let selected_name = self.installed_layouts.iter()
                 .find(|l|l.id==self.prefs.layout).map(|l|l.name.as_str())
                 .or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
                 .unwrap_or("Unknown layout");
-            egui::ComboBox::from_id_salt("layout").width(255.0)
+            egui::ComboBox::from_id_salt("layout").width(ui.available_width().min(270.0))
                 .selected_text(selected_name)
                 .show_ui(ui, |ui| {
                     let filter = self.layout_search.trim().to_lowercase();
@@ -265,8 +265,8 @@ impl Typefinch {
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
         ui.heading("Connected keyboards");
-        ui.horizontal_wrapped(|ui| {
-            if ui.button("↻ Refresh").clicked() {
+        ui.vertical(|ui| {
+            if ui.button("Refresh device list").clicked() {
                 (self.keyboards, self.device_error) = Self::query_devices();
                 self.device_index = 0;
             }

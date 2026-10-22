@@ -388,17 +388,23 @@ impl Typefinch {
     }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
-        ui.label("Static SVG snapshot, no scripts or hosting required. Share it in a profile README.");
-        if ui.button("Export SVG").clicked() {
-            let p = &self.prefs.profiles[self.prefs.active_profile];
-            let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
-                .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
-                .unwrap_or("Custom XKB");
-            self.message = match export::save_card(p, display) {
-                Ok(path) => format!("Exported: {}", path.display()),
-                Err(e) => format!("Export failed: {e}"),
-            };
-        }
+        ui.label("Export a static SVG card and matching Markdown for your GitHub profile.");
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Export SVG + Markdown").clicked() {
+                let p = &self.prefs.profiles[self.prefs.active_profile];
+                let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
+                    .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+                    .unwrap_or("Custom XKB");
+                self.message = match export::save_widget(p, display) {
+                    Ok((svg, md)) => format!("Exported: {} and {}", svg.display(), md.display()),
+                    Err(e) => format!("Export failed: {e}"),
+                };
+            }
+            if ui.button("Copy GitHub Markdown").clicked() {
+                ui.ctx().copy_text(export::markdown_embed().to_owned());
+                self.message = "Markdown image embed copied to clipboard.".into();
+            }
+        });
     }
 }
 impl eframe::App for Typefinch {

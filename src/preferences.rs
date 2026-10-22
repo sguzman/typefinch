@@ -1,5 +1,6 @@
 //! Local user-controlled configuration; no online identity.
 use serde::{Deserialize, Serialize};
+use crate::engine::TestMode;
 use std::{fs, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,13 +23,14 @@ impl Default for Profile {
 #[serde(default)]
 pub struct Preferences {
     pub theme: Theme,
+    pub test_mode: TestMode,
     pub layout: String,
     pub profiles: Vec<Profile>,
     pub active_profile: usize,
     pub duration_seconds: u64,
 }
 impl Default for Preferences {
-    fn default() -> Self { Self { theme:Theme::System, layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
+    fn default() -> Self { Self { theme:Theme::System, test_mode:TestMode::Words, layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
 }
 pub fn base_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)
@@ -66,5 +68,6 @@ mod tests {
         let b=serde_json::to_vec(&p).unwrap();
         let q: Preferences=serde_json::from_slice(&b).unwrap();
         assert_eq!(q.layout, "us");
+        assert_eq!(q.test_mode, TestMode::Words);
     }
 }

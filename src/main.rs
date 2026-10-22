@@ -6,6 +6,7 @@ mod history;
 mod export;
 mod layouts;
 mod preferences;
+mod registry;
 mod qa;
 mod xkb;
 

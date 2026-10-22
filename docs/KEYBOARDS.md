@@ -33,3 +33,7 @@ Acceptance: hotplug two keyboards; map both with differing layouts; verify focus
 ## XKB compiler (new implementation)
 
 Where `xkeyboard-config` has a matching layout/variant, Typefinch can compile the installed keymap with `libxkbcommon` and remap common physical ANSI keys inside the application. This broadens *potentially emulatable* entries beyond the four built-in tables, with locale-specific symbols rather than guessed character mappings. This still is **not** complete emulation for AltGr, dead-key Compose, IMEs, ISO/JIS physical extras or per-device input attribution. An unavailable XKB preset remains recognition-only.
+
+## Installed XKB registry discovery
+
+At startup, Typefinch reads the local read-only xkeyboard-config rules inventory at `$XKB_CONFIG_ROOT/rules/evdev.lst` (default `/usr/share/X11/xkb/rules/evdev.lst`). It parses base layouts and named variants, deduplicates identities, and lets the user filter the installed list by name or ID alongside curated presets. Choosing an installed entry compiles its map through libxkbcommon where available. Registry discovery itself does not guarantee correct physical geometry, AltGr, Compose or IME support. A missing rules file disables extra discovery without preventing native typing.

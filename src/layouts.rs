@@ -64,8 +64,11 @@ pub const CATALOG: &[Layout] = &[
     Layout { id:"jp", name:"Japanese", region:"East Asia", rows:None },
     Layout { id:"kr", name:"Korean", region:"East Asia", rows:None },
 ];
+pub fn find(id: &str) -> Option<&'static Layout> {
+    CATALOG.iter().find(|l| l.id == id)
+}
 pub fn get(id: &str) -> &'static Layout {
-    CATALOG.iter().find(|l| l.id == id).unwrap_or(&CATALOG[0])
+    find(id).unwrap_or(&CATALOG[0])
 }
 pub fn physical_index(key: egui::Key) -> Option<(usize, usize)> {
     const TOP: &str = "qwertyuiop";
@@ -85,7 +88,7 @@ pub fn physical_index(key: egui::Key) -> Option<(usize, usize)> {
 pub fn emulate(key: egui::Key, id: &str, shift: bool) -> Option<char> {
     if key == egui::Key::Space { return Some(' '); }
     let (row, col) = physical_index(key)?;
-    let mapped = get(id).rows?[row].chars().nth(col)?;
+    let mapped = find(id)?.rows?[row].chars().nth(col)?;
     Some(if shift { shifted(mapped) } else { mapped })
 }
 fn shifted(ch: char) -> char {
@@ -107,6 +110,9 @@ mod tests {
         assert_eq!(emulate(egui::Key::Q, "us(dvorak)", false), Some('\''));
         assert_eq!(emulate(egui::Key::E, "us", true), Some('E'));
         assert_eq!(emulate(egui::Key::Space, "us(colemak_dh)", false), Some(' '));
+    }
+    #[test] fn unknown_layout_never_silently_emulates_us() {
+        assert_eq!(emulate(egui::Key::Q, "unknown-layout", false), None);
     }
     #[test] fn recognition_is_not_false_emulation() {
         assert_eq!(emulate(egui::Key::Q, "ara", false), None);

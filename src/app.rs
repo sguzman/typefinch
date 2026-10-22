@@ -5,6 +5,7 @@ use crate::{
     history::{self, Record},
     layouts::{self, Mode},
     preferences::{Preferences, Profile, Theme},
+    registry::{self, InstalledLayout},
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
@@ -17,6 +18,8 @@ pub struct Typefinch {
     session: Session,
     mode: Mode,
     emulator: Option<Emulator>,
+    installed_layouts: Vec<InstalledLayout>,
+    layout_search: String,
     history: Vec<Record>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
@@ -45,8 +48,9 @@ impl Typefinch {
         let (keyboards, device_error) = Self::query_devices();
         let session = Session::new(prefs.duration_seconds);
         let emulator = Emulator::compile(&prefs.layout).ok();
+        let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        Self { prefs, session, mode: Mode::System, emulator, history, keyboards, device_error,
+        Self { prefs, session, mode: Mode::System, emulator, installed_layouts, layout_search: String::new(), history, keyboards, device_error,
                device_index: 0, new_profile: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -205,19 +209,38 @@ impl Typefinch {
             }
         });
         ui.horizontal_wrapped(|ui| {
-            ui.label("Keyboard layout");
+            ui.label("Target layout");
             let last = self.prefs.layout.clone();
-            egui::ComboBox::from_id_salt("layout").width(270.0)
-                .selected_text(layouts::get(&self.prefs.layout).name)
+            let selected_name = self.installed_layouts.iter()
+                .find(|l|l.id==self.prefs.layout).map(|l|l.name.as_str())
+                .or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+                .unwrap_or("Unknown layout");
+            egui::ComboBox::from_id_salt("layout").width(255.0)
+                .selected_text(selected_name)
                 .show_ui(ui, |ui| {
+                    let filter = self.layout_search.trim().to_lowercase();
                     for l in layouts::CATALOG {
+                        if !filter.is_empty() && !format!("{} {} {}",l.name,l.id,l.region).to_lowercase().contains(&filter) { continue; }
                         let suffix = if l.rows.is_some() { " · built-in" } else { " · XKB if installed" };
                         ui.selectable_value(&mut self.prefs.layout, l.id.to_owned(), format!("{}{}", l.name, suffix));
+                    }
+                    if filter.is_empty() {
+                        ui.label("Search below to browse installed XKB variants.");
+                    } else {
+                        let mut count=0;
+                        for l in &self.installed_layouts {
+                            if layouts::find(&l.id).is_some() { continue; }
+                            if !format!("{} {}",l.name,l.id).to_lowercase().contains(&filter) { continue; }
+                            if count>=60 { break; }
+                            ui.selectable_value(&mut self.prefs.layout, l.id.clone(), format!("{} · XKB",l.name));
+                            count+=1;
+                        }
+                        if count>=60 { ui.label("Showing first 60 matches; refine search."); }
                     }
                 });
             if self.prefs.layout != last {
                 self.emulator = Emulator::compile(&self.prefs.layout).ok();
-                if self.emulator.is_none() && layouts::get(&self.prefs.layout).rows.is_none() {
+                if self.emulator.is_none() && !layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some()) {
                     self.mode = Mode::System;
                     self.message = "The selected XKB layout/variant is not installed; using OS input.".into();
                 }
@@ -225,13 +248,16 @@ impl Typefinch {
             }
             ui.separator();
             ui.selectable_value(&mut self.mode, Mode::System, "OS input");
-            if self.emulator.is_some() || layouts::get(&self.prefs.layout).rows.is_some() {
+            if self.emulator.is_some() || layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some()) {
                 ui.selectable_value(&mut self.mode, Mode::Emulated, "Software emulation");
             } else {
                 ui.add_enabled(false, egui::Button::new("Software emulation (not available)"));
             }
         });
-        ui.small(format!("Layout family: {} · XKB compiled: {}", layouts::get(&self.prefs.layout).region, if self.emulator.is_some() { "yes" } else { "no" }));
+        ui.add(egui::TextEdit::singleline(&mut self.layout_search).hint_text("Search installed layouts / variants").desired_width(285.0));
+        ui.small(format!("{} system XKB layouts and variants discovered · emulation compiled: {}",
+            self.installed_layouts.len(), if self.emulator.is_some() { "yes" } else { "no" }));
+        ui.small("OS input follows the active system layout; this selection controls the emulation target.");
         if self.mode == Mode::Emulated {
             ui.colored_label(PERIWINKLE, "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
             ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });
@@ -346,7 +372,10 @@ impl Typefinch {
         ui.label("Static SVG snapshot, no scripts or hosting required. Share it in a profile README.");
         if ui.button("↓ Export SVG").clicked() {
             let p = &self.prefs.profiles[self.prefs.active_profile];
-            self.message = match export::save_card(p, layouts::get(&self.prefs.layout).name) {
+            let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
+                .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+                .unwrap_or("Custom XKB");
+            self.message = match export::save_card(p, display) {
                 Ok(path) => format!("Exported: {}", path.display()),
                 Err(e) => format!("Export failed: {e}"),
             };

@@ -2,17 +2,17 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██░░░░░░░░ 19%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██░░░░░░░░ 22%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████░░░░░░ 38%`
+## 🐣 M0 — Native typing MVP — `████░░░░░░ 44%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
-### 🧱 P0 — Foundation and visual identity — `█████░░░░░ 50%`
+### 🧱 P0 — Foundation and visual identity — `██████░░░░ 59%`
 
-- 🦀 **T001** Rust/egui application — `███░░░░░░░ 33%`
+- 🦀 **T001** Rust/egui application — `███████░░░ 67%`
   - [x] Native shell committed — Cargo.toml; src/main.rs
-  - [ ] CI native build passes
+  - [x] CI native build passes — GitHub Actions run 39867817749: cargo check succeeded
   - [ ] Live Hyprland window screenshot
 - 🎨 **T002** Perceptual OKLCH project color — `███████░░░ 67%`
   - [x] Color specified — docs/COLOR.md
@@ -42,17 +42,17 @@
   - [ ] Per-profile setting persistence
   - [ ] Export/import
 
-### ⌨️ P2 — Tests and core scoring — `████░░░░░░ 38%`
+### ⌨️ P2 — Tests and core scoring — `█████░░░░░ 45%`
 
 - ⚡ **T201** Typing input and session lifecycle — `█████░░░░░ 50%`
   - [x] Input handlers implemented — src/app.rs
   - [x] Start/cancel/restart coded — src/engine.rs
   - [ ] End-to-end text/paste/focus QA
   - [ ] IME support
-- 📏 **T202** WPM and accuracy calculations — `███████░░░ 67%`
+- 📏 **T202** WPM and accuracy calculations — `██████████ 100%`
   - [x] Pure scoring function implemented — src/engine.rs
   - [x] Scoring tests authored — src/engine.rs
-  - [ ] CI scoring tests pass
+  - [x] CI scoring tests pass — GitHub Actions run 39867817749: all 11 Rust unit tests passed
 - ⏱️ **T203** Timed tests — `█████░░░░░ 50%`
   - [x] Four durations coded — src/app.rs
   - [x] Monotonic timer coded — src/engine.rs
@@ -68,6 +68,12 @@
   - [ ] Per-language speed definitions
   - [ ] Pause/focus/repeat rules
   - [ ] Anti-cheat tests
+
+**Feature inventory** (computed from associated task progress):
+
+- ⌨️ Typing tests — `█████░░░░░ 45%`
+- 🐦 Local identity — `██░░░░░░░░ 22%`
+- 🌗 Appearance — `██████░░░░ 56%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `██░░░░░░░░ 24%`
 
@@ -116,6 +122,12 @@
   - [ ] Opt-in backend
   - [ ] No global interception verification
 
+**Feature inventory** (computed from associated task progress):
+
+- 🗺️ Layout recognition — `████░░░░░░ 44%`
+- 🔀 Software layout emulation — `█░░░░░░░░░ 13%`
+- 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
+
 ## 🎓 M2 — Typing academy — `░░░░░░░░░░ 0%`
 
 **Acceptance gate:** Adaptive lessons, weak-key drills, and course progression.
@@ -139,6 +151,11 @@
   - [ ] Challenge UI
   - [ ] Performance summaries
 
+**Feature inventory** (computed from associated task progress):
+
+- 🎓 Structured curriculum — `░░░░░░░░░░ 0%`
+- 🧠 Adaptive exercises — `░░░░░░░░░░ 0%`
+
 ## 📊 M3 — Statistics and achievements — `█░░░░░░░░░ 8%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
@@ -161,6 +178,11 @@
   - [ ] Rules and earned records
   - [ ] Celebration UI
   - [ ] Optional streaks
+
+**Feature inventory** (computed from associated task progress):
+
+- 📊 Statistics — `█░░░░░░░░░ 11%`
+- 🏆 Achievements — `░░░░░░░░░░ 0%`
 
 ## 🎨 M4 — Profile card studio — `█░░░░░░░░░ 13%`
 
@@ -186,6 +208,11 @@
   - [ ] Safe credentials
   - [ ] Offline failure handling
 
+**Feature inventory** (computed from associated task progress):
+
+- 🐤 GitHub widget — `██░░░░░░░░ 17%`
+- 🔄 Publishing automation — `░░░░░░░░░░ 0%`
+
 ## 🌎 M5 — Multilingual typing — `░░░░░░░░░░ 0%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
@@ -209,15 +236,20 @@
   - [ ] Error highlighting
   - [ ] RTL tests
 
-## 📦 M6 — Release quality — `█░░░░░░░░░ 8%`
+**Feature inventory** (computed from associated task progress):
+
+- 🌏 Languages — `░░░░░░░░░░ 0%`
+- 🔤 Unicode correctness — `░░░░░░░░░░ 0%`
+
+## 📦 M6 — Release quality — `██░░░░░░░░ 17%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `█░░░░░░░░░ 8%`
+### 🧪 P9 — Acceptance and release — `██░░░░░░░░ 17%`
 
-- 🧪 **T901** CI and acceptance-ledger validation — `███░░░░░░░ 33%`
+- 🧪 **T901** CI and acceptance-ledger validation — `███████░░░ 67%`
   - [x] Workflow authored — .github/workflows/ci.yml
-  - [ ] CI build/test green
+  - [x] CI build/test green — GitHub Actions run 39867817749: cargo check and cargo test passed
   - [ ] Roadmap drift verified
 - 🪟 **T902** Live Hyprland automation — `░░░░░░░░░░ 0%`
   - [ ] Headless run
@@ -231,4 +263,9 @@
   - [ ] Versioned packages
   - [ ] Install/rollback tests
   - [ ] MVP gate accepted
+
+**Feature inventory** (computed from associated task progress):
+
+- 🧪 Automated QA — `███░░░░░░░ 34%`
+- 🚀 Release readiness — `░░░░░░░░░░ 0%`
 

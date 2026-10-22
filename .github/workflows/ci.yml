@@ -13,7 +13,7 @@ jobs:
       - name: Native dependencies
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config
       - name: Verify acceptance ledger
-        run: python3 tools/verify_progress.py
+        run: python3 tools/verify_progress.py && python3 tools/render_roadmap.py --check
       - name: Build
         run: cargo check --all-targets
       - name: Test

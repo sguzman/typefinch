@@ -17,7 +17,7 @@
               "id": "T001",
               "emoji": "🦀",
               "name": "Rust/egui application",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Native shell committed",
@@ -26,7 +26,8 @@
                 },
                 {
                   "text": "CI native build passes",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions run 39867817749: cargo check succeeded"
                 },
                 {
                   "text": "Live Hyprland window screenshot",
@@ -205,7 +206,7 @@
               "id": "T202",
               "emoji": "📏",
               "name": "WPM and accuracy calculations",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Pure scoring function implemented",
@@ -219,7 +220,8 @@
                 },
                 {
                   "text": "CI scoring tests pass",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions run 39867817749: all 11 Rust unit tests passed"
                 }
               ]
             },
@@ -298,6 +300,37 @@
                 }
               ]
             }
+          ]
+        }
+      ],
+      "features": [
+        {
+          "emoji": "⌨️",
+          "name": "Typing tests",
+          "task_ids": [
+            "T201",
+            "T202",
+            "T203",
+            "T204",
+            "T205"
+          ]
+        },
+        {
+          "emoji": "🐦",
+          "name": "Local identity",
+          "task_ids": [
+            "T101",
+            "T102",
+            "T103"
+          ]
+        },
+        {
+          "emoji": "🌗",
+          "name": "Appearance",
+          "task_ids": [
+            "T002",
+            "T003",
+            "T004"
           ]
         }
       ]
@@ -513,6 +546,35 @@
             }
           ]
         }
+      ],
+      "features": [
+        {
+          "emoji": "🗺️",
+          "name": "Layout recognition",
+          "task_ids": [
+            "T301",
+            "T401",
+            "T403"
+          ]
+        },
+        {
+          "emoji": "🔀",
+          "name": "Software layout emulation",
+          "task_ids": [
+            "T302",
+            "T303",
+            "T304",
+            "T305"
+          ]
+        },
+        {
+          "emoji": "🔌",
+          "name": "Multi-keyboard selection",
+          "task_ids": [
+            "T402",
+            "T404"
+          ]
+        }
       ]
     },
     {
@@ -606,6 +668,24 @@
                 }
               ]
             }
+          ]
+        }
+      ],
+      "features": [
+        {
+          "emoji": "🎓",
+          "name": "Structured curriculum",
+          "task_ids": [
+            "T501",
+            "T504"
+          ]
+        },
+        {
+          "emoji": "🧠",
+          "name": "Adaptive exercises",
+          "task_ids": [
+            "T502",
+            "T503"
           ]
         }
       ]
@@ -702,6 +782,24 @@
                 }
               ]
             }
+          ]
+        }
+      ],
+      "features": [
+        {
+          "emoji": "📊",
+          "name": "Statistics",
+          "task_ids": [
+            "T601",
+            "T602",
+            "T603"
+          ]
+        },
+        {
+          "emoji": "🏆",
+          "name": "Achievements",
+          "task_ids": [
+            "T604"
           ]
         }
       ]
@@ -805,6 +903,24 @@
             }
           ]
         }
+      ],
+      "features": [
+        {
+          "emoji": "🐤",
+          "name": "GitHub widget",
+          "task_ids": [
+            "T701",
+            "T702",
+            "T703"
+          ]
+        },
+        {
+          "emoji": "🔄",
+          "name": "Publishing automation",
+          "task_ids": [
+            "T704"
+          ]
+        }
       ]
     },
     {
@@ -900,6 +1016,24 @@
             }
           ]
         }
+      ],
+      "features": [
+        {
+          "emoji": "🌏",
+          "name": "Languages",
+          "task_ids": [
+            "T801",
+            "T803",
+            "T804"
+          ]
+        },
+        {
+          "emoji": "🔤",
+          "name": "Unicode correctness",
+          "task_ids": [
+            "T802"
+          ]
+        }
       ]
     },
     {
@@ -917,7 +1051,7 @@
               "id": "T901",
               "emoji": "🧪",
               "name": "CI and acceptance-ledger validation",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Workflow authored",
@@ -926,7 +1060,8 @@
                 },
                 {
                   "text": "CI build/test green",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions run 39867817749: cargo check and cargo test passed"
                 },
                 {
                   "text": "Roadmap drift verified",
@@ -994,6 +1129,24 @@
                 }
               ]
             }
+          ]
+        }
+      ],
+      "features": [
+        {
+          "emoji": "🧪",
+          "name": "Automated QA",
+          "task_ids": [
+            "T901",
+            "T902"
+          ]
+        },
+        {
+          "emoji": "🚀",
+          "name": "Release readiness",
+          "task_ids": [
+            "T903",
+            "T904"
           ]
         }
       ]

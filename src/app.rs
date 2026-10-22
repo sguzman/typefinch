@@ -61,8 +61,9 @@ impl Typefinch {
         profile.tests = profile.tests.saturating_add(1);
         profile.best_wpm = profile.best_wpm.max(result.wpm);
         profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
+        let completed_tests = profile.tests;
         self.save();
-        if let Err(err) = crate::qa::write_smoke_report(&self.session, profile.tests) {
+        if let Err(err) = crate::qa::write_smoke_report(&self.session, completed_tests) {
             self.message = format!("QA report failed: {err}");
         }
     }

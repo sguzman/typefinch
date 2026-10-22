@@ -24,7 +24,7 @@ impl Emulator {
     pub fn translate(&self, physical: Key, shift: bool) -> Option<String> {
         let evdev = evdev_code(physical)?;
         let mut state = xkb::State::new(&self.keymap);
-        if shift { state.update_key(xkb::Keycode::new(42 + 8), xkb::KEY_DOWN); }
+        if shift { state.update_key(xkb::Keycode::new(42 + 8), xkb::KeyDirection::Down); }
         let result = state.key_get_utf8(xkb::Keycode::new(evdev + 8));
         if result.is_empty() || result.chars().any(char::is_control) { None } else { Some(result) }
     }

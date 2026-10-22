@@ -397,11 +397,12 @@
               "id": "T303",
               "emoji": "🌐",
               "name": "libxkbcommon-backed full emulation",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Compile installed keymaps",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests"
                 },
                 {
                   "text": "Shift/AltGr/dead-key handling",
@@ -1051,7 +1052,7 @@
               "id": "T901",
               "emoji": "🧪",
               "name": "CI and acceptance-ledger validation",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Workflow authored",
@@ -1065,7 +1066,8 @@
                 },
                 {
                   "text": "Roadmap drift verified",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions 39868627924: render_roadmap.py --check passed"
                 }
               ]
             },

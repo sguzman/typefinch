@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██░░░░░░░░ 22%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██░░░░░░░░ 23%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `████░░░░░░ 44%`
 
@@ -75,11 +75,11 @@
 - 🐦 Local identity — `██░░░░░░░░ 22%`
 - 🌗 Appearance — `██████░░░░ 56%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `██░░░░░░░░ 24%`
+## 🗺️ M1 — Keyboard layout laboratory — `███░░░░░░░ 28%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `██░░░░░░░░ 17%`
+### 🧬 P3 — Recognition, emulation and geometry — `██░░░░░░░░ 23%`
 
 - 📖 **T301** Known layout catalog — `███░░░░░░░ 33%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -90,8 +90,8 @@
   - [x] Physical key event handling coded — src/app.rs
   - [ ] Native mapping QA
   - [ ] Full modifiers and punctuation layers
-- 🌐 **T303** libxkbcommon-backed full emulation — `░░░░░░░░░░ 0%`
-  - [ ] Compile installed keymaps
+- 🌐 **T303** libxkbcommon-backed full emulation — `███░░░░░░░ 33%`
+  - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
   - [ ] Shift/AltGr/dead-key handling
   - [ ] Layout regression corpus
 - 🛠️ **T304** User-editable custom layouts — `░░░░░░░░░░ 0%`
@@ -125,7 +125,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `████░░░░░░ 44%`
-- 🔀 Software layout emulation — `█░░░░░░░░░ 13%`
+- 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
 ## 🎓 M2 — Typing academy — `░░░░░░░░░░ 0%`
@@ -241,16 +241,16 @@
 - 🌏 Languages — `░░░░░░░░░░ 0%`
 - 🔤 Unicode correctness — `░░░░░░░░░░ 0%`
 
-## 📦 M6 — Release quality — `██░░░░░░░░ 17%`
+## 📦 M6 — Release quality — `███░░░░░░░ 25%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `██░░░░░░░░ 17%`
+### 🧪 P9 — Acceptance and release — `███░░░░░░░ 25%`
 
-- 🧪 **T901** CI and acceptance-ledger validation — `███████░░░ 67%`
+- 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
   - [x] CI build/test green — GitHub Actions run 39867817749: cargo check and cargo test passed
-  - [ ] Roadmap drift verified
+  - [x] Roadmap drift verified — GitHub Actions 39868627924: render_roadmap.py --check passed
 - 🪟 **T902** Live Hyprland automation — `░░░░░░░░░░ 0%`
   - [ ] Headless run
   - [ ] Keyboard/input QA
@@ -266,6 +266,6 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🧪 Automated QA — `███░░░░░░░ 34%`
+- 🧪 Automated QA — `█████░░░░░ 50%`
 - 🚀 Release readiness — `░░░░░░░░░░ 0%`
 

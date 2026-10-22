@@ -12,9 +12,9 @@
 | Dvorak | ✅ | ✅ ANSI base layer |
 | Colemak | ✅ | ✅ ANSI base layer |
 | Colemak-DH | ✅ | ✅ ANSI base layer |
-| Workman, Norman, Halmak, Canary, Engram, Semimak | ✅ | Planned |
-| QWERTZ, AZERTY, BÉPO, Neo 2, Turkish F | ✅ | Planned |
-| Spanish, Latin American, Nordic, Cyrillic, Greek | ✅ | Planned |
+| Workman, Norman, Halmak, Canary, Engram, Semimak | ✅ | XKB if installed; complete modifier/IME QA planned |
+| QWERTZ, AZERTY, BÉPO, Neo 2, Turkish F | ✅ | XKB if installed; complete modifier/IME QA planned |
+| Spanish, Latin American, Nordic, Cyrillic, Greek | ✅ | XKB if installed; complete modifier/IME QA planned |
 | Arabic, Hebrew, Japanese, Korean and more | ✅ | Planned; IME/BiDi/geometry complexities |
 
 The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommon`, plus custom layout editing, physical geometry, modifier and dead-key correctness. Do not falsely present conceptual named layouts as installed or emulatable.

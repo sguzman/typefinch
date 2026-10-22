@@ -145,7 +145,7 @@ impl Typefinch {
                     }
                 });
             ui.add(egui::TextEdit::singleline(&mut self.new_profile).hint_text("New local profile").desired_width(190.0));
-            if ui.button("＋ Create").clicked() {
+            if ui.button("Create profile").clicked() {
                 let name = self.new_profile.trim();
                 if !name.is_empty() && name.chars().count() <= 32 {
                     self.prefs.profiles.push(Profile { name: name.to_owned(), ..Default::default() });
@@ -196,8 +196,8 @@ impl Typefinch {
                 Theme::System=>"System (default)", Theme::Light=>"Light", Theme::Dark=>"Dark",
             }).show_ui(ui, |ui| {
                 ui.selectable_value(&mut self.prefs.theme, Theme::System, "System");
-                ui.selectable_value(&mut self.prefs.theme, Theme::Light, "☀ Light");
-                ui.selectable_value(&mut self.prefs.theme, Theme::Dark, "🌙 Dark");
+                ui.selectable_value(&mut self.prefs.theme, Theme::Light, "Light");
+                ui.selectable_value(&mut self.prefs.theme, Theme::Dark, "Dark");
             });
             if previous != self.prefs.theme {
                 ctx.set_theme(match self.prefs.theme {
@@ -290,7 +290,7 @@ impl Typefinch {
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
-            let name = if self.session.state == State::Running { "↻ Restart" } else { "▶ Start test" };
+            let name = if self.session.state == State::Running { "Restart test" } else { "Start test" };
             if ui.button(name).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
             ui.label(match self.session.state {
@@ -370,7 +370,7 @@ impl Typefinch {
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
         ui.label("Static SVG snapshot, no scripts or hosting required. Share it in a profile README.");
-        if ui.button("↓ Export SVG").clicked() {
+        if ui.button("Export SVG").clicked() {
             let p = &self.prefs.profiles[self.prefs.active_profile];
             let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
                 .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))

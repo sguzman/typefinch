@@ -2,13 +2,13 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███░░░░░░░ 26%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███░░░░░░░ 30%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████░░░░░ 52%`
+## 🐣 M0 — Native typing MVP — `██████░░░░ 57%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
-### 🧱 P0 — Foundation and visual identity — `██████░░░░ 59%`
+### 🧱 P0 — Foundation and visual identity — `██████░░░░ 61%`
 
 - 🦀 **T001** Rust/egui application — `███████░░░ 67%`
   - [x] Native shell committed — Cargo.toml; src/main.rs
@@ -18,9 +18,10 @@
   - [x] Color specified — docs/COLOR.md
   - [x] README swatch authored — assets/typefinch-color.svg
   - [ ] Contrast and accessibility audit
-- 🌗 **T003** System, Light and Dark modes — `███████░░░ 67%`
+- 🌗 **T003** System, Light and Dark modes — `████████░░ 75%`
   - [x] Three-way selector coded — src/app.rs
   - [x] Preference persistence coded — src/preferences.rs
+  - [x] Explicit Light and Dark rendered screenshots pass graphical CI — GitHub Actions 39872686067: light luminance 0.955 vs dark 0.125
   - [ ] Hyprland system theme transition verified
 - 🧭 **T004** Navigation and responsive egui shell — `███░░░░░░░ 33%`
   - [x] Main panels and controls coded — src/app.rs
@@ -42,7 +43,7 @@
   - [ ] Per-profile setting persistence
   - [ ] Export/import
 
-### ⌨️ P2 — Tests and core scoring — `█████░░░░░ 50%`
+### ⌨️ P2 — Tests and core scoring — `██████░░░░ 62%`
 
 - ⚡ **T201** Typing input and session lifecycle — `█████░░░░░ 50%`
   - [x] Input handlers implemented — src/app.rs
@@ -58,32 +59,33 @@
   - [x] Monotonic timer coded — src/engine.rs
   - [ ] Live timing edge-case QA
   - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
-- 📚 **T204** Word, quote, punctuation and custom tests — `███░░░░░░░ 25%`
+- 📚 **T204** Word, quote, punctuation and custom tests — `██████░░░░ 60%`
   - [x] Starter English corpus — src/engine.rs
-  - [ ] Quotes and paragraphs
-  - [ ] Punctuation and numbers
+  - [x] Quote passages — src/engine.rs quotes corpus; GitHub Actions 39872686067
+  - [ ] Dedicated paragraph test content
+  - [x] Punctuation and numbers — src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067
   - [ ] Custom/imported text
-- 🧮 **T205** Scoring taxonomy and fair comparisons — `░░░░░░░░░░ 0%`
+- 🧮 **T205** Scoring taxonomy and fair comparisons — `███░░░░░░░ 25%`
   - [ ] Raw vs corrected WPM
   - [ ] Per-language speed definitions
   - [ ] Pause/focus/repeat rules
-  - [ ] Anti-cheat tests
+  - [x] Anti-cheat tests — Real X11 Ctrl+V injection excluded from scored session; GitHub Actions 39872686067
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `█████░░░░░ 50%`
+- ⌨️ Typing tests — `██████░░░░ 62%`
 - 🐦 Local identity — `█████░░░░░ 45%`
-- 🌗 Appearance — `██████░░░░ 56%`
+- 🌗 Appearance — `██████░░░░ 58%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `███░░░░░░░ 28%`
+## 🗺️ M1 — Keyboard layout laboratory — `███░░░░░░░ 31%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `██░░░░░░░░ 23%`
+### 🧬 P3 — Recognition, emulation and geometry — `███░░░░░░░ 30%`
 
-- 📖 **T301** Known layout catalog — `███░░░░░░░ 33%`
+- 📖 **T301** Known layout catalog — `███████░░░ 67%`
   - [x] Curated identifiers and names coded — src/layouts.rs
-  - [ ] Discover installed XKB variants
+  - [x] Discover installed XKB variants — src/registry.rs; GitHub Actions 39872686067 discovered XKB layouts and passed 30 tests
   - [ ] Normalize identities and availability
 - 🔀 **T302** Starter software emulation — `█████░░░░░ 50%`
   - [x] Four initial ANSI row mappings coded — src/layouts.rs
@@ -124,7 +126,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🗺️ Layout recognition — `████░░░░░░ 44%`
+- 🗺️ Layout recognition — `██████░░░░ 56%`
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
@@ -184,11 +186,11 @@
 - 📊 Statistics — `█░░░░░░░░░ 11%`
 - 🏆 Achievements — `░░░░░░░░░░ 0%`
 
-## 🎨 M4 — Profile card studio — `█░░░░░░░░░ 13%`
+## 🎨 M4 — Profile card studio — `██░░░░░░░░ 21%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `█░░░░░░░░░ 13%`
+### 🐤 P7 — Widgets and publishing — `██░░░░░░░░ 21%`
 
 - 🪄 **T701** GitHub-safe SVG card — `█████░░░░░ 50%`
   - [x] SVG generator coded — src/export.rs
@@ -199,8 +201,8 @@
   - [ ] Template system
   - [ ] Color and type controls
   - [ ] Live preview
-- 📝 **T703** Markdown, PNG, JSON exports — `░░░░░░░░░░ 0%`
-  - [ ] README Markdown
+- 📝 **T703** Markdown, PNG, JSON exports — `███░░░░░░░ 33%`
+  - [x] README Markdown — src/export.rs produces paired local Markdown/SVG and validates the embed; GitHub Actions 39872686067
   - [ ] PNG renderer
   - [ ] Privacy-aware data exports
 - 🔄 **T704** Optional GitHub profile updates — `░░░░░░░░░░ 0%`
@@ -210,7 +212,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `██░░░░░░░░ 17%`
+- 🐤 GitHub widget — `███░░░░░░░ 28%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `░░░░░░░░░░ 0%`

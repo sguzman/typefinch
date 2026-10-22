@@ -61,7 +61,7 @@
               "id": "T003",
               "emoji": "🌗",
               "name": "System, Light and Dark modes",
-              "progress": 67,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Three-way selector coded",
@@ -72,6 +72,11 @@
                   "text": "Preference persistence coded",
                   "passed": true,
                   "evidence": "src/preferences.rs"
+                },
+                {
+                  "text": "Explicit Light and Dark rendered screenshots pass graphical CI",
+                  "passed": true,
+                  "evidence": "GitHub Actions 39872686067: light luminance 0.955 vs dark 0.125"
                 },
                 {
                   "text": "Hyprland system theme transition verified",
@@ -258,7 +263,7 @@
               "id": "T204",
               "emoji": "📚",
               "name": "Word, quote, punctuation and custom tests",
-              "progress": 25,
+              "progress": 60,
               "checks": [
                 {
                   "text": "Starter English corpus",
@@ -266,12 +271,18 @@
                   "evidence": "src/engine.rs"
                 },
                 {
-                  "text": "Quotes and paragraphs",
+                  "text": "Quote passages",
+                  "passed": true,
+                  "evidence": "src/engine.rs quotes corpus; GitHub Actions 39872686067"
+                },
+                {
+                  "text": "Dedicated paragraph test content",
                   "passed": false
                 },
                 {
                   "text": "Punctuation and numbers",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067"
                 },
                 {
                   "text": "Custom/imported text",
@@ -283,7 +294,7 @@
               "id": "T205",
               "emoji": "🧮",
               "name": "Scoring taxonomy and fair comparisons",
-              "progress": 0,
+              "progress": 25,
               "checks": [
                 {
                   "text": "Raw vs corrected WPM",
@@ -299,7 +310,8 @@
                 },
                 {
                   "text": "Anti-cheat tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "Real X11 Ctrl+V injection excluded from scored session; GitHub Actions 39872686067"
                 }
               ]
             }
@@ -353,7 +365,7 @@
               "id": "T301",
               "emoji": "📖",
               "name": "Known layout catalog",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Curated identifiers and names coded",
@@ -362,7 +374,8 @@
                 },
                 {
                   "text": "Discover installed XKB variants",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/registry.rs; GitHub Actions 39872686067 discovered XKB layouts and passed 30 tests"
                 },
                 {
                   "text": "Normalize identities and availability",
@@ -869,11 +882,12 @@
               "id": "T703",
               "emoji": "📝",
               "name": "Markdown, PNG, JSON exports",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "README Markdown",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/export.rs produces paired local Markdown/SVG and validates the embed; GitHub Actions 39872686067"
                 },
                 {
                   "text": "PNG renderer",

@@ -1,6 +1,6 @@
 use crate::{
     devices::{self, Keyboard},
-    engine::{Session, State},
+    engine::{Session, State, TestMode},
     export,
     history::{self, Record},
     layouts::{self, Mode},
@@ -46,7 +46,7 @@ impl Typefinch {
             s.visuals.hyperlink_color = PERIWINKLE;
         });
         let (keyboards, device_error) = Self::query_devices();
-        let session = Session::new(prefs.duration_seconds);
+        let session = Session::new_with_mode(prefs.duration_seconds, prefs.test_mode);
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
@@ -185,7 +185,24 @@ impl Typefinch {
                 if self.session.state == State::Running {
                     self.prefs.duration_seconds = previous;
                 } else {
-                    self.session = Session::new(self.prefs.duration_seconds);
+                    self.session = Session::new_with_mode(self.prefs.duration_seconds, self.prefs.test_mode);
+                    self.save();
+                }
+            }
+            ui.add_space(6.0);
+            ui.label("Test content");
+            let last_mode = self.prefs.test_mode;
+            egui::ComboBox::from_id_salt("test-content").selected_text(last_mode.label())
+                .show_ui(ui, |ui| {
+                    for mode in TestMode::ALL {
+                        ui.selectable_value(&mut self.prefs.test_mode, mode, mode.label());
+                    }
+                });
+            if self.prefs.test_mode != last_mode {
+                if self.session.state == State::Running {
+                    self.prefs.test_mode = last_mode;
+                } else {
+                    self.session = Session::new_with_mode(self.prefs.duration_seconds, self.prefs.test_mode);
                     self.save();
                 }
             }
@@ -352,6 +369,7 @@ impl Typefinch {
         }
         egui::Grid::new("recent-tests").striped(true).min_col_width(75.0).show(ui, |ui| {
             ui.strong("WPM");
+            ui.strong("Content");
             ui.strong("Accuracy");
             ui.strong("Duration");
             ui.strong("Layout");
@@ -359,6 +377,7 @@ impl Typefinch {
             ui.end_row();
             for r in &self.history {
                 ui.label(format!("{:.1}", r.wpm));
+                ui.label(&r.test_mode);
                 ui.label(format!("{:.1}%", r.accuracy));
                 ui.label(format!("{}s", r.duration_ms / 1000));
                 ui.label(&r.layout);

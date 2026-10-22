@@ -411,7 +411,7 @@ impl eframe::App for Typefinch {
         self.session.tick();
         if before == State::Running && self.session.state == State::Finished { self.finish(); }
         egui::TopBottomPanel::top("typefinch-header")
-            .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)))
+            .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)).fill(ctx.style().visuals.panel_fill))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     let (rect, _) = ui.allocate_exact_size(egui::vec2(46.0, 46.0), egui::Sense::hover());
@@ -447,7 +447,7 @@ impl eframe::App for Typefinch {
                 .default_width(295.0)
                 .min_width(255.0)
                 .max_width(370.0)
-                .frame(egui::Frame::default().inner_margin(egui::Margin::same(18)))
+                .frame(egui::Frame::default().inner_margin(egui::Margin::same(18)).fill(ctx.style().visuals.panel_fill))
                 .show(ctx, |ui| {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         ui.add_space(6.0);
@@ -465,7 +465,7 @@ impl eframe::App for Typefinch {
                 });
         }
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().inner_margin(egui::Margin::same(24)))
+            .frame(egui::Frame::default().inner_margin(egui::Margin::same(24)).fill(ctx.style().visuals.panel_fill))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     if !wide {

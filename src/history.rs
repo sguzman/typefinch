@@ -136,6 +136,18 @@ mod tests {
         db.pragma_update(None,"user_version",999_i64).unwrap();
         assert!(init(&db).is_err());
     }
+    #[test] fn history_stores_metrics_only() {
+        let db=Connection::open_in_memory().unwrap();
+        init(&db).unwrap();
+        insert_with(&db,&item("a")).unwrap();
+        let cols: Vec<String> = {
+            let stmt=db.prepare("SELECT * FROM sessions LIMIT 0").unwrap();
+            stmt.column_names().iter().map(|s|s.to_string()).collect()
+        };
+        assert!(!cols.iter().any(|c| c.contains("text") || c.contains("typed")));
+        assert!(cols.contains(&"profile_id".to_owned()));
+        assert!(cols.contains(&"scoring_version".to_owned()));
+    }
     #[test] fn rejects_invalid_derived_accuracy() {
         let db=Connection::open_in_memory().unwrap();
         init(&db).unwrap();

@@ -72,7 +72,7 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
     let expected: Vec<char> = target.chars().collect();
     let entered: Vec<char> = typed.chars().collect();
     let correct = entered.iter().zip(expected.iter()).filter(|(a,b)| a==b).count();
-    let accuracy = if entered.is_empty() { 100.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
+    let accuracy = if entered.is_empty() { 0.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
     let minutes = elapsed.as_secs_f64() / 60.0;
     Score { wpm: if minutes > 0.0 { correct as f64 / 5.0 / minutes } else { 0.0 }, accuracy, correct, entered: entered.len(), elapsed }
 }
@@ -85,6 +85,12 @@ mod tests {
         assert_eq!(a.correct, 2);
         assert!((a.accuracy - 66.66666667).abs() < 0.001);
         assert!((a.wpm - 0.4).abs() < 0.001);
+    }
+    #[test] fn empty_test_has_no_accuracy_or_wpm() {
+        let a=score("abc", "", Duration::from_secs(30));
+        assert_eq!(a.accuracy,0.0);
+        assert_eq!(a.wpm,0.0);
+        assert_eq!(a.entered,0);
     }
     #[test] fn zero_duration_is_safe() {
         assert_eq!(score("abc", "abc", Duration::ZERO).wpm, 0.0);

@@ -351,7 +351,7 @@ impl Typefinch {
                 Some(c) if c == ch => Color32::from_rgb(91, 184, 137),
                 Some(_) => Color32::from_rgb(239, 102, 112),
                 None if i == actual.len() && self.session.state == State::Running => PERIWINKLE,
-                None => ui.visuals().weak_text_color(),
+                None => ui.visuals().text_color().gamma_multiply(0.75),
             };
             job.append(&ch.to_string(), 0.0, egui::TextFormat {
                 font_id: egui::FontId::monospace(21.0),

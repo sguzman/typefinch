@@ -836,7 +836,7 @@
               "id": "T701",
               "emoji": "🪄",
               "name": "GitHub-safe SVG card",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "SVG generator coded",
@@ -854,7 +854,8 @@
                 },
                 {
                   "text": "Filesystem export test passes",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions run 39873211637: F6 native GUI writes valid SVG and paired Markdown, parsed by XML validator"
                 }
               ]
             },

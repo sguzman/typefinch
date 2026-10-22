@@ -186,17 +186,17 @@
 - 📊 Statistics — `█░░░░░░░░░ 11%`
 - 🏆 Achievements — `░░░░░░░░░░ 0%`
 
-## 🎨 M4 — Profile card studio — `██░░░░░░░░ 21%`
+## 🎨 M4 — Profile card studio — `███░░░░░░░ 27%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `██░░░░░░░░ 21%`
+### 🐤 P7 — Widgets and publishing — `███░░░░░░░ 27%`
 
-- 🪄 **T701** GitHub-safe SVG card — `█████░░░░░ 50%`
+- 🪄 **T701** GitHub-safe SVG card — `████████░░ 75%`
   - [x] SVG generator coded — src/export.rs
   - [x] XML escaping and test authored — src/export.rs
   - [ ] Rendered validation on GitHub
-  - [ ] Filesystem export test passes
+  - [x] Filesystem export test passes — GitHub Actions run 39873211637: F6 native GUI writes valid SVG and paired Markdown, parsed by XML validator
 - 🎛️ **T702** Widget designer — `░░░░░░░░░░ 0%`
   - [ ] Template system
   - [ ] Color and type controls
@@ -212,7 +212,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `███░░░░░░░ 28%`
+- 🐤 GitHub widget — `████░░░░░░ 36%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `░░░░░░░░░░ 0%`

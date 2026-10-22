@@ -2,6 +2,7 @@ use crate::{
     devices::{self, Keyboard},
     engine::{Session, State},
     export,
+    history::{self, Record},
     layouts::{self, Mode},
     preferences::{Preferences, Profile, Theme},
     xkb::Emulator,
@@ -16,6 +17,7 @@ pub struct Typefinch {
     session: Session,
     mode: Mode,
     emulator: Option<Emulator>,
+    history: Vec<Record>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
     device_error: Option<String>,
@@ -43,7 +45,8 @@ impl Typefinch {
         let (keyboards, device_error) = Self::query_devices();
         let session = Session::new(prefs.duration_seconds);
         let emulator = Emulator::compile(&prefs.layout).ok();
-        Self { prefs, session, mode: Mode::System, emulator, keyboards, device_error,
+        let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
+        Self { prefs, session, mode: Mode::System, emulator, history, keyboards, device_error,
                device_index: 0, new_profile: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -57,6 +60,16 @@ impl Typefinch {
     }
     fn finish(&mut self) {
         let result = self.session.score();
+        let identity = self.prefs.profiles[self.prefs.active_profile].id.clone();
+        let mode = if self.mode == Mode::System { "OS" } else { "Emulated" };
+        let record = Record::completed(&identity, &self.prefs.layout, mode, &self.session);
+        match history::insert(&record) {
+            Ok(_) => match history::recent(&identity) {
+                Ok(records) => self.history = records,
+                Err(e) => self.message = format!("History read failed: {e}"),
+            },
+            Err(e) => self.message = format!("History not saved: {e}"),
+        }
         let profile = &mut self.prefs.profiles[self.prefs.active_profile];
         profile.tests = profile.tests.saturating_add(1);
         profile.best_wpm = profile.best_wpm.max(result.wpm);
@@ -114,6 +127,7 @@ impl Typefinch {
     }
     fn show_profile(&mut self, ui: &mut egui::Ui) {
         ui.heading("🐦  Your perch");
+        let previous = self.prefs.active_profile;
         ui.horizontal_wrapped(|ui| {
             egui::ComboBox::from_id_salt("profile").selected_text(&self.prefs.profiles[self.prefs.active_profile].name)
                 .show_ui(ui, |ui| {
@@ -134,6 +148,11 @@ impl Typefinch {
                 }
             }
         });
+        if self.prefs.active_profile != previous {
+            let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
+            self.history = history::recent(&id).unwrap_or_default();
+            self.save();
+        }
         let p = &self.prefs.profiles[self.prefs.active_profile];
         ui.label(format!("{} completed tests  ·  best {:.1} WPM  ·  best accuracy {:.1}%",
             p.tests, p.best_wpm, p.best_accuracy));
@@ -290,6 +309,29 @@ impl Typefinch {
         if response.clicked() { response.request_focus(); }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
+    fn show_history(&mut self, ui: &mut egui::Ui) {
+        ui.heading("📊  Recent tests");
+        if self.history.is_empty() {
+            ui.label("No completed scored tests yet. Results stay on this device.");
+            return;
+        }
+        egui::Grid::new("recent-tests").striped(true).min_col_width(75.0).show(ui, |ui| {
+            ui.strong("WPM");
+            ui.strong("Accuracy");
+            ui.strong("Duration");
+            ui.strong("Layout");
+            ui.strong("Input");
+            ui.end_row();
+            for r in &self.history {
+                ui.label(format!("{:.1}", r.wpm));
+                ui.label(format!("{:.1}%", r.accuracy));
+                ui.label(format!("{}s", r.duration_ms / 1000));
+                ui.label(&r.layout);
+                ui.label(&r.input_mode);
+                ui.end_row();
+            }
+        });
+    }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("🎨  GitHub card");
         ui.label("Static SVG snapshot, no scripts or hosting required. Share it in a profile README.");
@@ -325,6 +367,8 @@ impl eframe::App for Typefinch {
                 self.show_settings(ui, ctx);
                 ui.separator();
                 self.show_test(ui, ctx);
+                ui.separator();
+                self.show_history(ui);
                 ui.separator();
                 self.show_devices(ui);
                 ui.separator();

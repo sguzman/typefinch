@@ -64,6 +64,11 @@ assert r["entered"] >= 8, r
 assert r["correct"] >= 5, r
 assert r["wpm"] > 0.0, r
 assert 1500 <= r["elapsed_ms"] <= 2500, r
+import sqlite3,os
+dbpath=os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")
+with sqlite3.connect(dbpath) as db:
+    rows=db.execute("SELECT entered,correct,scoring_version FROM sessions").fetchall()
+assert len(rows)==1 and rows[0][0]>=8 and rows[0][2]==1,rows
 print(f"X11 GUI smoke PASS: {r['entered']} entered, {r['correct']} correct, {r['wpm']:.1f} WPM")
 PY
 if [[ ! -s "$tmp/typefinch-window.png" ]]; then

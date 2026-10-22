@@ -2,6 +2,7 @@
 mod app;
 mod devices;
 mod engine;
+mod history;
 mod export;
 mod layouts;
 mod preferences;

@@ -7,13 +7,16 @@ use std::{fs, path::PathBuf};
 pub enum Theme { #[default] System, Light, Dark }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
+    #[serde(default = "new_profile_id")]
+    pub id: String,
     pub name: String,
     pub tests: u32,
     pub best_wpm: f64,
     pub best_accuracy: f64,
 }
+fn new_profile_id() -> String { uuid::Uuid::new_v4().to_string() }
 impl Default for Profile {
-    fn default() -> Self { Self { name:"Finch".into(), tests:0, best_wpm:0.0, best_accuracy:0.0 } }
+    fn default() -> Self { Self { id:new_profile_id(), name:"Finch".into(), tests:0, best_wpm:0.0, best_accuracy:0.0 } }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -52,6 +55,11 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn legacy_profile_receives_id() {
+        let p: Profile = serde_json::from_str(r#"{"name":"Old","tests":3,"best_wpm":60.0,"best_accuracy":95.0}"#).unwrap();
+        assert!(!p.id.is_empty());
+        assert_eq!(p.name, "Old");
+    }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {
         let p=Preferences::default();

@@ -284,8 +284,9 @@ impl Typefinch {
         ui.heading("Connected keyboards");
         ui.vertical(|ui| {
             if ui.button("Refresh device list").clicked() {
+                let previous = self.keyboards.get(self.device_index).map(|k|k.address.clone());
                 (self.keyboards, self.device_error) = Self::query_devices();
-                self.device_index = 0;
+                self.device_index = previous.and_then(|addr|self.keyboards.iter().position(|k|k.address==addr)).unwrap_or(0);
             }
             if !self.keyboards.is_empty() {
                 self.device_index = self.device_index.min(self.keyboards.len() - 1);
@@ -296,8 +297,20 @@ impl Typefinch {
                         }
                     });
                 let k = &self.keyboards[self.device_index];
+                let active_map = k.active_keymap.clone();
                 ui.label(format!("Active map: {} · configured: {} {}", k.active_keymap, k.layout, k.variant));
                 ui.small(format!("Device: {}", k.address));
+                let matched = registry::resolve_active(&self.installed_layouts, &active_map).map(|l|l.id.clone());
+                if let Some(id) = matched {
+                    if ui.add_enabled(self.session.state != State::Running, egui::Button::new("Use detected layout")).clicked() {
+                        self.prefs.layout = id;
+                        self.emulator = Emulator::compile(&self.prefs.layout).ok();
+                        self.save();
+                        self.message = "Target layout updated from this device's reported active keymap. Your system layout is unchanged.".into();
+                    }
+                } else {
+                    ui.small("No unique installed XKB match for this device's active map.");
+                }
             } else {
                 ui.label(self.device_error.as_deref().unwrap_or("No keyboards listed by Hyprland."));
             }

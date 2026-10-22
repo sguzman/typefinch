@@ -43,6 +43,16 @@ pub fn parse_rules(input: &str) -> Vec<InstalledLayout> {
     results.sort_by(|a,b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.id.cmp(&b.id)));
     results
 }
+/// Resolve a compositor-reported display name only when exactly one installed
+/// XKB entry matches it; never guess between similarly named variants.
+pub fn resolve_active<'a>(layouts: &'a [InstalledLayout], active: &str) -> Option<&'a InstalledLayout> {
+    let normalized = |name: &str| name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
+    let label = normalized(active);
+    if label.is_empty() { return None; }
+    let mut hits = layouts.iter().filter(|l| normalized(&l.name) == label);
+    let first = hits.next()?;
+    if hits.next().is_some() { None } else { Some(first) }
+}
 pub fn discover() -> Result<Vec<InstalledLayout>, String> {
     let root = std::env::var_os("XKB_CONFIG_ROOT")
         .map(PathBuf::from)
@@ -62,6 +72,17 @@ mod tests {
         assert!(x.iter().any(|t| t.id=="us" && t.name=="English (US)"));
         assert!(x.iter().any(|t| t.id=="de(nodeadkeys)" && t.name=="German (no dead keys)"));
         assert!(x.iter().any(|t| t.id=="us(colemak)"));
+    }
+    #[test] fn active_map_detection_requires_unique_name() {
+        let data = vec![
+            InstalledLayout { id:"us".into(),name:"English (US)".into() },
+            InstalledLayout { id:"de".into(),name:"German".into() }
+        ];
+        assert_eq!(resolve_active(&data,"  english   (US) ").unwrap().id,"us");
+        assert!(resolve_active(&data,"Swedish").is_none());
+        let mut dup = data;
+        dup.push(InstalledLayout { id:"us(custom)".into(),name:"English (US)".into() });
+        assert!(resolve_active(&dup,"English (US)").is_none());
     }
     #[test] fn duplicate_ids_are_not_offered() {
         let input = "! layout\n us English (US)\n us Duplicate\n";

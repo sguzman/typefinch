@@ -1,0 +1,20 @@
+name: Typefinch CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config
+      - name: Verify acceptance ledger
+        run: python3 tools/verify_progress.py
+      - name: Build
+        run: cargo check --all-targets
+      - name: Test
+        run: cargo test --all-targets

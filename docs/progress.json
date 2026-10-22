@@ -1,0 +1,1002 @@
+{
+  "schema": 1,
+  "policy": "Task percentages equal accepted check count / all check count, rounded to nearest integer. Every passed check requires an evidence field. Milestone and phase percentages are arithmetic means of task percentages. 100% requires all evidence and acceptance.",
+  "milestones": [
+    {
+      "id": "M0",
+      "emoji": "🐣",
+      "name": "Native typing MVP",
+      "gate": "A working native session, reliable scoring, local profiles, and live Hyprland acceptance.",
+      "phases": [
+        {
+          "id": "P0",
+          "emoji": "🧱",
+          "name": "Foundation and visual identity",
+          "tasks": [
+            {
+              "id": "T001",
+              "emoji": "🦀",
+              "name": "Rust/egui application",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Native shell committed",
+                  "passed": true,
+                  "evidence": "Cargo.toml; src/main.rs"
+                },
+                {
+                  "text": "CI native build passes",
+                  "passed": false
+                },
+                {
+                  "text": "Live Hyprland window screenshot",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T002",
+              "emoji": "🎨",
+              "name": "Perceptual OKLCH project color",
+              "progress": 67,
+              "checks": [
+                {
+                  "text": "Color specified",
+                  "passed": true,
+                  "evidence": "docs/COLOR.md"
+                },
+                {
+                  "text": "README swatch authored",
+                  "passed": true,
+                  "evidence": "assets/typefinch-color.svg"
+                },
+                {
+                  "text": "Contrast and accessibility audit",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T003",
+              "emoji": "🌗",
+              "name": "System, Light and Dark modes",
+              "progress": 67,
+              "checks": [
+                {
+                  "text": "Three-way selector coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Preference persistence coded",
+                  "passed": true,
+                  "evidence": "src/preferences.rs"
+                },
+                {
+                  "text": "Hyprland system theme transition verified",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T004",
+              "emoji": "🧭",
+              "name": "Navigation and responsive egui shell",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Main panels and controls coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Keyboard navigation audit",
+                  "passed": false
+                },
+                {
+                  "text": "HiDPI/small-window screenshots",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "P1",
+          "emoji": "🐦",
+          "name": "Profiles and persistence",
+          "tasks": [
+            {
+              "id": "T101",
+              "emoji": "👤",
+              "name": "Multiple local profiles",
+              "progress": 67,
+              "checks": [
+                {
+                  "text": "Create/select profile UI coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "JSON persistence coded",
+                  "passed": true,
+                  "evidence": "src/preferences.rs"
+                },
+                {
+                  "text": "Recovery, collisions, migrations and actual runtime testing",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T102",
+              "emoji": "🗄️",
+              "name": "SQLite test history",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Schema and migrations",
+                  "passed": false
+                },
+                {
+                  "text": "Persist each complete test",
+                  "passed": false
+                },
+                {
+                  "text": "Retention and backup tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T103",
+              "emoji": "🎯",
+              "name": "Per-profile goals and settings",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Settings and goals UI",
+                  "passed": false
+                },
+                {
+                  "text": "Per-profile setting persistence",
+                  "passed": false
+                },
+                {
+                  "text": "Export/import",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "P2",
+          "emoji": "⌨️",
+          "name": "Tests and core scoring",
+          "tasks": [
+            {
+              "id": "T201",
+              "emoji": "⚡",
+              "name": "Typing input and session lifecycle",
+              "progress": 50,
+              "checks": [
+                {
+                  "text": "Input handlers implemented",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Start/cancel/restart coded",
+                  "passed": true,
+                  "evidence": "src/engine.rs"
+                },
+                {
+                  "text": "End-to-end text/paste/focus QA",
+                  "passed": false
+                },
+                {
+                  "text": "IME support",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T202",
+              "emoji": "📏",
+              "name": "WPM and accuracy calculations",
+              "progress": 67,
+              "checks": [
+                {
+                  "text": "Pure scoring function implemented",
+                  "passed": true,
+                  "evidence": "src/engine.rs"
+                },
+                {
+                  "text": "Scoring tests authored",
+                  "passed": true,
+                  "evidence": "src/engine.rs"
+                },
+                {
+                  "text": "CI scoring tests pass",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T203",
+              "emoji": "⏱️",
+              "name": "Timed tests",
+              "progress": 50,
+              "checks": [
+                {
+                  "text": "Four durations coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Monotonic timer coded",
+                  "passed": true,
+                  "evidence": "src/engine.rs"
+                },
+                {
+                  "text": "Live timing edge-case QA",
+                  "passed": false
+                },
+                {
+                  "text": "Session history persisted",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T204",
+              "emoji": "📚",
+              "name": "Word, quote, punctuation and custom tests",
+              "progress": 25,
+              "checks": [
+                {
+                  "text": "Starter English corpus",
+                  "passed": true,
+                  "evidence": "src/engine.rs"
+                },
+                {
+                  "text": "Quotes and paragraphs",
+                  "passed": false
+                },
+                {
+                  "text": "Punctuation and numbers",
+                  "passed": false
+                },
+                {
+                  "text": "Custom/imported text",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T205",
+              "emoji": "🧮",
+              "name": "Scoring taxonomy and fair comparisons",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Raw vs corrected WPM",
+                  "passed": false
+                },
+                {
+                  "text": "Per-language speed definitions",
+                  "passed": false
+                },
+                {
+                  "text": "Pause/focus/repeat rules",
+                  "passed": false
+                },
+                {
+                  "text": "Anti-cheat tests",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M1",
+      "emoji": "🗺️",
+      "name": "Keyboard layout laboratory",
+      "gate": "Broad XKB-backed layout emulation and honest multi-device handling.",
+      "phases": [
+        {
+          "id": "P3",
+          "emoji": "🧬",
+          "name": "Recognition, emulation and geometry",
+          "tasks": [
+            {
+              "id": "T301",
+              "emoji": "📖",
+              "name": "Known layout catalog",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Curated identifiers and names coded",
+                  "passed": true,
+                  "evidence": "src/layouts.rs"
+                },
+                {
+                  "text": "Discover installed XKB variants",
+                  "passed": false
+                },
+                {
+                  "text": "Normalize identities and availability",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T302",
+              "emoji": "🔀",
+              "name": "Starter software emulation",
+              "progress": 50,
+              "checks": [
+                {
+                  "text": "Four initial ANSI row mappings coded",
+                  "passed": true,
+                  "evidence": "src/layouts.rs"
+                },
+                {
+                  "text": "Physical key event handling coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Native mapping QA",
+                  "passed": false
+                },
+                {
+                  "text": "Full modifiers and punctuation layers",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T303",
+              "emoji": "🌐",
+              "name": "libxkbcommon-backed full emulation",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Compile installed keymaps",
+                  "passed": false
+                },
+                {
+                  "text": "Shift/AltGr/dead-key handling",
+                  "passed": false
+                },
+                {
+                  "text": "Layout regression corpus",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T304",
+              "emoji": "🛠️",
+              "name": "User-editable custom layouts",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Editor and geometry",
+                  "passed": false
+                },
+                {
+                  "text": "Versioned schema",
+                  "passed": false
+                },
+                {
+                  "text": "Import/export and tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T305",
+              "emoji": "🌍",
+              "name": "ANSI, ISO, JIS and split geometries",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Geometry definitions",
+                  "passed": false
+                },
+                {
+                  "text": "Physical key routing",
+                  "passed": false
+                },
+                {
+                  "text": "Per-key rendering",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "P4",
+          "emoji": "🔌",
+          "name": "Keyboard detection and selection",
+          "tasks": [
+            {
+              "id": "T401",
+              "emoji": "🔍",
+              "name": "Hyprland device inspection",
+              "progress": 67,
+              "checks": [
+                {
+                  "text": "Read-only hyprctl query coded",
+                  "passed": true,
+                  "evidence": "src/devices.rs"
+                },
+                {
+                  "text": "Device and active map display coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Live connected-keyboard test",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T402",
+              "emoji": "🎛️",
+              "name": "Multiple connected keyboards",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Read-only device chooser coded",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Hotplug support",
+                  "passed": false
+                },
+                {
+                  "text": "Reliable per-device event attribution or explicit unsupported mode",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T403",
+              "emoji": "🪟",
+              "name": "Generic compositor fallback",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Safe Hyprland-unavailable state coded",
+                  "passed": true,
+                  "evidence": "src/devices.rs"
+                },
+                {
+                  "text": "Generic XKB seat detection",
+                  "passed": false
+                },
+                {
+                  "text": "X11 fallback",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T404",
+              "emoji": "🔐",
+              "name": "Optional authorized per-device capture",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Permission and threat model",
+                  "passed": false
+                },
+                {
+                  "text": "Opt-in backend",
+                  "passed": false
+                },
+                {
+                  "text": "No global interception verification",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "emoji": "🎓",
+      "name": "Typing academy",
+      "gate": "Adaptive lessons, weak-key drills, and course progression.",
+      "phases": [
+        {
+          "id": "P5",
+          "emoji": "🧠",
+          "name": "Practice and learning",
+          "tasks": [
+            {
+              "id": "T501",
+              "emoji": "📚",
+              "name": "Courses and lessons",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Lesson content schema",
+                  "passed": false
+                },
+                {
+                  "text": "Progression UI",
+                  "passed": false
+                },
+                {
+                  "text": "Course completion tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T502",
+              "emoji": "🎯",
+              "name": "Character and n-gram drills",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Per-key timing metrics",
+                  "passed": false
+                },
+                {
+                  "text": "Adaptive drill generation",
+                  "passed": false
+                },
+                {
+                  "text": "Training efficacy tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T503",
+              "emoji": "🖐️",
+              "name": "Finger assignments and visual guidance",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Finger models",
+                  "passed": false
+                },
+                {
+                  "text": "Heatmaps",
+                  "passed": false
+                },
+                {
+                  "text": "Accessibility tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T504",
+              "emoji": "🌱",
+              "name": "Daily targets and accuracy-first practice",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Goal engine",
+                  "passed": false
+                },
+                {
+                  "text": "Challenge UI",
+                  "passed": false
+                },
+                {
+                  "text": "Performance summaries",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "emoji": "📊",
+      "name": "Statistics and achievements",
+      "gate": "Reproducible longitudinal statistics and achievements.",
+      "phases": [
+        {
+          "id": "P6",
+          "emoji": "📈",
+          "name": "Analytics and progression",
+          "tasks": [
+            {
+              "id": "T601",
+              "emoji": "🏅",
+              "name": "Records by layout and test mode",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Basic profile bests tracked",
+                  "passed": true,
+                  "evidence": "src/app.rs"
+                },
+                {
+                  "text": "Segmented history",
+                  "passed": false
+                },
+                {
+                  "text": "Versioned scoring policies",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T602",
+              "emoji": "📉",
+              "name": "Progress charts and consistency",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Timeseries store",
+                  "passed": false
+                },
+                {
+                  "text": "Graphs and filters",
+                  "passed": false
+                },
+                {
+                  "text": "Consistency formulas",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T603",
+              "emoji": "🔥",
+              "name": "Key timing and error heatmaps",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Event recording",
+                  "passed": false
+                },
+                {
+                  "text": "Aggregations",
+                  "passed": false
+                },
+                {
+                  "text": "Visual heatmaps",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T604",
+              "emoji": "🏆",
+              "name": "Achievements and streaks",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Rules and earned records",
+                  "passed": false
+                },
+                {
+                  "text": "Celebration UI",
+                  "passed": false
+                },
+                {
+                  "text": "Optional streaks",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "emoji": "🎨",
+      "name": "Profile card studio",
+      "gate": "Accessible exportable SVG and Markdown cards with a friendly finch identity.",
+      "phases": [
+        {
+          "id": "P7",
+          "emoji": "🐤",
+          "name": "Widgets and publishing",
+          "tasks": [
+            {
+              "id": "T701",
+              "emoji": "🪄",
+              "name": "GitHub-safe SVG card",
+              "progress": 50,
+              "checks": [
+                {
+                  "text": "SVG generator coded",
+                  "passed": true,
+                  "evidence": "src/export.rs"
+                },
+                {
+                  "text": "XML escaping and test authored",
+                  "passed": true,
+                  "evidence": "src/export.rs"
+                },
+                {
+                  "text": "Rendered validation on GitHub",
+                  "passed": false
+                },
+                {
+                  "text": "Filesystem export test passes",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T702",
+              "emoji": "🎛️",
+              "name": "Widget designer",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Template system",
+                  "passed": false
+                },
+                {
+                  "text": "Color and type controls",
+                  "passed": false
+                },
+                {
+                  "text": "Live preview",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T703",
+              "emoji": "📝",
+              "name": "Markdown, PNG, JSON exports",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "README Markdown",
+                  "passed": false
+                },
+                {
+                  "text": "PNG renderer",
+                  "passed": false
+                },
+                {
+                  "text": "Privacy-aware data exports",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T704",
+              "emoji": "🔄",
+              "name": "Optional GitHub profile updates",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Explicit opt-in",
+                  "passed": false
+                },
+                {
+                  "text": "Safe credentials",
+                  "passed": false
+                },
+                {
+                  "text": "Offline failure handling",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "emoji": "🌎",
+      "name": "Multilingual typing",
+      "gate": "Correct Unicode, IME composition, RTL and per-language corpora.",
+      "phases": [
+        {
+          "id": "P8",
+          "emoji": "🗣️",
+          "name": "Languages and input methods",
+          "tasks": [
+            {
+              "id": "T801",
+              "emoji": "🧾",
+              "name": "Language packs and corpora",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "English/Spanish data",
+                  "passed": false
+                },
+                {
+                  "text": "Corpus provenance and license",
+                  "passed": false
+                },
+                {
+                  "text": "Difficulty grading",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T802",
+              "emoji": "🔤",
+              "name": "Grapheme and normalization scoring",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Grapheme segmentation",
+                  "passed": false
+                },
+                {
+                  "text": "Normalization rules",
+                  "passed": false
+                },
+                {
+                  "text": "Regression tests",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T803",
+              "emoji": "㊙️",
+              "name": "CJK IME composition",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Committed text semantics",
+                  "passed": false
+                },
+                {
+                  "text": "CJK integration tests",
+                  "passed": false
+                },
+                {
+                  "text": "Speed conventions",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T804",
+              "emoji": "🪶",
+              "name": "Arabic and Hebrew bidirectional input",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Shaping and caret",
+                  "passed": false
+                },
+                {
+                  "text": "Error highlighting",
+                  "passed": false
+                },
+                {
+                  "text": "RTL tests",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M6",
+      "emoji": "📦",
+      "name": "Release quality",
+      "gate": "Automated regression, live QA and reproducible Linux packages.",
+      "phases": [
+        {
+          "id": "P9",
+          "emoji": "🧪",
+          "name": "Acceptance and release",
+          "tasks": [
+            {
+              "id": "T901",
+              "emoji": "🧪",
+              "name": "CI and acceptance-ledger validation",
+              "progress": 33,
+              "checks": [
+                {
+                  "text": "Workflow authored",
+                  "passed": true,
+                  "evidence": ".github/workflows/ci.yml"
+                },
+                {
+                  "text": "CI build/test green",
+                  "passed": false
+                },
+                {
+                  "text": "Roadmap drift verified",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T902",
+              "emoji": "🪟",
+              "name": "Live Hyprland automation",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Headless run",
+                  "passed": false
+                },
+                {
+                  "text": "Keyboard/input QA",
+                  "passed": false
+                },
+                {
+                  "text": "Theme/layout screenshots",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T903",
+              "emoji": "♿",
+              "name": "Accessibility review",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Keyboard-only audit",
+                  "passed": false
+                },
+                {
+                  "text": "Contrast/reduced motion",
+                  "passed": false
+                },
+                {
+                  "text": "Unicode fonts",
+                  "passed": false
+                }
+              ]
+            },
+            {
+              "id": "T904",
+              "emoji": "🚀",
+              "name": "Reproducible Linux release",
+              "progress": 0,
+              "checks": [
+                {
+                  "text": "Versioned packages",
+                  "passed": false
+                },
+                {
+                  "text": "Install/rollback tests",
+                  "passed": false
+                },
+                {
+                  "text": "MVP gate accepted",
+                  "passed": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

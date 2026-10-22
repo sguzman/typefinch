@@ -399,20 +399,21 @@ impl Typefinch {
             }
         });
     }
+    fn export_widget(&mut self) {
+        let p = &self.prefs.profiles[self.prefs.active_profile];
+        let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
+            .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+            .unwrap_or("Custom XKB");
+        self.message = match export::save_widget(p, display) {
+            Ok((svg, md)) => format!("Exported: {} and {}", svg.display(), md.display()),
+            Err(e) => format!("Export failed: {e}"),
+        };
+    }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
         ui.label("Export a static SVG card and matching Markdown for your GitHub profile.");
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Export SVG + Markdown").clicked() {
-                let p = &self.prefs.profiles[self.prefs.active_profile];
-                let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
-                    .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
-                    .unwrap_or("Custom XKB");
-                self.message = match export::save_widget(p, display) {
-                    Ok((svg, md)) => format!("Exported: {} and {}", svg.display(), md.display()),
-                    Err(e) => format!("Export failed: {e}"),
-                };
-            }
+            if ui.button("Export SVG + Markdown").clicked() { self.export_widget(); }
             if ui.button("Copy GitHub Markdown").clicked() {
                 ui.ctx().copy_text(export::markdown_embed().to_owned());
                 self.message = "Markdown image embed copied to clipboard.".into();
@@ -424,6 +425,9 @@ impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F6)) {
+            self.export_widget();
         }
         let before = self.session.state;
         self.apply_events(ctx);

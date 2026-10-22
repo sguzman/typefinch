@@ -15,6 +15,11 @@ cleanup() {
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
   fi
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+    for file in "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"; do
+      if [[ -s "$file" ]]; then cp "$file" "$GITHUB_WORKSPACE/"; fi
+    done
+  fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/app.log" ]]; then
     cp "$tmp/app.log" "$GITHUB_WORKSPACE/typefinch-gui-smoke.log"
   fi
@@ -95,6 +100,26 @@ with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","ses
     rows=db.execute("SELECT entered,correct FROM sessions ORDER BY id").fetchall()
 assert len(rows)==2 and rows[1]==(len("little finches"),len("little finches")),rows
 print("Clipboard paste suppression PASS: synthetic paste was not counted")
+PY
+xdotool key --clearmodifiers F6
+svg="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
+md="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"
+for _ in $(seq 1 30); do
+  if [[ -s "$svg" && -s "$md" ]]; then break; fi
+  sleep 0.1
+done
+python3 - "$svg" "$md" <<'PY'
+from pathlib import Path
+from xml.etree import ElementTree
+import sys
+svg,md=map(Path,sys.argv[1:3])
+root=ElementTree.parse(svg).getroot()
+assert root.tag.endswith("svg"),root.tag
+assert "<script" not in svg.read_text(encoding="utf-8")
+assert "Finch" in svg.read_text(encoding="utf-8")
+content=md.read_text(encoding="utf-8")
+assert content.strip()=="![Typefinch typing profile](./typefinch-profile.svg)",content
+print("SVG/Markdown export PASS: well-formed local static card, correct relative image embed")
 PY
 
 # Validate *explicit* appearance overrides on real native rendered frames.

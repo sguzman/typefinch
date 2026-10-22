@@ -34,4 +34,6 @@ jobs:
             typefinch-light.png
             typefinch-dark.png
             typefinch-gui-smoke.log
+            typefinch-profile.svg
+            typefinch-profile.md
           if-no-files-found: ignore

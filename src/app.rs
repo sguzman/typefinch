@@ -130,7 +130,7 @@ impl Typefinch {
         }
     }
     fn show_profile(&mut self, ui: &mut egui::Ui) {
-        ui.heading("🐦  Your perch");
+        ui.heading("Your perch");
         let previous = self.prefs.active_profile;
         ui.add_enabled_ui(self.session.state != State::Running, |ui| {
           ui.horizontal_wrapped(|ui| {
@@ -167,7 +167,7 @@ impl Typefinch {
             p.tests, p.best_wpm, p.best_accuracy));
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.heading("🎛️  Test setup");
+        ui.heading("Test setup");
         ui.horizontal_wrapped(|ui| {
             ui.label("Duration");
             let previous = self.prefs.duration_seconds;
@@ -238,7 +238,7 @@ impl Typefinch {
         }
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
-        ui.heading("🔌  Connected keyboards");
+        ui.heading("Connected keyboards");
         ui.horizontal_wrapped(|ui| {
             if ui.button("↻ Refresh").clicked() {
                 (self.keyboards, self.device_error) = Self::query_devices();
@@ -262,7 +262,7 @@ impl Typefinch {
         ui.small("This selector inspects keyboard metadata. Ordinary Wayland typing events are seat-level: this is not yet a per-device input filter.");
     }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.heading("⌨️  Typing test");
+        ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
             let name = if self.session.state == State::Running { "↻ Restart" } else { "▶ Start test" };
             if ui.button(name).clicked() { self.start_test(ctx); }
@@ -319,7 +319,7 @@ impl Typefinch {
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
-        ui.heading("📊  Recent tests");
+        ui.heading("Recent tests");
         if self.history.is_empty() {
             ui.label("No completed scored tests yet. Results stay on this device.");
             return;
@@ -342,7 +342,7 @@ impl Typefinch {
         });
     }
     fn show_export(&mut self, ui: &mut egui::Ui) {
-        ui.heading("🎨  GitHub card");
+        ui.heading("GitHub profile card");
         ui.label("Static SVG snapshot, no scripts or hosting required. Share it in a profile README.");
         if ui.button("↓ Export SVG").clicked() {
             let p = &self.prefs.profiles[self.prefs.active_profile];
@@ -362,32 +362,91 @@ impl eframe::App for Typefinch {
         self.apply_events(ctx);
         self.session.tick();
         if before == State::Running && self.session.state == State::Finished { self.finish(); }
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.add_space(10.0);
+        egui::TopBottomPanel::top("typefinch-header")
+            .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)))
+            .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.heading(RichText::new("🐦 Typefinch").size(31.0).color(PERIWINKLE));
-                    ui.label("Find your rhythm.");
+                    let (rect, _) = ui.allocate_exact_size(egui::vec2(46.0, 46.0), egui::Sense::hover());
+                    let painter = ui.painter();
+                    let c = rect.center();
+                    painter.rect_filled(rect, 12.0, PERIWINKLE.gamma_multiply(0.18));
+                    painter.circle_filled(c + egui::vec2(-4.0, 3.0), 13.0, PERIWINKLE);
+                    painter.circle_filled(c + egui::vec2(7.0, -6.0), 8.0, PERIWINKLE);
+                    painter.circle_filled(c + egui::vec2(10.0, -8.0), 2.0, Color32::from_rgb(27, 34, 65));
+                    painter.add(egui::Shape::convex_polygon(
+                        vec![
+                            c + egui::vec2(14.0, -6.0),
+                            c + egui::vec2(22.0, -3.0),
+                            c + egui::vec2(14.0, 0.0)
+                        ],
+                        Color32::from_rgb(246, 195, 118),
+                        egui::Stroke::NONE
+                    ));
+                    ui.add_space(5.0);
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("Typefinch").size(28.0).strong().color(PERIWINKLE));
+                        ui.label(RichText::new("Find your rhythm.").size(12.0).weak());
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(RichText::new("LOCAL-FIRST  ·  DEVELOPMENT PREVIEW").size(11.0).weak());
+                    });
                 });
-                ui.small("Local-first typing studio · early developer preview");
-                ui.separator();
-                self.show_profile(ui);
-                ui.separator();
-                self.show_settings(ui, ctx);
-                ui.separator();
-                self.show_test(ui, ctx);
-                ui.separator();
-                self.show_history(ui);
-                ui.separator();
-                self.show_devices(ui);
-                ui.separator();
-                self.show_export(ui);
-                if !self.message.is_empty() {
-                    ui.add_space(9.0);
-                    ui.colored_label(PERIWINKLE, &self.message);
-                }
-                ui.add_space(14.0);
             });
-        });
+        let wide = ctx.content_rect().width() >= 900.0;
+        if wide {
+            egui::SidePanel::left("typefinch-tools")
+                .resizable(true)
+                .default_width(295.0)
+                .min_width(255.0)
+                .max_width(370.0)
+                .frame(egui::Frame::default().inner_margin(egui::Margin::same(18)))
+                .show(ctx, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.add_space(6.0);
+                        self.show_profile(ui);
+                        ui.add_space(17.0);
+                        ui.separator();
+                        ui.add_space(12.0);
+                        self.show_settings(ui, ctx);
+                        ui.add_space(17.0);
+                        ui.separator();
+                        ui.add_space(12.0);
+                        self.show_devices(ui);
+                        ui.add_space(14.0);
+                    });
+                });
+        }
+        egui::CentralPanel::default()
+            .frame(egui::Frame::default().inner_margin(egui::Margin::same(24)))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    if !wide {
+                        egui::CollapsingHeader::new("Profiles, appearance and keyboard settings")
+                            .default_open(true).show(ui, |ui| {
+                                self.show_profile(ui);
+                                ui.add_space(12.0);
+                                self.show_settings(ui, ctx);
+                                ui.add_space(12.0);
+                                self.show_devices(ui);
+                            });
+                        ui.add_space(18.0);
+                    }
+                    ui.add_space(8.0);
+                    self.show_test(ui, ctx);
+                    ui.add_space(24.0);
+                    ui.separator();
+                    ui.add_space(16.0);
+                    self.show_history(ui);
+                    ui.add_space(24.0);
+                    ui.separator();
+                    ui.add_space(16.0);
+                    self.show_export(ui);
+                    if !self.message.is_empty() {
+                        ui.add_space(12.0);
+                        ui.colored_label(PERIWINKLE, &self.message);
+                    }
+                    ui.add_space(24.0);
+                });
+            });
     }
 }

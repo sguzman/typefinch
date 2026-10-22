@@ -181,6 +181,7 @@ impl Typefinch {
                 ui.add_enabled(false, egui::Button::new("Software emulation (not available)"));
             }
         });
+        ui.small(format!("Layout family: {} · XKB compiled: {}", layouts::get(&self.prefs.layout).region, if self.emulator.is_some() { "yes" } else { "no" }));
         if self.mode == Mode::Emulated {
             ui.colored_label(PERIWINKLE, "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
             ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });
@@ -227,6 +228,7 @@ impl Typefinch {
             ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(PERIWINKLE).strong());
             ui.label(format!("{:.1}% accuracy", score.accuracy));
             ui.label(format!("{} corrections", self.session.corrections));
+            ui.label(format!("{} chars · {:.1} s elapsed", score.entered, score.elapsed.as_secs_f64()));
             ui.label(format!("{:.1} s left", self.session.seconds_left()));
         });
         ui.add(egui::ProgressBar::new(

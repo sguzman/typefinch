@@ -78,6 +78,25 @@ if [[ ! -s "$tmp/typefinch-window.png" ]]; then
 fi
 echo "Native X11 window and synthetic typing session both verified."
 
+# A second session exercises real clipboard paste suppression, not just unit logic.
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 35 "little finches"
+printf "PASTE SHOULD NEVER CHANGE A SCORED SESSION" | xclip -selection clipboard
+xdotool key --clearmodifiers ctrl+v
+sleep 2.4
+python3 - "$tmp/report.json" <<'PY'
+import json,os,sqlite3,sys
+r=json.load(open(sys.argv[1]))
+assert r["tests"]==2,r
+assert r["entered"]==len("little finches"),r
+assert r["correct"]==len("little finches"),r
+with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
+    rows=db.execute("SELECT entered,correct FROM sessions ORDER BY id").fetchall()
+assert len(rows)==2 and rows[1]==(len("little finches"),len("little finches")),rows
+print("Clipboard paste suppression PASS: synthetic paste was not counted")
+PY
+
 # Validate *explicit* appearance overrides on real native rendered frames.
 # System-default screenshot above is still separately preserved.
 kill "$app_pid" 2>/dev/null || true

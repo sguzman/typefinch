@@ -60,6 +60,10 @@ impl Typefinch {
     }
     fn finish(&mut self) {
         let result = self.session.score();
+        if result.entered == 0 {
+            self.message = "Empty session not recorded. Start another test when ready.".into();
+            return;
+        }
         let identity = self.prefs.profiles[self.prefs.active_profile].id.clone();
         let mode = if self.mode == Mode::System { "OS" } else { "Emulated" };
         let record = Record::completed(&identity, &self.prefs.layout, mode, &self.session);
@@ -128,7 +132,8 @@ impl Typefinch {
     fn show_profile(&mut self, ui: &mut egui::Ui) {
         ui.heading("🐦  Your perch");
         let previous = self.prefs.active_profile;
-        ui.horizontal_wrapped(|ui| {
+        ui.add_enabled_ui(self.session.state != State::Running, |ui| {
+          ui.horizontal_wrapped(|ui| {
             egui::ComboBox::from_id_salt("profile").selected_text(&self.prefs.profiles[self.prefs.active_profile].name)
                 .show_ui(ui, |ui| {
                     for (i, profile) in self.prefs.profiles.iter().enumerate() {
@@ -147,7 +152,11 @@ impl Typefinch {
                     self.message = "Profile name must contain 1–32 characters.".into();
                 }
             }
+          });
         });
+        if self.session.state == State::Running {
+            ui.small("Profile selection is locked until this typing test finishes.");
+        }
         if self.prefs.active_profile != previous {
             let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
             self.history = history::recent(&id).unwrap_or_default();

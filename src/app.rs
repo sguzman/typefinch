@@ -25,6 +25,7 @@ pub struct Typefinch {
     device_index: usize,
     device_error: Option<String>,
     new_profile: String,
+    custom_text: String,
     message: String,
 }
 impl Typefinch {
@@ -51,7 +52,7 @@ impl Typefinch {
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         Self { prefs, session, mode: Mode::System, emulator, installed_layouts, layout_search: String::new(), history, keyboards, device_error,
-               device_index: 0, new_profile: String::new(), message: String::new() }
+               device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
         match devices::inspect() {
@@ -88,7 +89,14 @@ impl Typefinch {
             self.message = format!("QA report failed: {err}");
         }
     }
+    fn rebuild_session(&mut self) {
+        self.session = Session::new_with_custom(self.prefs.duration_seconds, self.prefs.test_mode, &self.custom_text);
+    }
     fn start_test(&mut self, ctx: &egui::Context) {
+        if self.session.target.is_empty() {
+            self.message = "Enter some custom text before starting this test.".into();
+            return;
+        }
         self.session.begin();
         ctx.memory_mut(|m| m.request_focus(egui::Id::new("typing_surface")));
     }
@@ -185,7 +193,7 @@ impl Typefinch {
                 if self.session.state == State::Running {
                     self.prefs.duration_seconds = previous;
                 } else {
-                    self.session = Session::new_with_mode(self.prefs.duration_seconds, self.prefs.test_mode);
+                    self.rebuild_session();
                     self.save();
                 }
             }
@@ -202,9 +210,22 @@ impl Typefinch {
                 if self.session.state == State::Running {
                     self.prefs.test_mode = last_mode;
                 } else {
-                    self.session = Session::new_with_mode(self.prefs.duration_seconds, self.prefs.test_mode);
+                    self.rebuild_session();
                     self.save();
                 }
+            }
+            if self.prefs.test_mode == TestMode::Custom {
+                ui.add_space(6.0);
+                ui.label("Custom passage (in memory only)");
+                let edit = ui.add_enabled(
+                    self.session.state != State::Running,
+                    egui::TextEdit::multiline(&mut self.custom_text)
+                        .desired_rows(4)
+                        .desired_width(ui.available_width())
+                        .hint_text("Paste or write text for your private typing test")
+                );
+                if edit.changed() { self.rebuild_session(); }
+                ui.small(format!("{} characters entered; only the first 4096 will be used. Text is not saved.", self.custom_text.chars().count()));
             }
             ui.add_space(6.0);
             ui.label("Theme");
@@ -321,7 +342,7 @@ impl Typefinch {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
             let name = if self.session.state == State::Running { "Restart test" } else { "Start test" };
-            if ui.button(name).clicked() { self.start_test(ctx); }
+            if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
             ui.label(match self.session.state {
                 State::Ready=>"Ready · press Start to capture typing",

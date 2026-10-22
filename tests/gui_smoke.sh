@@ -6,8 +6,10 @@ export WINIT_UNIX_BACKEND=x11
 export RUST_BACKTRACE=1
 tmp="$(mktemp -d)"
 app_pid=""
+wm_pid=""
 cleanup() {
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
+  if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/typefinch-window.png" ]]; then
     cp "$tmp/typefinch-window.png" "$GITHUB_WORKSPACE/typefinch-gui-smoke.png"
   fi
@@ -19,6 +21,9 @@ cleanup() {
 trap cleanup EXIT
 export XDG_CONFIG_HOME="$tmp/config"
 export TYPEFINCH_QA_REPORT="$tmp/report.json"
+openbox --sm-disable >"$tmp/window-manager.log" 2>&1 &
+wm_pid=$!
+sleep 0.5
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
 window=""

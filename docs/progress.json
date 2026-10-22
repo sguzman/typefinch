@@ -133,15 +133,17 @@
               "id": "T102",
               "emoji": "🗄️",
               "name": "SQLite test history",
-              "progress": 0,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Schema and migrations",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935"
                 },
                 {
                   "text": "Persist each complete test",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935"
                 },
                 {
                   "text": "Retention and backup tests",
@@ -229,7 +231,7 @@
               "id": "T203",
               "emoji": "⏱️",
               "name": "Timed tests",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Four durations coded",
@@ -247,7 +249,8 @@
                 },
                 {
                   "text": "Session history persisted",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "Xvfb session stored in SQLite during GUI smoke; Actions 39870213935"
                 }
               ]
             },
@@ -1075,11 +1078,12 @@
               "id": "T902",
               "emoji": "🪟",
               "name": "Live Hyprland automation",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Headless run",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "Xvfb + Openbox + Mesa launched native egui app, typed 33 chars and captured screenshot; Actions 39870050679"
                 },
                 {
                   "text": "Keyboard/input QA",

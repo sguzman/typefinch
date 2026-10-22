@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██░░░░░░░░ 23%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███░░░░░░░ 26%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████░░░░░░ 44%`
+## 🐣 M0 — Native typing MVP — `█████░░░░░ 52%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -27,22 +27,22 @@
   - [ ] Keyboard navigation audit
   - [ ] HiDPI/small-window screenshots
 
-### 🐦 P1 — Profiles and persistence — `██░░░░░░░░ 22%`
+### 🐦 P1 — Profiles and persistence — `█████░░░░░ 45%`
 
 - 👤 **T101** Multiple local profiles — `███████░░░ 67%`
   - [x] Create/select profile UI coded — src/app.rs
   - [x] JSON persistence coded — src/preferences.rs
   - [ ] Recovery, collisions, migrations and actual runtime testing
-- 🗄️ **T102** SQLite test history — `░░░░░░░░░░ 0%`
-  - [ ] Schema and migrations
-  - [ ] Persist each complete test
+- 🗄️ **T102** SQLite test history — `███████░░░ 67%`
+  - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
+  - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
   - [ ] Retention and backup tests
 - 🎯 **T103** Per-profile goals and settings — `░░░░░░░░░░ 0%`
   - [ ] Settings and goals UI
   - [ ] Per-profile setting persistence
   - [ ] Export/import
 
-### ⌨️ P2 — Tests and core scoring — `█████░░░░░ 45%`
+### ⌨️ P2 — Tests and core scoring — `█████░░░░░ 50%`
 
 - ⚡ **T201** Typing input and session lifecycle — `█████░░░░░ 50%`
   - [x] Input handlers implemented — src/app.rs
@@ -53,11 +53,11 @@
   - [x] Pure scoring function implemented — src/engine.rs
   - [x] Scoring tests authored — src/engine.rs
   - [x] CI scoring tests pass — GitHub Actions run 39867817749: all 11 Rust unit tests passed
-- ⏱️ **T203** Timed tests — `█████░░░░░ 50%`
+- ⏱️ **T203** Timed tests — `████████░░ 75%`
   - [x] Four durations coded — src/app.rs
   - [x] Monotonic timer coded — src/engine.rs
   - [ ] Live timing edge-case QA
-  - [ ] Session history persisted
+  - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
 - 📚 **T204** Word, quote, punctuation and custom tests — `███░░░░░░░ 25%`
   - [x] Starter English corpus — src/engine.rs
   - [ ] Quotes and paragraphs
@@ -71,8 +71,8 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `█████░░░░░ 45%`
-- 🐦 Local identity — `██░░░░░░░░ 22%`
+- ⌨️ Typing tests — `█████░░░░░ 50%`
+- 🐦 Local identity — `█████░░░░░ 45%`
 - 🌗 Appearance — `██████░░░░ 56%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `███░░░░░░░ 28%`
@@ -241,18 +241,18 @@
 - 🌏 Languages — `░░░░░░░░░░ 0%`
 - 🔤 Unicode correctness — `░░░░░░░░░░ 0%`
 
-## 📦 M6 — Release quality — `███░░░░░░░ 25%`
+## 📦 M6 — Release quality — `███░░░░░░░ 33%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `███░░░░░░░ 25%`
+### 🧪 P9 — Acceptance and release — `███░░░░░░░ 33%`
 
 - 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
   - [x] CI build/test green — GitHub Actions run 39867817749: cargo check and cargo test passed
   - [x] Roadmap drift verified — GitHub Actions 39868627924: render_roadmap.py --check passed
-- 🪟 **T902** Live Hyprland automation — `░░░░░░░░░░ 0%`
-  - [ ] Headless run
+- 🪟 **T902** Live Hyprland automation — `███░░░░░░░ 33%`
+  - [x] Headless run — Xvfb + Openbox + Mesa launched native egui app, typed 33 chars and captured screenshot; Actions 39870050679
   - [ ] Keyboard/input QA
   - [ ] Theme/layout screenshots
 - ♿ **T903** Accessibility review — `░░░░░░░░░░ 0%`
@@ -266,6 +266,6 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🧪 Automated QA — `█████░░░░░ 50%`
+- 🧪 Automated QA — `███████░░░ 67%`
 - 🚀 Release readiness — `░░░░░░░░░░ 0%`
 

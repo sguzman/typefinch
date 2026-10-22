@@ -11,7 +11,7 @@
 ## Currently implemented in source
 
 - ⌨️ English timed word tests: 15, 30, 60 and 120 seconds; WPM, accuracy and corrections.
-- 🐦 Multiple local profiles and saved high-water statistics without online accounts.
+- 🐦 Multiple local profiles, versioned SQLite session history, and saved high-water statistics without online accounts.
 - 🌗 System/Light/Dark egui appearance and persisted preference.
 - 🗺️ Named keyboard-layout catalog with four initial ANSI emulation tables: QWERTY, Dvorak, Colemak and Colemak-DH. Installed XKB layout/variant identities can also be compiled for provisional in-app ANSI-position emulation; unavailable identities remain recognition-only. AltGr/dead-key/IME and non-ANSI behavior still need QA.
 - 🔌 Read-only Hyprland device discovery with a chooser for device metadata. **Not yet a per-keyboard typing input filter.**
@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `██░░░░░░░░ 23%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%.
+**Acceptance-based overall progress:** `███░░░░░░░ 26%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%.
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -33,3 +33,7 @@ Settings: `$XDG_CONFIG_HOME/typefinch/settings.json` (or `~/.config/typefinch/se
 [🗺️ Keyboard support and honest limitations](docs/KEYBOARDS.md) · [🎨 Color](docs/COLOR.md) · [📋 GitHub tracking](docs/ISSUES.md).
 
 Public sources must never include private workstation paths, user-supplied venting, secrets, personal typed text or profiles. License: MIT.
+
+## Native GUI validation
+
+GitHub Actions runs a real X11/virtual-display smoke test using Openbox and software Mesa. It focuses the typing canvas, injects synthetic keys, checks WPM and the saved SQLite record, and uploads a screenshot. This verifies the native application under **X11**, not production Hyprland or physical multi-keyboard routing. CI evidence: [successful X11 and SQLite run](https://github.com/sguzman/typefinch/actions/runs/39870213935).

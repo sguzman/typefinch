@@ -133,3 +133,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Corrupt settings safeguard:** If an existing settings file cannot be read or decoded, Typefinch preserves it byte-for-byte and clearly enters a read-only recovery state rather than creating a replacement profile on disk. Preferences writes, goals import, full backup from fallback defaults, and scored session persistence are disabled until the settings file is repaired or recovered. Missing settings on a genuine first run still bootstrap normally.
 
 The guarded startup path also avoids opening or migrating the saved SQLite database until the settings identity is recovered, and prevents publishing fallback profile statistics or goals as if they were genuine.
+
+**Orphaned-history safeguard:** If `settings.json` disappears but `sessions.sqlite3` still exists, startup now enters guarded recovery mode instead of assigning a new profile UUID. Original session data remains untouched while a matching settings backup is recovered.

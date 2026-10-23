@@ -144,8 +144,21 @@ impl Preferences {
             prefs:Self::default(),read_only:true,warning:Some(warning.to_owned())
         };
         match fs::symlink_metadata(path) {
-            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>
-                return SettingsLoad{prefs:Self::default(),read_only:false,warning:None},
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{
+                // An existing history database without its identity-bearing
+                // settings is NOT a first run. Never replace the missing
+                // identity with a fresh UUID and orphan all saved sessions.
+                let database=path.parent().unwrap_or(std::path::Path::new("."))
+                    .join("sessions.sqlite3");
+                match fs::symlink_metadata(&database) {
+                    Ok(_)=>return unsafe_to_write(
+                        "Settings are missing but an existing sessions database was found. Nothing was replaced; restore the matching settings backup before recording."),
+                    Err(ref e) if e.kind()==std::io::ErrorKind::NotFound=>{},
+                    Err(_)=>return unsafe_to_write(
+                        "Settings are missing and the existing sessions database cannot be inspected. No identity or history is replaced."),
+                }
+                return SettingsLoad{prefs:Self::default(),read_only:false,warning:None};
+            },
             Err(_)=>return unsafe_to_write(
                 "Could not inspect the settings path. No data is replaced; settings and session recording are disabled."),
             Ok(metadata) if !metadata.file_type().is_file()=>
@@ -249,6 +262,20 @@ mod tests {
             b"{\"profiles\":[{\"name\":\"Finch\",\"tests\":1,\"best_wpm\":15.0,\"best_accuracy\":85.0}]}".as_slice()] {
             assert!(Preferences::parse_and_migrate(bad).is_none());
         }
+    }
+    #[test] fn missing_settings_with_existing_database_must_enter_recovery_mode() {
+        let dir=std::env::temp_dir().join(format!("typefinch-orphan-history-{}",uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let settings=dir.join("settings.json");
+        let database=dir.join("sessions.sqlite3");
+        let sentinel=b"existing history must never be touched";
+        fs::write(&database,sentinel).unwrap();
+        let loaded=Preferences::load_at(&settings);
+        assert!(loaded.read_only);
+        assert!(loaded.warning.unwrap().contains("existing sessions database"));
+        assert!(!settings.exists());
+        assert_eq!(fs::read(&database).unwrap(),sentinel);
+        fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn first_run_is_writable_but_empty_existing_profiles_are_guarded() {
         let dir=std::env::temp_dir().join(format!("typefinch-guard-{}",uuid::Uuid::new_v4()));

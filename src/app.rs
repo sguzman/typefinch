@@ -1045,8 +1045,16 @@ impl Typefinch {
             self.installed_layouts.len(), if self.emulator.is_some() { "yes" } else { "no" }));
         ui.small("OS input follows the active system layout; this selection controls the emulation target.");
         if self.mode==Mode::System {
-            let inferred=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
-            ui.small(format!("Scoring layout attribution: {inferred} (seat-level, not per-keyboard)"));
+            // The preview must match what the next scored session could
+            // actually record, including an in-flight or stale inspection.
+            let fresh=inspection_confirmed(self.device_inventory_fresh,
+                self.pending_device_query.is_some());
+            let inferred=layout_for_new_session(self.mode,&self.prefs.layout,
+                &self.keyboards,&self.installed_layouts,fresh);
+            ui.small(format!("Next OS session layout: {inferred} (seat-level, not per-keyboard)"));
+            if !fresh {
+                ui.small("Detected layout unavailable until inspection completes successfully.");
+            }
         }
         self.show_custom_layout_editor(ui);
         if self.session.state == State::Running { ui.small("Layout and input mode are locked while a test is running."); }
@@ -2013,6 +2021,28 @@ mod palette_tests {
         assert_eq!(layout_for_new_session(Mode::System,"us",&keyboards,&installed,
             inspection_confirmed(true,false)),"detected/us");
         assert_eq!(layout_for_new_session(Mode::Emulated,"us",&keyboards,&installed,
+            inspection_confirmed(false,true)),"us");
+    }
+    #[test] fn layout_preview_matches_new_session_provenance_when_refresh_pending() {
+        let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];
+        let found=vec![Keyboard{
+            address:"0x1".into(),active_keymap:"English (US)".into(),
+            ..Default::default()
+        }];
+        for (fresh,pending,expected) in [
+            (true,false,"detected/us"),
+            (true,true,"os:unknown"),
+            (false,false,"os:unknown"),
+            (false,true,"os:unknown")
+        ] {
+            let preview=layout_for_new_session(Mode::System,"us",&found,&installed,
+                inspection_confirmed(fresh,pending));
+            assert_eq!(preview,expected);
+            assert_eq!(preview,layout_for_new_session(Mode::System,"us",&found,&installed,
+                inspection_confirmed(fresh,pending)),
+                "the displayed next-session layout must use scoring provenance");
+        }
+        assert_eq!(layout_for_new_session(Mode::Emulated,"us",&found,&installed,
             inspection_confirmed(false,true)),"us");
     }
     #[test] fn completing_a_session_during_refresh_cannot_persist_stale_layout() {

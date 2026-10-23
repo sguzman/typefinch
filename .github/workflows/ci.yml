@@ -33,6 +33,8 @@ jobs:
           if ./target/debug/typefinch --unsupported; then exit 1; fi
       - name: Synthetic Hyprland two-keyboard inventory lifecycle
         run: bash tests/hyprland_fixture_smoke.sh
+      - name: Synthetic Wayland parent subprocess and metadata validation
+        run: bash tests/wayland_fixture_smoke.sh
       - name: Native Wayland seat protocol probe (no keyboard subscriptions)
         run: bash tests/wayland_seat_smoke.sh
       - name: X11 aggregate seat fallback (read-only)

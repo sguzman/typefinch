@@ -12,6 +12,15 @@ fn canonical_prefix(expected:&str,entered:&str)->bool {
     normalized.starts_with(&prefix)
 }
 fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
+fn extends_previous_grapheme(ch:char, typed:&str)->bool {
+    let value=ch as u32;
+    canonical_combining_class(ch)>0
+        || matches!(value,0x200D|0x20E3|0xFE0E|0xFE0F)
+        || (0x1F3FB..=0x1F3FF).contains(&value)
+        || typed.ends_with('\u{200D}')
+        || ((0x1F1E6..=0x1F1FF).contains(&value)
+            && typed.chars().last().is_some_and(|c|(0x1F1E6..=0x1F1FF).contains(&(c as u32))))
+}
 
 /// Parse a local custom passage in bounded memory; the bytes are never logged.
 pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
@@ -204,9 +213,9 @@ impl Session {
             let cursor=grapheme_count(&self.typed);
             // Allow a combining mark to extend the final grapheme, including
             // when its base character arrived in a separate Text event.
-            let combining=canonical_combining_class(ch)>0;
-            if cursor>=total && !combining {break;}
-            let position=if combining && cursor>0 {cursor-1} else {cursor};
+            let extension=extends_previous_grapheme(ch,&self.typed);
+            if cursor>=total && !extension {break;}
+            let position=if extension && cursor>0 {cursor-1} else {cursor};
             let expected=self.target.graphemes(true).nth(position).unwrap_or("");
             self.typed.push(ch);
             self.attempts=self.attempts.saturating_add(1);
@@ -338,6 +347,21 @@ mod tests {
         assert_eq!(session.score().entered,1);
         assert_eq!(session.score().correct,1);
         assert_eq!(session.mistakes,0);
+    }
+    #[test] fn composed_emoji_and_flags_remain_single_graphemes() {
+        for glyph in ["👩‍💻","🇲🇽","👍🏽"] {
+            let mut session=Session::new_with_custom(0,TestMode::Custom,glyph);
+            session.begin();
+            session.type_text(glyph);
+            assert_eq!(session.state,State::Finished,"failed emoji {glyph}");
+            assert_eq!(session.score().entered,1);
+            assert_eq!(session.score().correct,1);
+        }
+        let mut session=Session::new_with_custom(30,TestMode::Custom,"👩‍💻 abc");
+        session.begin();
+        session.type_text("👩‍💻");
+        session.backspace();
+        assert!(session.typed.is_empty());
     }
     #[test] fn a_backspace_erases_one_whole_grapheme() {
         let mut session=Session::new_with_custom(30,TestMode::Custom,"é a");

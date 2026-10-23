@@ -191,11 +191,24 @@ impl Typefinch {
              history::all_for_profile(id).unwrap_or_default())
         };
         let earned_badges=achievements::earned(&all_history);
+        // This override is available only to the disposable graphical smoke
+        // process, never in normal use. It does not change physical input.
+        let preview_shape=if std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+            match std::env::var("TYPEFINCH_QA_PREVIEW_SHAPE").as_deref() {
+                Ok("iso")=>Shape::Iso, Ok("jis")=>Shape::Jis,
+                Ok("split")=>Shape::Split, _=>Shape::Ansi,
+            }
+        } else {Shape::Ansi};
+        if std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some()
+            && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+            let _=crate::qa::write_geometry_report(
+                preview_shape.label(),&geometry::slots(preview_shape));
+        }
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
-            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, preview_shape:Shape::Ansi, message: startup_warning }
+            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, preview_shape, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());

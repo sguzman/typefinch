@@ -517,3 +517,41 @@ xdotool windowactivate --sync "$secondary_window" 2>/dev/null || true
 xdotool windowfocus --sync "$secondary_window"
 sleep 0.8
 XDG_CONFIG_HOME="$focus_root" lua5.4 tests/smoke_assert.lua focus-loss "$tmp/focus-report.json"
+
+# Screenshot the actual native UI for each non-ANSI geometry, in an isolated
+# synthetic configuration. Counts prove extra keys stay distinct from egui
+# physical-key events; images provide a separate visual QA artifact.
+kill "$app_pid" "$secondary_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+wait "$secondary_pid" 2>/dev/null || true
+app_pid=""
+for shape in iso jis split; do
+  shape_root="$tmp/geometry-$shape"
+  mkdir -p "$shape_root"
+  XDG_CONFIG_HOME="$shape_root" \
+  TYPEFINCH_QA_REPORT="$tmp/geometry-$shape.json" \
+  TYPEFINCH_QA_PREVIEW_SHAPE="$shape" \
+    ./target/debug/typefinch >"$tmp/app-geometry-$shape.log" 2>&1 &
+  app_pid=$!
+  window=""
+  for _ in $(seq 1 200); do
+    window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+    [[ -n "$window" ]] && break
+    if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-geometry-$shape.log"; exit 1; fi
+    sleep 0.25
+  done
+  [[ -n "$window" ]] || { echo "No $shape preview window" >&2; exit 1; }
+  xdotool windowactivate --sync "$window" 2>/dev/null || true
+  xdotool windowfocus --sync "$window"
+  xdotool windowsize "$window" 1100 850
+  sleep 0.7
+  lua5.4 tests/smoke_assert.lua geometry-preview "$tmp/geometry-$shape.json" "$shape"
+  import -window "$window" "$tmp/typefinch-geometry-$shape.png"
+  [[ -s "$tmp/typefinch-geometry-$shape.png" ]] || {
+    echo "Missing $shape native preview screenshot" >&2; exit 1;
+  }
+  identify -format "$shape geometry screenshot: %wx%h pixels\n" "$tmp/typefinch-geometry-$shape.png"
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+  app_pid=""
+done

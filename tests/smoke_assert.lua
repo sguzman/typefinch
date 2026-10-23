@@ -170,6 +170,21 @@ elseif mode == "xkb-compose" then
     equals(x.attempts,12,"dead key must not create an extra attempt")
     equals(x.accuracy,100)
     print("Real X11 Spanish XKB dead-key Compose + Backspace cancellation PASS: 12 correct graphemes, 12 scored attempts")
+elseif mode == "geometry-preview" then
+    local r=report(assert(arg[2]))
+    local shape=assert(arg[3])
+    local expected={
+        iso={name="ISO 105",slots=49,unattributed=1,visual_only=0},
+        jis={name="JIS 109",slots=53,unattributed=5,visual_only=0},
+        split={name="Split ANSI",slots=49,unattributed=0,visual_only=1},
+    }
+    local v=assert(expected[shape],"unknown geometry")
+    assert(r.synthetic and r.state=="geometry-preview")
+    equals(r.shape,v.name)
+    equals(r.slots,v.slots)
+    equals(r.unattributed,v.unattributed)
+    equals(r.visual_only,v.visual_only)
+    print("Native geometry preview PASS: "..r.shape.." ("..r.slots.." slots)")
 elseif mode == "prepare-card-theme" then
     local path=assert(arg[2])
     local config=assert(json.decode(read(path)))

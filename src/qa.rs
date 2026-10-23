@@ -37,3 +37,21 @@ pub fn write_focus_lost_report()->Result<(),String> {
     fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
         .map_err(|e|e.to_string())
 }
+
+/// Synthetic-only QA metadata for visual keyboard geometry snapshots.
+pub fn write_geometry_report(
+    name:&str, slots:&[crate::geometry::Slot]
+)->Result<(),String>{
+    let Some(path)=env::var_os("TYPEFINCH_QA_REPORT") else {return Ok(());};
+    let report=serde_json::json!({
+        "state":"geometry-preview",
+        "synthetic":true,
+        "shape":name,
+        "slots":slots.len(),
+        "unattributed":slots.iter().filter(|s|
+            s.egui_key.is_none() && s.evdev!=0).count(),
+        "visual_only":slots.iter().filter(|s|s.evdev==0).count(),
+    });
+    fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

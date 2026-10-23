@@ -51,6 +51,25 @@ fn reference_ink(dark:bool)->Color32 {
     if dark {Color32::from_rgb(185,190,205)}
     else {Color32::from_rgb(85,85,92)}
 }
+/// In-session key heatmap fills deliberately keep enough contrast against
+/// error_ink so count labels and glyphs are legible in light and dark themes.
+fn key_heat_fill(errors:u32,dark:bool)->Color32 {
+    if dark {
+        match errors {
+            0=>Color32::from_rgb(35,39,60),
+            1=>Color32::from_rgb(59,36,52),
+            2|3=>Color32::from_rgb(75,35,53),
+            _=>Color32::from_rgb(91,37,55),
+        }
+    } else {
+        match errors {
+            0=>Color32::from_rgb(247,247,252),
+            1=>Color32::from_rgb(255,235,237),
+            2|3=>Color32::from_rgb(255,219,223),
+            _=>Color32::from_rgb(255,203,209),
+        }
+    }
+}
 
 
 pub struct Typefinch {
@@ -685,9 +704,12 @@ impl Typefinch {
                         value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
                     } else {0};
                     let ink=if missed>0 {error_ink(ui.visuals().dark_mode)} else {ui.visuals().text_color()};
-                    let cell=egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::symmetric(7,7))
-                        .show(ui,|ui| {
+                    let mut frame=egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::symmetric(7,7));
+                    if missed>0 {
+                        frame=frame.fill(key_heat_fill(missed,ui.visuals().dark_mode));
+                    }
+                    let cell=frame.show(ui,|ui| {
                             let finger=layouts::finger_hint(*key).unwrap_or("–");
                             ui.add_sized([34.0,43.0], egui::Label::new(
                                 RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
@@ -703,7 +725,7 @@ impl Typefinch {
             ui.add_space(2.0);
         }
         ui.small("Finger hints: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Standard ANSI guidance only.");
-        ui.small("Red symbols had mistakes in the current session. Hover for the in-memory count.");
+        ui.small("In-session heatmap: darker/redder keycaps indicate more missed attempts. Hover for counts; nothing is stored.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty() {
             ui.small("Slower single-key intervals (current session only; ≥2 samples each):");
@@ -1123,6 +1145,18 @@ mod palette_tests {
         });
         assert_eq!(recorded_layout(Mode::System,"us",&keyboards,&xkb),"os:unknown");
         assert_eq!(recorded_layout(Mode::System,"us",&[],&xkb),"os:unknown");
+    }
+    #[test] fn key_heat_levels_preserve_readable_error_glyphs() {
+        for dark in [false,true] {
+            let bg=key_heat_fill(0,dark);
+            assert_ne!(key_heat_fill(1,dark),bg);
+            assert_ne!(key_heat_fill(4,dark),key_heat_fill(1,dark));
+            for count in [1,2,4,10] {
+                let fg=error_ink(dark);
+                let fill=key_heat_fill(count,dark);
+                assert!(contrast(fg,fill)>=4.5,"heatmap {dark} count={count}: {fg:?} vs {fill:?}");
+            }
+        }
     }
     #[test] fn brand_ink_and_feedback_meet_normal_text_contrast() {
         let light=Color32::WHITE;

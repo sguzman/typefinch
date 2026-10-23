@@ -2,6 +2,20 @@
 use std::time::{Duration, Instant};
 use serde::{Serialize, Deserialize};
 
+/// Parse a local custom passage in bounded memory; the bytes are never logged.
+pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
+    if bytes.len()>65_536 {return Err("Text file exceeds 64 KiB".into());}
+    let text=std::str::from_utf8(bytes).map_err(|_|"Only UTF-8 text files are supported")?;
+    if text.chars().any(|c|c.is_control() && !matches!(c,'\n'|'\r'|'\t')) {
+        return Err("File contains unsupported control characters".into());
+    }
+    let result=text.chars().take(4096).collect::<String>();
+    if result.split_whitespace().next().is_none() {
+        return Err("Text file is empty or whitespace-only".into());
+    }
+    Ok(result)
+}
+
 pub const WORDS: &str = "little finches practice every day with patient rhythm gentle wings make steady progress while fingers learn their keys accuracy grows through focused practice kind habits build confident typing and each new session brings another chance to improve";
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -162,6 +176,14 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn private_text_file_import_is_utf8_and_bounded() {
+        assert_eq!(import_custom_passage(b"hello\nworld").unwrap(),"hello\nworld");
+        assert!(import_custom_passage(&vec![b'a';65_537]).is_err());
+        assert_eq!(import_custom_passage(&vec![b'a';65_536]).unwrap().len(),4096);
+        assert!(import_custom_passage(b" \t \n ").is_err());
+        assert!(import_custom_passage(&[0xFF]).is_err());
+        assert!(import_custom_passage(b"hi\0there").is_err());
+    }
     #[test] fn custom_and_lesson_scores_never_inflate_standard_records() {
         for mode in TestMode::ALL {
             assert_eq!(mode.counts_for_benchmark(), !matches!(mode,TestMode::Custom|TestMode::Lesson));

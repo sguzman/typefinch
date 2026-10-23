@@ -200,6 +200,33 @@ impl Typefinch {
             }
         }
     }
+    fn accept_custom_file(&mut self, ctx:&egui::Context) {
+        if self.prefs.test_mode!=TestMode::Custom || self.session.state==State::Running {return;}
+        let files=ctx.input(|i|i.raw.dropped_files.clone());
+        let Some(drop)=files.into_iter().next() else {return;};
+        let Some(path)=drop.path else {
+            self.message="Drop a local file with a readable filesystem path.".into();
+            return;
+        };
+        let imported=(|| -> Result<String,String> {
+            use std::io::Read;
+            let input=std::fs::File::open(&path).map_err(|e|e.to_string())?;
+            // Read one extra byte for strict size detection, never the entire
+            // contents of a potentially huge file.
+            let mut data=Vec::new();
+            input.take(65_537).read_to_end(&mut data).map_err(|e|e.to_string())?;
+            crate::engine::import_custom_passage(&data)
+        })();
+        match imported {
+            Ok(passage)=>{
+                let count=passage.chars().count();
+                self.custom_text=passage;
+                self.rebuild_session();
+                self.message=format!("Loaded {count} characters into memory. The passage will not be saved.");
+            },
+            Err(reason)=>self.message=format!("Custom text import rejected: {reason}"),
+        }
+    }
     fn show_profile(&mut self, ui: &mut egui::Ui) {
         ui.heading("Your perch");
         let previous = self.prefs.active_profile;
@@ -321,6 +348,7 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
                 ui.label("Custom passage (in memory only)");
+                ui.small("Drop a UTF-8 .txt or .md file onto this window to load up to 4096 characters.");
                 let edit = ui.add_enabled(
                     self.session.state != State::Running,
                     egui::TextEdit::multiline(&mut self.custom_text)
@@ -668,6 +696,7 @@ impl eframe::App for Typefinch {
         if ctx.input(|i| i.key_pressed(egui::Key::F7)) {
             self.export_statistics();
         }
+        self.accept_custom_file(ctx);
         let before = self.session.state;
         self.apply_events(ctx);
         self.session.tick();

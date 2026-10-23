@@ -428,12 +428,17 @@
               "id": "T303",
               "emoji": "🌐",
               "name": "libxkbcommon-backed full emulation",
-              "progress": 33,
+              "progress": 50,
               "checks": [
                 {
                   "text": "Compile installed keymaps",
                   "passed": true,
                   "evidence": "src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests"
+                },
+                {
+                  "text": "Session-local XKB Compose for ANSI dead keys and one-grapheme scoring",
+                  "passed": true,
+                  "evidence": "src/xkb.rs and src/app.rs: session-local XKB Compose, reset on restart/Backspace/cancel/focus loss; GitHub Actions 39985958620: 106 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Shift/AltGr/dead-key handling",

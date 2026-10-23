@@ -144,4 +144,6 @@ The guarded startup path also avoids opening or migrating the saved SQLite datab
 
 **Keyboard-driven preview:** F3 cycles Base, Shift, AltGr and Shift+AltGr without changing the system keyboard or the active typing session. This is an in-app symbol inspector, not modifier-event interception.
 
+**Stateful dead-key Compose:** XKB-backed ANSI emulation now maintains a fresh Compose state for each scored test. Spanish acute + e produces one scored `é`; a pending dead key can be canceled with Backspace, Escape or focus loss without recording an extra character. Physical AltGr and complex IME input remain unverified. [106 Rust tests and graphical CI passed](https://github.com/sguzman/typefinch/actions/runs/39985958620).
+
 **Recovery and focus QA:** [102 passing Rust tests plus native recovery staging, corrupt/orphaned settings protection, and two-window focus-loss cancellation](https://github.com/sguzman/typefinch/actions/runs/39967868689). Real Hyprland hardware acceptance and full IME handling remain open.

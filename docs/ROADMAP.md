@@ -78,11 +78,11 @@
 - 🐦 Local identity — `█████████░ 89%`
 - 🌗 Appearance — `███████░░░ 70%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 49%`
+## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 51%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `██████░░░░ 62%`
+### 🧬 P3 — Recognition, emulation and geometry — `███████░░░ 65%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -93,8 +93,9 @@
   - [x] Physical key event handling coded — src/app.rs
   - [x] Native mapping QA — src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [ ] Full modifiers and punctuation layers
-- 🌐 **T303** libxkbcommon-backed full emulation — `███░░░░░░░ 33%`
+- 🌐 **T303** libxkbcommon-backed full emulation — `█████░░░░░ 50%`
   - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
+  - [x] Session-local XKB Compose for ANSI dead keys and one-grapheme scoring — src/xkb.rs and src/app.rs: session-local XKB Compose, reset on restart/Backspace/cancel/focus loss; GitHub Actions 39985958620: 106 Rust tests and native X11 graphical suite passed
   - [ ] Shift/AltGr/dead-key handling
   - [ ] Layout regression corpus
 - 🛠️ **T304** User-editable custom layouts — `██████████ 100%`
@@ -128,7 +129,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `███████░░░ 67%`
-- 🔀 Software layout emulation — `█████░░░░░ 52%`
+- 🔀 Software layout emulation — `██████░░░░ 56%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

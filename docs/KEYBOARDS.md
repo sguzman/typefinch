@@ -32,7 +32,7 @@ Acceptance: hotplug two keyboards; map both with differing layouts; verify focus
 
 ## XKB compiler (new implementation)
 
-Where `xkeyboard-config` has a matching layout/variant, Typefinch can compile the installed keymap with `libxkbcommon` and remap common physical ANSI keys inside the application. This broadens *potentially emulatable* entries beyond the four built-in tables, with locale-specific symbols rather than guessed character mappings. This still is **not** complete emulation for AltGr, dead-key Compose, IMEs, ISO/JIS physical extras or per-device input attribution. An unavailable XKB preset remains recognition-only.
+Where `xkeyboard-config` has a matching layout/variant, Typefinch can compile the installed keymap with `libxkbcommon` and remap common physical ANSI keys inside the application. This broadens *potentially emulatable* entries beyond the four built-in tables, with locale-specific symbols rather than guessed character mappings. Session-scoped XKB dead-key Compose now works for supported ANSI physical positions when the selected locale has a Compose table. This still is **not** complete emulation for physical AltGr, all Compose-key sequences, IMEs, ISO/JIS extras or per-device input attribution. An unavailable XKB preset remains recognition-only.
 
 ## Installed XKB registry discovery
 
@@ -57,3 +57,9 @@ While Typefinch is open inside Hyprland, it refreshes the keyboard inventory on 
 ## Modifier-layer inspector
 
 The preview exposes Base, Shift, AltGr and Shift+AltGr positions. XKB-backed layouts synthesize the right-Alt Level-3 modifier (evdev 100) for *read-only symbol inspection*, while the real input surface intentionally does not treat an undifferentiated left-Alt/right-Alt event as a trustworthy AltGr keystroke. Two-layer personal layouts have no inferred AltGr layer. Dead-key state and Compose sequences require a stateful input design before they may count toward the full-emulation acceptance gate.
+
+## Stateful Compose in scored ANSI emulation
+
+For installed XKB layouts, a fresh libxkbcommon Compose state is associated with each scored emulation session. A dead key adds no scored character while pending. A completed sequence emits the composed UTF-8 string once; an invalid continuation drops the pending accent and passes through a printable cancelling key. Backspace cancels an uncommitted accent before deleting previously typed text. Session restart, Escape, and window-focus loss reset pending composition; user custom two-layer maps do not pretend to provide XKB Compose.
+
+The existing native-mode committed-text path remains unchanged. If no usable locale Compose table is installed, emulation retains its previous non-composing path rather than inventing symbols. Automated coverage exercises Spanish dead acute + e, cancellation/reset, and one-grapheme scoring ([CI run 39985958620](https://github.com/sguzman/typefinch/actions/runs/39985958620)). Actual compositor AltGr attribution, ISO/JIS, IMEs and physical keyboard acceptance are still separate gates.

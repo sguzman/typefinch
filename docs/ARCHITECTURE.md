@@ -9,7 +9,7 @@ Typefinch is a **single standalone Rust application**, not a monorepo, with a na
 | `app` | UI state, focus, navigation, profiles, settings, on-screen typing feedback |
 | `engine` | Monotonic-session clock and deterministic WPM/accuracy calculations |
 | `layouts` | Named preset catalog and four provisional ANSI fallback mappings |
-| `xkb` | Compile installed system XKB keymaps and translate supported physical positions |
+| `xkb` | Compile installed system XKB keymaps, translate supported physical positions, and apply session-scoped dead-key Compose |
 | `devices` | Read-only Hyprland keyboard listing and active-keymap metadata |
 | `preferences` | System/Light/Dark theme, local profiles and settings JSON |
 | `history` | Versioned SQLite sessions, profile isolation, stored scoring rules |
@@ -32,7 +32,7 @@ SVG export is explicit and writes to the local `exports/typefinch-profile.svg`; 
 
 ## Keyboard capabilities
 
-The static catalog is recognition-oriented. When the operating system provides the selected XKB symbols, `libxkbcommon` compiles their character mapping for a known subset of physical ANSI keys. AltGr, dead/compose sequences, ISO/JIS extras, complex IMEs and trusted per-device attribution are not complete. The device selector only inspects Hyprland metadata. See [KEYBOARDS.md](KEYBOARDS.md).
+The static catalog is recognition-oriented. When the operating system provides the selected XKB symbols, `libxkbcommon` compiles their character mapping for a known subset of physical ANSI keys. Installed XKB layouts now support session-local dead-key Compose for recognized ANSI positions when a locale table is available. Physical AltGr, dedicated Compose-key routing, ISO/JIS extras, complex IMEs and trusted per-device attribution are not complete. The device selector only inspects Hyprland metadata. See [KEYBOARDS.md](KEYBOARDS.md).
 
 ## QA boundary
 

@@ -5,6 +5,11 @@ publish a versioned `x86_64` Linux preview archive and SHA-256 checksum as
 CI artifacts. These are not signed releases, and X11 CI does not certify live
 Hyprland input or physical keyboard routing.
 
+GitHub Actions downloads are ZIP containers. Unzip the `typefinch-linux-preview`
+artifact first to obtain the `.tar.gz` archive and matching `.sha256`
+file. Place these together in the same directory and verify them with
+`sha256sum -c typefinch-<version>-linux-x86_64.tar.gz.sha256`.
+
 From an extracted `typefinch-<version>-linux-x86_64` folder, use
 `./install.sh` to install under `$HOME/.local`, or
 `./install.sh --prefix "$HOME/.local"` to specify the destination.

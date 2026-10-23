@@ -244,12 +244,15 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
     let mut seen=HashSet::new();
     let mut found=Vec::with_capacity(keyboards.len());
     for item in keyboards {
-        // Hyprland addresses identify *inspection rows* across hotplug
-        // refreshes. A blank or duplicate identity cannot safely preserve
-        // a selected row; do not invent one from its array index/name.
-        let Some(address)=item.get("address").and_then(Value::as_str) else {continue};
+        // A partial inventory cannot prove that every keyboard shares
+        // the same active XKB layout. Reject missing/duplicate/malformed
+        // addresses instead of silently dropping potentially conflicting
+        // keyboard layouts and falsely attributing scored OS input.
+        let Some(address)=item.get("address").and_then(Value::as_str) else {
+            return Err("Hyprland keyboard inventory has an unidentified row.".into());
+        };
         if !usable_metadata(address,256) || !seen.insert(address.to_owned()) {
-            continue;
+            return Err("Hyprland keyboard inventory has an invalid or duplicate address.".into());
         }
         let field=|key:&str,max_len|item.get(key).and_then(Value::as_str)
             .filter(|v|v.len()<=max_len && !v.chars().any(char::is_control))
@@ -262,9 +265,6 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
             layout:field("layout",128),
             variant:field("variant",128),
         });
-    }
-    if !keyboards.is_empty() && found.is_empty() {
-        return Err("Hyprland returned no keyboard entries with usable unique addresses.".into());
     }
     Ok(found)
 }
@@ -451,10 +451,8 @@ mod tests {
                 assert_eq!(preserve_selection(Some("0x2"),&found),0);
             },
             "duplicates"=>{
-                let found=result.unwrap();
-                assert_eq!(found.len(),1);
-                assert_eq!(found[0].active_keymap,"English (US)");
-                assert_eq!(found[0].address,"0x1");
+                assert!(result.unwrap_err().contains("invalid or duplicate address"),
+                    "a partial inventory cannot certify an active layout");
             },
             "invalid"=>{
                 assert!(result.unwrap_err().contains("Invalid Hyprland device JSON"));
@@ -508,12 +506,16 @@ mod tests {
             {"name":"USB","address":"0x2","active_keymap":"German"},
             {"name":"Broken label\nline","address":"0x3","active_keymap":"English (US)"}
         ]}"#;
-        let found=parse_json(input).unwrap();
-        assert_eq!(found.len(),3);
+        assert!(parse_json(input).is_err(),
+            "skipping an unknown keyboard could misattribute OS input layout");
+        let safe=br#"{"keyboards":[
+            {"name":"First","address":"0x1","active_keymap":"English (US)"},
+            {"name":"Broken label\\nline","address":"0x2","active_keymap":"German"}
+        ]}"#;
+        let found=parse_json(safe).unwrap();
+        assert_eq!(found.len(),2);
         assert_eq!(found[0].name,"First");
-        assert_eq!(found[0].active_keymap,"English (US)");
-        assert_eq!(found[1].address,"0x2");
-        assert_eq!(found[2].name,"Unlabeled keyboard");
+        assert_eq!(found[1].name,"Unlabeled keyboard");
         assert_eq!(preserve_selection(Some("0x2"),&found),1);
         assert_eq!(preserve_selection(Some("bad\naddress"),&found),0);
         assert!(parse_json(br#"{"keyboards":[{"name":"anonymous"}]}"#).is_err());

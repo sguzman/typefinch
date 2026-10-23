@@ -1022,9 +1022,63 @@ impl Typefinch {
         if response.clicked() { response.request_focus(); }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
+    /// Render any supported ANSI physical position consistently, including
+    /// real XKB dead keys and unavailable symbols. This is not ISO/JIS geometry.
+    fn show_preview_key(&self,ui:&mut egui::Ui,key:egui::Key,shift:bool,alt_gr:bool) {
+        let custom=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout);
+        let mapped=if let Some(personal)=custom {
+            if alt_gr {None} else {personal.translate(key,shift)}
+        } else if let Some(emulator)=&self.emulator {
+            emulator.translate_layer(key,shift,alt_gr)
+        } else if alt_gr {
+            None
+        } else {
+            layouts::emulate(key,&self.prefs.layout,shift).map(|c|c.to_string())
+        };
+        let dead=if mapped.is_none() && custom.is_none() {
+            self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(key,shift,alt_gr))
+        } else {None};
+        let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
+        let missed=if value.chars().count()==1 {
+            value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
+        } else {0};
+        let ink=if missed>0 {error_ink(ui.visuals().dark_mode)} else {ui.visuals().text_color()};
+        let mut frame=egui::Frame::group(ui.style()).inner_margin(egui::Margin::symmetric(7,7));
+        if missed>0 {frame=frame.fill(key_heat_fill(missed,ui.visuals().dark_mode));}
+        let cell=frame.show(ui,|ui| {
+            let finger=layouts::finger_hint(key).unwrap_or("·");
+            ui.add_sized([34.0,43.0],egui::Label::new(
+                RichText::new(format!("{value}\\n{finger}")).monospace().size(13.0).color(ink)
+            ).selectable(false));
+        });
+        if let Some(name)=dead {
+            cell.response.on_hover_text(format!(
+                "ANSI position {key:?}: XKB dead key {name}. Composes with the next matching key when a locale Compose table is installed."
+            ));
+        } else if missed>0 {
+            cell.response.on_hover_text(format!(
+                "ANSI position {key:?}: {missed} missed attempt(s) in the current session"
+            ));
+        } else if let Some(ms)=value.chars().next().and_then(|ch|self.session.average_key_latency_ms(ch)) {
+            cell.response.on_hover_text(format!(
+                "ANSI position {key:?}: {ms:.0} ms average interval for this character; session only"
+            ));
+        } else {
+            cell.response.on_hover_text(format!("ANSI physical position {key:?}"));
+        }
+    }
     fn show_layout_preview(&mut self, ui: &mut egui::Ui) {
         // This is a map of the selected typing target, not a device-level OS
         // keyboard reading. An unknown key is shown explicitly, never guessed.
+        const NUMBER_ROW:[egui::Key;12]=[
+            egui::Key::Num1,egui::Key::Num2,egui::Key::Num3,egui::Key::Num4,
+            egui::Key::Num5,egui::Key::Num6,egui::Key::Num7,egui::Key::Num8,
+            egui::Key::Num9,egui::Key::Num0,egui::Key::Minus,egui::Key::Equals,
+        ];
+        const OTHER_PUNCTUATION:[egui::Key;5]=[
+            egui::Key::Backtick,egui::Key::OpenBracket,egui::Key::CloseBracket,
+            egui::Key::Quote,egui::Key::Backslash,
+        ];
         const ROWS:[[egui::Key;10];3] = [
             [egui::Key::Q,egui::Key::W,egui::Key::E,egui::Key::R,egui::Key::T,
              egui::Key::Y,egui::Key::U,egui::Key::I,egui::Key::O,egui::Key::P],
@@ -1050,52 +1104,22 @@ impl Typefinch {
             if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {"personal key positions"}
             else if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
         ui.add_space(6.0);
+        ui.label(RichText::new("ANSI number and symbol positions").strong());
+        ui.horizontal_wrapped(|ui| {
+            for key in NUMBER_ROW {self.show_preview_key(ui,key,shift,alt_gr);}
+        });
+        ui.horizontal_wrapped(|ui| {
+            for key in OTHER_PUNCTUATION {self.show_preview_key(ui,key,shift,alt_gr);}
+        });
+        ui.add_space(5.0);
         for (row_index, keys) in ROWS.iter().enumerate() {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.add_space((row_index*12) as f32);
-                for key in keys {
-                    let custom=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout);
-                    let mapped=if let Some(personal)=custom {
-                        if alt_gr {None} else {personal.translate(*key,shift)}
-                    } else if let Some(emulator)=&self.emulator {
-                        emulator.translate_layer(*key,shift,alt_gr)
-                    } else if alt_gr {
-                        None
-                    } else {
-                        layouts::emulate(*key,&self.prefs.layout,shift).map(|c|c.to_string())
-                    };
-                    let dead=if mapped.is_none() && custom.is_none() {
-                        self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(*key,shift,alt_gr))
-                    } else {None};
-                    // Dotted circle = an intentionally pending accent, dash = no mapping.
-                    let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
-                    let missed=if value.chars().count()==1 {
-                        value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
-                    } else {0};
-                    let ink=if missed>0 {error_ink(ui.visuals().dark_mode)} else {ui.visuals().text_color()};
-                    let mut frame=egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::symmetric(7,7));
-                    if missed>0 {
-                        frame=frame.fill(key_heat_fill(missed,ui.visuals().dark_mode));
-                    }
-                    let cell=frame.show(ui,|ui| {
-                            let finger=layouts::finger_hint(*key).unwrap_or("–");
-                            ui.add_sized([34.0,43.0], egui::Label::new(
-                                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
-                            ).selectable(false));
-                        });
-                    if let Some(name)=dead {
-                        cell.response.on_hover_text(format!("XKB dead key: {name}. Composes with the next matching key when a locale Compose table is installed."));
-                    } else if missed>0 {
-                        cell.response.on_hover_text(format!("{missed} missed attempt(s) for this character in the current session"));
-                    } else if let Some(ms)=value.chars().next().and_then(|ch|self.session.average_key_latency_ms(ch)) {
-                        cell.response.on_hover_text(format!("{ms:.0} ms average interval for this character; session only"));
-                    }
-                }
+                for key in keys {self.show_preview_key(ui,*key,shift,alt_gr);}
             });
             ui.add_space(2.0);
         }
-        ui.small("Finger hints: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Standard ANSI guidance only.");
+        ui.small("Finger hints on letter positions: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Other positions show ·.");
         ui.small("In-session heatmap: darker/redder keycaps indicate more missed attempts. Hover for counts; nothing is stored.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty() {
@@ -1105,7 +1129,7 @@ impl Typefinch {
             }
         }
         ui.small("◌ = genuine XKB dead key (hover for accent name); – = unmapped position. AltGr remains unavailable for personal two-layer maps.");
-        ui.small("Preview only. Actual OS input may differ; reliable physical AltGr, ISO/JIS keys and dead-key composition remain separate work.");
+        ui.small("Preview only. Dead-key Compose works for supported ANSI XKB positions; physical AltGr, ISO/JIS geometry, IMEs and live Hyprland QA remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
         ui.heading("Typing history");

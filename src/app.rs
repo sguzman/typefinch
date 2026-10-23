@@ -317,6 +317,7 @@ impl Typefinch {
         if !ctx.input(|i| i.focused) {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
+            let _=crate::qa::write_focus_lost_report();
             self.message = "Session canceled on window focus loss. No result saved.".into();
             return;
         }

@@ -28,3 +28,12 @@ pub fn write_guarded_report()->Result<(),String> {
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
         .map_err(|e|e.to_string())
 }
+
+/// Marker for an actual foreground test canceled by losing window focus.
+/// Only the explicit synthetic QA process can write this metadata-only file.
+pub fn write_focus_lost_report()->Result<(),String> {
+    let Some(path)=env::var_os("TYPEFINCH_QA_REPORT") else {return Ok(());};
+    let data=serde_json::json!({"state":"canceled-focus","synthetic":true});
+    fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

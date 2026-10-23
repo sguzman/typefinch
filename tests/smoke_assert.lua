@@ -90,6 +90,13 @@ elseif mode == "stats" then
         assert(item.typed==nil and item.raw_text==nil)
     end
     print("Full JSON history export PASS: three records, versioned aggregate-only payload")
+elseif mode == "focus-loss" then
+    local result=report(assert(arg[2]))
+    equals(result.state,"canceled-focus")
+    assert(result.synthetic)
+    local rows=dbquery("SELECT COUNT(*) AS n FROM sessions")
+    equals(rows[1].n,0)
+    print("Window focus-loss PASS: running test canceled and no SQLite score persisted")
 elseif mode == "orphan" then
     local r=report(assert(arg[2]))
     equals(r.state,"blocked")

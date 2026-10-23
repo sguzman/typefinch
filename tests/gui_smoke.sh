@@ -7,7 +7,12 @@ export RUST_BACKTRACE=1
 tmp="$(mktemp -d)"
 app_pid=""
 wm_pid=""
+secondary_pid=""
 cleanup() {
+  if [[ -n "$secondary_pid" ]]; then
+    kill "$secondary_pid" 2>/dev/null || true
+    wait "$secondary_pid" 2>/dev/null || true
+  fi
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
   if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
@@ -435,3 +440,43 @@ if compgen -G "$orphan_root/typefinch/exports/typefinch-backup-*" >/dev/null; th
   echo "Orphan-history guard must not generate fallback profile backup"
   exit 1
 fi
+
+# Two real windows: a focused test must cancel as soon as another app
+# takes foreground focus, never recording a score or paste.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+focus_root="$tmp/focus-primary"
+secondary_root="$tmp/focus-secondary"
+mkdir -p "$focus_root" "$secondary_root"
+XDG_CONFIG_HOME="$focus_root" TYPEFINCH_QA_REPORT="$tmp/focus-report.json" \
+  ./target/debug/typefinch >"$tmp/app-focus-primary.log" 2>&1 &
+app_pid=$!
+primary_window=""
+for _ in $(seq 1 200); do
+  primary_window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$primary_window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-focus-primary.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$primary_window" ]] || { echo "No focus-test primary window"; exit 1; }
+XDG_CONFIG_HOME="$secondary_root" ./target/debug/typefinch >"$tmp/app-focus-secondary.log" 2>&1 &
+secondary_pid=$!
+secondary_window=""
+for _ in $(seq 1 200); do
+  secondary_window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | grep -vx "$primary_window" | head -n 1 || true)"
+  [[ -n "$secondary_window" ]] && break
+  if ! kill -0 "$secondary_pid" 2>/dev/null; then cat "$tmp/app-focus-secondary.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$secondary_window" ]] || { echo "No focus-test competing window"; exit 1; }
+xdotool windowactivate --sync "$primary_window" 2>/dev/null || true
+xdotool windowfocus --sync "$primary_window"
+sleep 0.3
+xdotool key --clearmodifiers F5
+sleep 0.2
+xdotool type --clearmodifiers --delay 20 "lit"
+xdotool windowactivate --sync "$secondary_window" 2>/dev/null || true
+xdotool windowfocus --sync "$secondary_window"
+sleep 0.8
+XDG_CONFIG_HOME="$focus_root" lua5.4 tests/smoke_assert.lua focus-loss "$tmp/focus-report.json"

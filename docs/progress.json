@@ -564,7 +564,7 @@
               "id": "T403",
               "emoji": "🪟",
               "name": "Generic compositor fallback",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Safe Hyprland-unavailable state coded",
@@ -577,7 +577,8 @@
                 },
                 {
                   "text": "X11 fallback",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/devices.rs: gated read-only setxkbmap -query on genuine X11 sessions, one clearly labeled aggregate seat rather than invented devices; CI 40008974131: 122 Rust tests and dedicated live Xvfb seat probe, plus graphical suite passed"
                 }
               ]
             },

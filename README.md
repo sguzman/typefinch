@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███████░░░ 71%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `███████░░░ 72%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -157,3 +157,5 @@ The guarded startup path also avoids opening or migrating the saved SQLite datab
 **Spanish dead-key preview QA:** [CI 40004800479](https://github.com/sguzman/typefinch/actions/runs/40004800479) passed 116 Rust tests and captured a disposable installed-Spanish-XKB native screenshot. Two accented dead-key positions render a readable `dk` caption (hover for the accent name), distinct from unknown mappings. This is not physical AltGr verification.
 
 **Function/navigation and keypad references:** F10 switches the keyboard preview between the typing block, a 26-key function/navigation reference, and a 17-key numeric keypad reference. Positions are Linux evdev-backed illustrations only; they do not claim physical-event capture or change scored input. [118 Rust tests and native graphical acceptance passed](https://github.com/sguzman/typefinch/actions/runs/40006834967), with screenshots inspected for both new views.
+
+**X11 seat inspection:** Outside Hyprland, a genuine X11 session can read the aggregate keyboard layout using `setxkbmap -query`; Typefinch explicitly labels this a **seat, not a physical keyboard**. No global input is captured, and the feature does not use XWayland to invent Wayland device attribution. [122 Rust tests and a real Xvfb seat probe passed](https://github.com/sguzman/typefinch/actions/runs/40008974131). Generic Wayland/XKB seat detection remains open.

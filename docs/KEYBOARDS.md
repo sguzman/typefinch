@@ -21,10 +21,10 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 
 ## Multiple keyboards
 
-- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland devices, labels, and reported active keymap. A dropdown chooses the device *whose metadata to inspect*.
+- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland devices and active keymaps. On genuine X11 sessions, `setxkbmap -query` instead reports one **aggregate seat**, not individual devices. The selector inspects only returned metadata.
 - **Not implemented:** selecting a keyboard as an exclusive input source. Ordinary Wayland `wl_keyboard` is seat-level and can aggregate multiple physical keyboards.
 - **Future:** per-device event attribution only where a compositor-specific protocol or authorized opt-in evdev/libinput capture allows it. Never secretly capture keys or modify OS keyboard configuration.
-- If Hyprland is unavailable, regular native typing remains available and a detection limitation is displayed.
+- If neither Hyprland nor a genuine X11 seat query is available, regular native typing remains available and the detection limitation is displayed.
 
 Acceptance: hotplug two keyboards; map both with differing layouts; verify focus, shift/AltGr, symbols, dead keys, IMEs, ANSI/ISO/JIS and no double-count of physical + committed events.
 
@@ -99,3 +99,9 @@ Use the **Keys (F10)** selector to switch among the main typing block, function/
 ### Japanese top-left mode position
 
 The JIS main-block illustration uses `KEY_ZENKAKUHANKAKU=85` in the top-left location rather than displaying a guessed ANSI grave/backtick character (`KEY_GRAVE=41`). It appears as a non-scoring `Zen` control keycap. This follows the Linux input-event code assignments and does not imply egui can attribute the actual hardware event; the keycap is preview-only. A focused test ensures JIS never silently aliases it to an ANSI printable key.
+
+## Read-only X11 aggregate seat fallback
+
+When Hyprland is absent **and** the process declares a genuine `XDG_SESSION_TYPE=x11` with `DISPLAY`, Typefinch uses `setxkbmap -query` to inspect one X11 keyboard seat. This is intentionally reported as **"X11 aggregate seat (not a physical keyboard)"** with a stable synthetic inspection identity. The result preserves the reported layout and variant strings without pretending an X11 seat can attribute individual hardware events. There is no write to `setxkbmap`, no privilege escalation, no global keyboard capture, and no fallback through XWayland while a Wayland session is declared. Hyprland inspection still takes priority.
+
+[CI 40008974131](https://github.com/sguzman/typefinch/actions/runs/40008974131) passed 122 Rust tests, malicious/missing-layout parser cases, a separate live `Xvfb` + `setxkbmap -query` probe, and the full native graphical suite. This accepts the X11 fallback only. Generic Wayland-compositor XKB seat discovery and verified per-device attribution remain future work; if `setxkbmap` is missing or the X11 query fails, ordinary native typing remains available and the inspector reports the limitation.

@@ -252,6 +252,51 @@ mod tests {
         assert!(parse_x11_query(&[255,254]).is_err());
         assert!(parse_x11_query(&vec![b'a';16*1024+1]).is_err());
     }
+    #[test] fn synthetic_hyprland_inventory_lifecycle_requires_explicit_fixture() {
+        let Ok(scenario)=std::env::var("TYPEFINCH_QA_HYPRLAND_CASE") else {return;};
+        assert_eq!(std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").as_deref(),
+            Some(std::ffi::OsStr::new("typefinch-qa-only")));
+        assert_eq!(std::env::var("XDG_SESSION_TYPE").as_deref(),Ok("wayland"));
+        // A separate disposable CI executable named hyprctl supplies data
+        // through the real bounded subprocess path. This is NOT physical
+        // Hyprland/hardware acceptance.
+        let started=Instant::now();
+        let result=inspect();
+        match scenario.as_str() {
+            "initial"|"reordered"=>{
+                let found=result.unwrap();
+                assert_eq!(found.len(),2);
+                let names=found.iter().map(|k|k.address.as_str()).collect::<Vec<_>>();
+                assert_eq!(names,
+                    if scenario=="initial"{vec!["0x1","0x2"]}else{vec!["0x2","0x1"]});
+                assert_eq!(preserve_selection(Some("0x2"),&found),
+                    if scenario=="initial"{1}else{0});
+                assert_eq!(found.iter().find(|k|k.address=="0x2").unwrap().active_keymap,
+                    "German");
+            },
+            "unplugged"=>{
+                let found=result.unwrap();
+                assert_eq!(found.len(),1);
+                assert_eq!(found[0].address,"0x1");
+                assert_eq!(preserve_selection(Some("0x2"),&found),0);
+            },
+            "duplicates"=>{
+                let found=result.unwrap();
+                assert_eq!(found.len(),1);
+                assert_eq!(found[0].active_keymap,"English (US)");
+                assert_eq!(found[0].address,"0x1");
+            },
+            "invalid"=>{
+                assert!(result.unwrap_err().contains("Invalid Hyprland device JSON"));
+            },
+            "hung"=>{
+                assert!(result.unwrap_err().contains("timed out"));
+                assert!(started.elapsed()<Duration::from_secs(5));
+            },
+            _=>panic!("unrecognized synthetic Hyprland QA scenario"),
+        }
+        assert!(started.elapsed()<Duration::from_secs(5));
+    }
     #[test] fn native_x11_aggregate_seat_is_read_only() {
         // Exercised under Xvfb by the dedicated CI step, not simulated
         // during the default unit-test pass without DISPLAY.

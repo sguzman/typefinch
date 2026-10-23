@@ -31,6 +31,8 @@ jobs:
           ./target/debug/typefinch --version | grep -Fx "typefinch $(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"
           ./target/debug/typefinch --help | grep -F "GUI shortcuts:"
           if ./target/debug/typefinch --unsupported; then exit 1; fi
+      - name: Synthetic Hyprland two-keyboard inventory lifecycle
+        run: bash tests/hyprland_fixture_smoke.sh
       - name: X11 aggregate seat fallback (read-only)
         run: xvfb-run -a -s "-screen 0 1280x900x24" env XDG_SESSION_TYPE=x11 TYPEFINCH_QA_X11_SEAT=1 cargo test devices::tests::native_x11_aggregate_seat_is_read_only -- --nocapture
       - name: X11 graphical smoke test (software-rendered)

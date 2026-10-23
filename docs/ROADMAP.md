@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███████░░░ 69%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███████░░░ 70%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `████████░░ 77%`
 
@@ -78,11 +78,11 @@
 - 🐦 Local identity — `█████████░ 89%`
 - 🌗 Appearance — `███████░░░ 70%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 51%`
+## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 54%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `███████░░░ 65%`
+### 🧬 P3 — Recognition, emulation and geometry — `███████░░░ 70%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -93,11 +93,11 @@
   - [x] Physical key event handling coded — src/app.rs
   - [x] Native mapping QA — src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [ ] Full modifiers and punctuation layers
-- 🌐 **T303** libxkbcommon-backed full emulation — `█████░░░░░ 50%`
+- 🌐 **T303** libxkbcommon-backed full emulation — `████████░░ 75%`
   - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
   - [x] Session-local XKB Compose for ANSI dead keys and one-grapheme scoring — src/xkb.rs and src/app.rs: session-local XKB Compose, reset on restart/Backspace/cancel/focus loss; GitHub Actions 39985958620: 106 Rust tests and native X11 graphical suite passed
   - [ ] Shift/AltGr/dead-key handling
-  - [ ] Layout regression corpus
+  - [x] Layout regression corpus — src/xkb.rs: 20 golden symbol cases across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic, including Shift, AltGr inspection and Unicode; GitHub Actions 39986908299: 107 Rust tests and native X11 graphical suite passed
 - 🛠️ **T304** User-editable custom layouts — `██████████ 100%`
   - [x] Editor and geometry — src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Versioned schema — src/custom_layout.rs v1 UUID-identified serde JSON schema, Unicode grapheme validation, malformed-input unit tests; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
@@ -129,7 +129,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `███████░░░ 67%`
-- 🔀 Software layout emulation — `██████░░░░ 56%`
+- 🔀 Software layout emulation — `██████░░░░ 63%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

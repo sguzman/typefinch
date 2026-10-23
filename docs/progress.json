@@ -428,7 +428,7 @@
               "id": "T303",
               "emoji": "🌐",
               "name": "libxkbcommon-backed full emulation",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Compile installed keymaps",
@@ -446,7 +446,8 @@
                 },
                 {
                   "text": "Layout regression corpus",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/xkb.rs: 20 golden symbol cases across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic, including Shift, AltGr inspection and Unicode; GitHub Actions 39986908299: 107 Rust tests and native X11 graphical suite passed"
                 }
               ]
             },

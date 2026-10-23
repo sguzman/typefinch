@@ -10,6 +10,7 @@ mod engine;
 mod history;
 mod export;
 mod layouts;
+mod geometry;
 mod lesson;
 mod preferences;
 mod registry;

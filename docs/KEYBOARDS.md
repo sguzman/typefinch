@@ -40,7 +40,7 @@ At startup, Typefinch reads the local read-only xkeyboard-config rules inventory
 
 ## Session layout attribution
 
-Typefinch records the emulated target identity for software-emulated sessions. OS-input sessions use a clearly prefixed `detected/<id>` identity only if a **complete, uniquely addressed** Hyprland keyboard inventory agrees on the active keymap and it resolves uniquely to an installed XKB entry. Otherwise Typefinch records `os:unknown` and excludes that session from layout-comparable trend charts. This is seat-level *best-effort* metadata, not proof of which physical keyboard generated a keystroke; changes after the session begins are not presently monitored. The layout context is snapshotted when a session starts.
+Typefinch records the emulated target identity for software-emulated sessions. OS-input sessions use a clearly prefixed `detected/<id>` identity only if a **complete, uniquely addressed** Hyprland keyboard inventory agrees on the active keymap and it resolves uniquely to an installed XKB entry. Otherwise Typefinch records `os:unknown` and excludes that session from layout-comparable trend charts. This is seat-level *best-effort* metadata, not proof of which physical keyboard generated a keystroke; the layout context is snapshotted when a session starts, then downgraded to `os:unknown` if focus changes or a later trusted inventory contradicts it. Polling is periodic, not per-event input attribution, and an unknown session is never retroactively upgraded.
 
 ## Refresh after hardware changes
 

@@ -7,6 +7,7 @@ use crate::{
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
+    geometry::{self, Shape, Slot},
     history::{self, Record},
     lesson,
     layouts::{self, Mode},
@@ -137,6 +138,7 @@ pub struct Typefinch {
     backup_settings_path:String,
     backup_check_result:String,
     preview_layer:PreviewLayer,
+    preview_shape:Shape,
     message: String,
 }
 impl Typefinch {
@@ -193,7 +195,7 @@ impl Typefinch {
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
-            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, message: startup_warning }
+            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, preview_shape:Shape::Ansi, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -1024,7 +1026,7 @@ impl Typefinch {
     }
     /// Render any supported ANSI physical position consistently, including
     /// real XKB dead keys and unavailable symbols. This is not ISO/JIS geometry.
-    fn show_preview_key(&self,ui:&mut egui::Ui,key:egui::Key,shift:bool,alt_gr:bool) {
+    fn show_preview_key(&self,ui:&mut egui::Ui,key:egui::Key,shift:bool,alt_gr:bool,width:f32) {
         let custom=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout);
         let mapped=if let Some(personal)=custom {
             if alt_gr {None} else {personal.translate(key,shift)}
@@ -1039,6 +1041,7 @@ impl Typefinch {
             self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(key,shift,alt_gr))
         } else {None};
         let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
+        let value=if key==egui::Key::Space && value==" " {"␣".to_string()} else {value};
         let missed=if value.chars().count()==1 {
             value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
         } else {0};
@@ -1047,7 +1050,7 @@ impl Typefinch {
         if missed>0 {frame=frame.fill(key_heat_fill(missed,ui.visuals().dark_mode));}
         let cell=frame.show(ui,|ui| {
             let finger=layouts::finger_hint(key).unwrap_or("·");
-            ui.add_sized([34.0,43.0],egui::Label::new(
+            ui.add_sized([width,43.0],egui::Label::new(
                 RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
             ).selectable(false));
         });
@@ -1067,69 +1070,89 @@ impl Typefinch {
             cell.response.on_hover_text(format!("ANSI physical position {key:?}"));
         }
     }
-    fn show_layout_preview(&mut self, ui: &mut egui::Ui) {
-        // This is a map of the selected typing target, not a device-level OS
-        // keyboard reading. An unknown key is shown explicitly, never guessed.
-        const NUMBER_ROW:[egui::Key;12]=[
-            egui::Key::Num1,egui::Key::Num2,egui::Key::Num3,egui::Key::Num4,
-            egui::Key::Num5,egui::Key::Num6,egui::Key::Num7,egui::Key::Num8,
-            egui::Key::Num9,egui::Key::Num0,egui::Key::Minus,egui::Key::Equals,
-        ];
-        const OTHER_PUNCTUATION:[egui::Key;5]=[
-            egui::Key::Backtick,egui::Key::OpenBracket,egui::Key::CloseBracket,
-            egui::Key::Quote,egui::Key::Backslash,
-        ];
-        const ROWS:[[egui::Key;10];3] = [
-            [egui::Key::Q,egui::Key::W,egui::Key::E,egui::Key::R,egui::Key::T,
-             egui::Key::Y,egui::Key::U,egui::Key::I,egui::Key::O,egui::Key::P],
-            [egui::Key::A,egui::Key::S,egui::Key::D,egui::Key::F,egui::Key::G,
-             egui::Key::H,egui::Key::J,egui::Key::K,egui::Key::L,egui::Key::Semicolon],
-            [egui::Key::Z,egui::Key::X,egui::Key::C,egui::Key::V,egui::Key::B,
-             egui::Key::N,egui::Key::M,egui::Key::Comma,egui::Key::Period,egui::Key::Slash],
-        ];
+    fn show_preview_extra(&self,ui:&mut egui::Ui,slot:&Slot,shift:bool,alt_gr:bool,width:f32) {
+        let personal=self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout);
+        let mapped=if personal {None} else {
+            self.emulator.as_ref().and_then(|xkb|
+                xkb.translate_evdev_layer(slot.evdev,shift,alt_gr))
+        };
+        let dead=if personal {None} else {
+            self.emulator.as_ref().and_then(|xkb|
+                xkb.dead_evdev_name(slot.evdev,shift,alt_gr))
+        };
+        let symbol=if slot.evdev==0 {"␣".to_string()} else {
+            mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()})
+        };
+        let frame=egui::Frame::group(ui.style()).inner_margin(egui::Margin::symmetric(7,7));
+        let cell=frame.show(ui,|ui|{
+            ui.add_sized([width,43.0],egui::Label::new(
+                RichText::new(format!("{symbol}\n·")).monospace().size(13.0)
+            ).selectable(false));
+        });
+        let note=if slot.evdev==0 {
+            "Illustrative second space half; not a second physical input event.".to_string()
+        } else {
+            format!("{} · Linux evdev {} · XKB {} · preview only; no physical event routing{}",
+                slot.name, slot.evdev, self.prefs.layout,
+                dead.as_deref().map(|name|format!(" · dead key: {name}")).unwrap_or_default())
+        };
+        cell.response.on_hover_text(note);
+    }
+    fn show_layout_preview(&mut self,ui:&mut egui::Ui) {
         ui.heading("Keyboard mapping preview");
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal_wrapped(|ui|{
             ui.label("Modifier layer (F3 cycles)");
             egui::ComboBox::from_id_salt("preview-modifier-layer")
-                .selected_text(self.preview_layer.label()).show_ui(ui,|ui| {
+                .selected_text(self.preview_layer.label()).show_ui(ui,|ui|{
                     for layer in PreviewLayer::ALL {
                         ui.selectable_value(&mut self.preview_layer,layer,layer.label());
+                    }
+                });
+            ui.label("Illustrative geometry");
+            egui::ComboBox::from_id_salt("preview-keyboard-shape")
+                .selected_text(self.preview_shape.label()).show_ui(ui,|ui|{
+                    for shape in Shape::ALL {
+                        ui.selectable_value(&mut self.preview_shape,shape,shape.label());
                     }
                 });
         });
         let shift=self.preview_layer.shift();
         let alt_gr=self.preview_layer.alt_gr();
-        ui.small(format!("Selected target: {} · ANSI physical positions · {}",
-            self.prefs.layout,
-            if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {"personal key positions"}
-            else if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
+        ui.small(format!("Selected XKB target: {} · {}. {}",
+            self.prefs.layout,self.preview_shape.label(),self.preview_shape.note()));
         ui.add_space(6.0);
-        ui.label(RichText::new("ANSI number and symbol positions").strong());
-        ui.horizontal_wrapped(|ui| {
-            for key in NUMBER_ROW {self.show_preview_key(ui,key,shift,alt_gr);}
+        let slots=geometry::slots(self.preview_shape);
+        // Each row is positioned in tenth-key units. A horizontal scroll
+        // preserves actual spacing even in a compact window.
+        egui::ScrollArea::horizontal().id_salt("geometry-preview").show(ui,|ui|{
+            for row in 0..=4_u8 {
+                ui.horizontal(|ui|{
+                    let mut prev_end=0_u16;
+                    for slot in slots.iter().filter(|s|s.row==row) {
+                        let gap=slot.x.saturating_sub(prev_end) as f32*4.8;
+                        if gap>0.0 {ui.add_space(gap);}
+                        let width=(slot.width as f32*4.8-14.0).max(30.0);
+                        if let Some(key)=slot.egui_key {
+                            self.show_preview_key(ui,key,shift,alt_gr,width);
+                        } else {
+                            self.show_preview_extra(ui,slot,shift,alt_gr,width);
+                        }
+                        prev_end=slot.x+slot.width as u16;
+                    }
+                });
+                ui.add_space(2.0);
+            }
         });
-        ui.horizontal_wrapped(|ui| {
-            for key in OTHER_PUNCTUATION {self.show_preview_key(ui,key,shift,alt_gr);}
-        });
-        ui.add_space(5.0);
-        for (row_index, keys) in ROWS.iter().enumerate() {
-            ui.horizontal_wrapped(|ui| {
-                ui.add_space((row_index*12) as f32);
-                for key in keys {self.show_preview_key(ui,*key,shift,alt_gr);}
-            });
-            ui.add_space(2.0);
-        }
-        ui.small("Finger hints on letter positions: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Other positions show ·.");
-        ui.small("In-session heatmap: darker/redder keycaps indicate more missed attempts. Hover for counts; nothing is stored.");
+        ui.small("Illustrative key shapes, not detected hardware. ISO/JIS extra positions have no trusted egui physical-key attribution; split spacing never duplicates scored Space.");
+        ui.small("◌ = actual XKB dead key (hover for name); – = unknown/unmapped; ␣ = Space. Shift/AltGr levels shown are inspected symbols, not evidence of physical AltGr input.");
         let slow=self.session.slowest_keys();
-        if !slow.is_empty() {
+        if !slow.is_empty(){
             ui.small("Slower single-key intervals (current session only; ≥2 samples each):");
-            for (ch,ms) in slow.iter().take(5) {
+            for (ch,ms) in slow.iter().take(5){
                 ui.label(format!("{} · {:.0} ms average between committed keys",ch,ms));
             }
         }
-        ui.small("◌ = genuine XKB dead key (hover for accent name); – = unmapped position. AltGr remains unavailable for personal two-layer maps.");
-        ui.small("Preview only. Dead-key Compose works for supported ANSI XKB positions; physical AltGr, ISO/JIS geometry, IMEs and live Hyprland QA remain separate work.");
+        ui.small("In-session red keycaps indicate missed attempts. Full ISO/JIS event routing, IMEs and live Hyprland verification remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
         ui.heading("Typing history");

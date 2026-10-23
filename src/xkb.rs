@@ -77,7 +77,13 @@ impl Emulator {
     /// Return the real XKB dead keysym name, not a guessed printable accent.
     /// A dead key has no single-key UTF-8 output, but remains a valid mapping.
     pub fn dead_key_name(&self, physical: Key, shift: bool, alt_gr: bool) -> Option<String> {
-        let code = xkb::Keycode::new(evdev_code(physical)? + 8);
+        self.dead_evdev_name(evdev_code(physical)?, shift, alt_gr)
+    }
+    /// Read-only symbol inspection for an explicit Linux evdev physical slot.
+    /// Extra ISO/JIS symbols are not attributed to egui/Wayland key events.
+    pub fn dead_evdev_name(&self, evdev:u32, shift:bool, alt_gr:bool) -> Option<String> {
+        if evdev==0 {return None;}
+        let code = xkb::Keycode::new(evdev + 8);
         let state = self.layer_state(shift, alt_gr);
         if !state.key_get_utf8(code).is_empty() { return None; }
         xkb::keysym_get_name(state.key_get_one_sym(code))
@@ -94,7 +100,10 @@ impl Emulator {
     /// This is a preview facility; egui does not reliably distinguish
     /// physical left-Alt from AltGr input on every compositor.
     pub fn translate_layer(&self,physical:Key,shift:bool,alt_gr:bool)->Option<String> {
-        let evdev=evdev_code(physical)?;
+        self.translate_evdev_layer(evdev_code(physical)?, shift, alt_gr)
+    }
+    pub fn translate_evdev_layer(&self,evdev:u32,shift:bool,alt_gr:bool)->Option<String> {
+        if evdev==0 {return None;}
         let state = self.layer_state(shift, alt_gr);
         let result=state.key_get_utf8(xkb::Keycode::new(evdev+8));
         if result.is_empty() || result.chars().any(char::is_control) {None} else {Some(result)}
@@ -212,6 +221,20 @@ mod tests {
         assert_eq!(es.dead_key_name(Key::Quote, false, false).as_deref(), Some("acute"));
         assert_eq!(es.dead_key_name(Key::E, false, false), None);
         assert_eq!(es.dead_key_name(Key::F12, false, false), None);
+    }
+    #[test] fn geometry_inspection_never_invents_extra_key_events() {
+        let us=Emulator::compile("us").unwrap();
+        let jp=Emulator::compile("jp").unwrap();
+        assert_eq!(us.translate_evdev_layer(0,false,false),None);
+        assert_eq!(us.dead_evdev_name(0,false,false),None);
+        assert_eq!(us.translate_evdev_layer(16,false,false).as_deref(),Some("q"));
+        // Extra JIS/Yen positions are inspected via raw XKB keycodes,
+        // never misrepresented as some other egui Key.
+        for slot in crate::geometry::slots(crate::geometry::Shape::Jis) {
+            if slot.egui_key.is_none() && slot.evdev!=0 {
+                let _=jp.translate_evdev_layer(slot.evdev,false,false);
+            }
+        }
     }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());

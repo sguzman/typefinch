@@ -36,6 +36,16 @@ impl PreviewLayer {
 }
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
+// Read modifier state from the *key press event*, not the frame-final
+// keyboard state. Fast synthetic chords and real quick releases may have
+// released Shift/Ctrl before the next GUI frame begins.
+fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::Modifiers> {
+    events.iter().find_map(|event| match event {
+        egui::Event::Key{key,pressed:true,repeat:false,modifiers,..} if *key==desired=>
+            Some(*modifiers),
+        _=>None,
+    })
+}
 fn should_poll_devices(can_poll:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
     can_poll && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
 }
@@ -1751,8 +1761,9 @@ impl eframe::App for Typefinch {
         }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
-        if ctx.input(|i|i.key_pressed(egui::Key::F12)) && self.session.state!=State::Running {
-            if ctx.input(|i|i.modifiers.shift) {
+        let f12=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::F12));
+        if let Some(modifiers)=f12.filter(|_|self.session.state!=State::Running) {
+            if modifiers.shift {
                 self.export_profile_goals();
             } else if !self.settings_read_only {
                 ctx.memory_mut(|memory|
@@ -1760,8 +1771,9 @@ impl eframe::App for Typefinch {
                 self.message="Enter a local goals JSON path, then press Enter to import into the selected profile.".into();
             }
         }
-        if (ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O))
-            || ctx.input(|i| i.key_pressed(egui::Key::F11)))
+        let ctrl_o=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::O)
+            .is_some_and(|modifiers|modifiers.ctrl));
+        if (ctrl_o || ctx.input(|i| i.key_pressed(egui::Key::F11)))
             && self.session.state!=State::Running && !self.settings_read_only {
             // Keyboard navigation to the ordinary editor, not a QA bypass.
             if self.prefs.test_mode!=TestMode::Custom {
@@ -2067,6 +2079,30 @@ mod palette_tests {
         assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
+    }
+    #[test] fn modified_shortcuts_preserve_keypress_modifiers_after_frame_release() {
+        let held=egui::Modifiers { shift:true,..Default::default() };
+        let press=egui::Event::Key {
+            key:egui::Key::F12,physical_key:None,pressed:true,
+            repeat:false,modifiers:held,
+        };
+        let release=egui::Event::Key {
+            key:egui::Key::F12,physical_key:None,pressed:false,
+            repeat:false,modifiers:egui::Modifiers::default(),
+        };
+        assert_eq!(pressed_key_modifiers(&[press.clone(),release],egui::Key::F12),Some(held));
+        assert_eq!(pressed_key_modifiers(&[press.clone()],egui::Key::O),None);
+        let ctrl=egui::Modifiers { ctrl:true,..Default::default() };
+        let ctrl_o=egui::Event::Key{
+            key:egui::Key::O,physical_key:None,pressed:true,
+            repeat:false,modifiers:ctrl,
+        };
+        assert_eq!(pressed_key_modifiers(&[ctrl_o],egui::Key::O),Some(ctrl));
+        let repeat=egui::Event::Key {
+            key:egui::Key::F12,physical_key:None,pressed:true,
+            repeat:true,modifiers:held,
+        };
+        assert_eq!(pressed_key_modifiers(&[repeat],egui::Key::F12),None);
     }
     #[test] fn pending_inspection_never_certifies_new_session_or_target() {
         let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];

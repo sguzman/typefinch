@@ -44,7 +44,15 @@ xdotool type --clearmodifiers --delay 20 "$tmp/incoming.json"
 xdotool key --clearmodifiers Return
 sleep 0.6
 lua5.4 tests/goals_gui_assert.lua imported "$XDG_CONFIG_HOME/typefinch/settings.json" "$tmp/incoming.json"
-xdotool key --clearmodifiers shift+F12
+# Send a realistic held-Shift chord; test the modifier recorded on F12
+# press, not the transient modifier state after a release in the same frame.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+xdotool keydown Shift_L
+sleep 0.12
+xdotool key F12
+sleep 0.12
+xdotool keyup Shift_L
 for _ in $(seq 1 40); do
   [[ -s "$XDG_CONFIG_HOME/typefinch/exports/typefinch-goals.json" ]] && break
   sleep 0.1

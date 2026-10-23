@@ -39,11 +39,39 @@ pub fn base_dir() -> PathBuf {
         .join("typefinch")
 }
 impl Preferences {
+    fn parse_and_migrate(bytes: &[u8]) -> Option<(Self,bool)> {
+        let data: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+        let mut p: Self = serde_json::from_value(data.clone()).ok()?;
+        if p.profiles.is_empty() || p.active_profile >= p.profiles.len() { return None; }
+        let originally_missing = data.get("profiles").and_then(|v|v.as_array())
+            .is_some_and(|arr|arr.iter().any(|value|value.get("id").and_then(|s|s.as_str()).is_none()));
+        let mut changed = originally_missing;
+        let mut ids=std::collections::HashSet::new();
+        for profile in &mut p.profiles {
+            if profile.id.trim().is_empty() || !ids.insert(profile.id.clone()) {
+                profile.id = new_profile_id();
+                ids.insert(profile.id.clone());
+                changed = true;
+            }
+        }
+        Some((p, changed))
+    }
     pub fn load() -> Self {
-        fs::read(base_dir().join("settings.json")).ok()
-            .and_then(|b| serde_json::from_slice::<Self>(&b).ok())
-            .filter(|p| !p.profiles.is_empty() && p.active_profile < p.profiles.len())
-            .unwrap_or_default()
+        let path=base_dir().join("settings.json");
+        let parsed=fs::read(&path).ok().and_then(|bytes| Self::parse_and_migrate(&bytes));
+        match parsed {
+            Some((settings, needs_write)) => {
+                // UUID migrations must be persisted *before* creating history,
+                // or a legacy profile gets a new UUID each launch.
+                if needs_write {
+                    if let Err(err)=settings.save() {
+                        eprintln!("Typefinch profile ID migration not saved: {err}");
+                    }
+                }
+                settings
+            },
+            None => Self::default(),
+        }
     }
     pub fn save(&self) -> Result<(), String> {
         let dir=base_dir();
@@ -57,6 +85,32 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn legacy_profile_ids_are_migrated_and_stable_when_serialized() {
+        let old = br#"{"theme":"system","layout":"us","profiles":[
+            {"name":"Old","tests":3,"best_wpm":60.0,"best_accuracy":95.0}
+        ],"active_profile":0,"duration_seconds":30}"#;
+        let (p,migrated)=Preferences::parse_and_migrate(old).unwrap();
+        assert!(migrated);
+        let stable=p.profiles[0].id.clone();
+        assert!(!stable.is_empty());
+        let bytes=serde_json::to_vec(&p).unwrap();
+        let (again,migrated_again)=Preferences::parse_and_migrate(&bytes).unwrap();
+        assert!(!migrated_again);
+        assert_eq!(again.profiles[0].id,stable);
+    }
+    #[test] fn duplicate_and_empty_ids_are_repaired_without_changing_valid_ids() {
+        let mut p=Preferences::default();
+        let known=p.profiles[0].id.clone();
+        p.profiles.push(Profile { id:known.clone(),name:"Duplicate".into(),..Default::default() });
+        p.profiles.push(Profile { id:String::new(),name:"Blank".into(),..Default::default() });
+        let raw=serde_json::to_vec(&p).unwrap();
+        let (repaired,migrated)=Preferences::parse_and_migrate(&raw).unwrap();
+        assert!(migrated);
+        assert_eq!(repaired.profiles[0].id,known);
+        assert_ne!(repaired.profiles[1].id, known);
+        assert!(!repaired.profiles[2].id.is_empty());
+        assert_ne!(repaired.profiles[1].id,repaired.profiles[2].id);
+    }
     #[test] fn legacy_profile_receives_id() {
         let p: Profile = serde_json::from_str(r#"{"name":"Old","tests":3,"best_wpm":60.0,"best_accuracy":95.0}"#).unwrap();
         assert!(!p.id.is_empty());

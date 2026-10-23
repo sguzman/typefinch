@@ -47,8 +47,10 @@ pub fn import(path:&Path)->Result<Goals,String> {
     parse(&bytes)
 }
 pub fn export(goals:&Goals)->Result<PathBuf,String> {
-    let dir=base_dir().join("exports");
-    fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
+    export_to_dir(goals,&base_dir().join("exports"))
+}
+fn export_to_dir(goals:&Goals,dir:&Path)->Result<PathBuf,String> {
+    fs::create_dir_all(dir).map_err(|e|e.to_string())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -92,6 +94,23 @@ mod tests {
         assert!(parse(base.replace("\"version\": 1","\"version\": 2").as_bytes()).is_err());
         assert!(parse(base.replace("60.0","500.0").as_bytes()).is_err());
         assert!(parse(&vec![b' ';LIMIT+1]).is_err());
+    }
+    #[test] fn exported_goals_are_private_atomic_and_reimportable() {
+        let dir=std::env::temp_dir().join(format!("typefinch-goal-export-{}",uuid::Uuid::new_v4()));
+        let goals=Goals{target_wpm:120.0,target_accuracy:99.0,daily_sessions:5,show_streak:true};
+        let first=export_to_dir(&goals,&dir).unwrap();
+        assert_eq!(import(&first).unwrap(),goals);
+        let second=Goals{target_wpm:25.0,target_accuracy:85.0,daily_sessions:1,show_streak:false};
+        assert_eq!(export_to_dir(&second,&dir).unwrap(),first);
+        assert_eq!(import(&first).unwrap(),second);
+        let files=fs::read_dir(&dir).unwrap().collect::<Vec<_>>();
+        assert_eq!(files.len(),1,"Atomic temp files were left behind");
+        #[cfg(unix)] {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(fs::metadata(&dir).unwrap().permissions().mode()&0o777,0o700);
+            assert_eq!(fs::metadata(&first).unwrap().permissions().mode()&0o777,0o600);
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn file_import_rejects_non_regular_sources_and_reads_exact_format() {
         let path=std::env::temp_dir().join(format!("typefinch-goals-test-{}.json",uuid::Uuid::new_v4()));

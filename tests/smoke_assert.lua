@@ -149,7 +149,17 @@ elseif mode == "png" then
     equals(big32(17),550)
     equals(big32(21),145)
     assert(#data>512)
-    print("Native PNG card export PASS: valid compact 550x145 raster with selected palette")
+    -- A valid PNG can still be missing all text when fontdb resolves no faces.
+    -- Crop the plain-background heading area, excluding the decorative bird.
+    local cmd="convert "..quoted(assert(arg[2]))..
+        " -crop 120x28+20+10 +repage -colorspace Gray -format "..
+        quoted("%[fx:standard_deviation]").." info:"
+    local pipe=assert(io.popen(cmd,"r"))
+    local deviation=tonumber(assert(pipe:read("*a")))
+    assert(pipe:close())
+    assert(deviation and deviation>0.01,
+        "PNG text is missing or unreadable: heading pixels are uniform")
+    print(string.format("Native PNG card export PASS: compact 550x145, palette and rendered glyphs (contrast spread %.3f)",deviation))
 elseif mode == "card-theme" then
     local data=read(assert(arg[2]))
     assert(data:find('fill="#F5F6FF"',1,true),"Daybreak background missing")

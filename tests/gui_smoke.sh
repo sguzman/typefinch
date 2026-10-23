@@ -23,6 +23,9 @@ cleanup() {
   if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/app.log" ]]; then
     cp "$tmp/app.log" "$GITHUB_WORKSPACE/typefinch-gui-smoke.log"
   fi
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/window-manager.log" ]]; then
+    cp "$tmp/window-manager.log" "$GITHUB_WORKSPACE/typefinch-window-manager.log"
+  fi
   rm -rf "$tmp"
 }
 trap cleanup EXIT
@@ -49,7 +52,9 @@ if [[ -z "$window" ]]; then
   cat "$tmp/app.log"
   exit 1
 fi
-xdotool windowactivate --sync "$window"
+if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
+  xdotool windowfocus --sync "$window"
+fi
 xdotool key --clearmodifiers F5
 sleep 0.4
 xdotool type --clearmodifiers --delay 55 "little finches practice every day"
@@ -111,7 +116,9 @@ for theme in light dark; do
     sleep 0.25
   done
   [[ -n "$window" ]] || { echo "No $theme window"; exit 1; }
-  xdotool windowactivate --sync "$window"
+  if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
+  xdotool windowfocus --sync "$window"
+fi
   sleep 0.5
   import -window "$window" "$tmp/typefinch-$theme.png"
   [[ -s "$tmp/typefinch-$theme.png" ]] || { echo "Missing $theme screenshot"; exit 1; }
@@ -136,7 +143,9 @@ for _ in $(seq 1 60); do
   sleep 0.25
 done
 [[ -n "$window" ]] || { echo "No lesson window"; exit 1; }
-xdotool windowactivate --sync "$window"
+if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
+  xdotool windowfocus --sync "$window"
+fi
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"

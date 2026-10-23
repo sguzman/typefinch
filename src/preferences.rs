@@ -1,6 +1,6 @@
 //! Local user-controlled configuration; no online identity.
 use serde::{Deserialize, Serialize};
-use crate::engine::{TestMode,Language,WordDifficulty};
+use crate::{engine::{TestMode,Language,WordDifficulty},custom_layout::CustomLayout};
 use std::{fs, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,12 +79,13 @@ pub struct Preferences {
     pub word_difficulty: WordDifficulty,
     pub lesson_id: String,
     pub layout: String,
+    pub custom_layouts:Vec<CustomLayout>,
     pub profiles: Vec<Profile>,
     pub active_profile: usize,
     pub duration_seconds: u64,
 }
 impl Default for Preferences {
-    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, card_template:CardTemplate::Classic, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
+    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, card_template:CardTemplate::Classic, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), custom_layouts:Vec::new(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
 }
 pub fn base_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)

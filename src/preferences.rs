@@ -114,6 +114,13 @@ pub struct SettingsLoad {
 impl Preferences {
     fn parse_and_migrate(bytes: &[u8]) -> Option<(Self,bool)> {
         let data: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+        // Existing identity-bearing settings cannot be recreated implicitly
+        // from serde defaults. '{}' must not generate a fresh UUID and orphan
+        // a real profile's SQLite sessions.
+        if !data.get("profiles").is_some_and(serde_json::Value::is_array)
+            || data.get("active_profile").is_none() {
+            return None;
+        }
         let mut p: Self = serde_json::from_value(data.clone()).ok()?;
         if p.profiles.is_empty() || p.active_profile >= p.profiles.len() { return None; }
         let originally_missing = data.get("profiles").and_then(|v|v.as_array())
@@ -236,6 +243,12 @@ mod tests {
         assert!(result.warning.unwrap().contains("symbolic link"));
         assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
         fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn existing_settings_with_missing_identity_are_not_new_first_runs() {
+        for bad in [b"{}".as_slice(),b"{\"theme\":\"dark\"}".as_slice(),
+            b"{\"profiles\":[{\"name\":\"Finch\",\"tests\":1,\"best_wpm\":15.0,\"best_accuracy\":85.0}]}".as_slice()] {
+            assert!(Preferences::parse_and_migrate(bad).is_none());
+        }
     }
     #[test] fn first_run_is_writable_but_empty_existing_profiles_are_guarded() {
         let dir=std::env::temp_dir().join(format!("typefinch-guard-{}",uuid::Uuid::new_v4()));

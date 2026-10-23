@@ -1,6 +1,6 @@
 //! Read-only Hyprland device inspection; not a privileged input grab.
 use serde_json::Value;
-use std::process::Command;
+use std::{collections::HashSet,process::Command};
 
 #[derive(Clone, Debug, Default)]
 pub struct Keyboard {
@@ -79,13 +79,49 @@ fn parse_x11_query(data:&[u8])->Result<Vec<Keyboard>,String>{
     }])
 }
 
+const MAX_HYPRLAND_RESPONSE_BYTES:usize=256*1024;
+const MAX_INSPECTED_KEYBOARDS:usize=128;
+fn usable_metadata(value:&str,max_len:usize)->bool {
+    !value.is_empty() && value.len()<=max_len
+        && !value.chars().any(char::is_control)
+}
 fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
-    let value: Value = serde_json::from_slice(data).map_err(|e| format!("Invalid Hyprland device JSON: {e}"))?;
-    let keyboards = value.get("keyboards").and_then(Value::as_array).ok_or("Hyprland omitted the keyboards list.")?;
-    Ok(keyboards.iter().map(|item| {
-        let s = |key| item.get(key).and_then(Value::as_str).unwrap_or("").to_owned();
-        Keyboard { name:s("name"), address:s("address"), active_keymap:s("active_keymap"), layout:s("layout"), variant:s("variant") }
-    }).collect())
+    if data.len()>MAX_HYPRLAND_RESPONSE_BYTES {
+        return Err("Hyprland device inventory exceeds inspection size limit.".into());
+    }
+    let value:Value=serde_json::from_slice(data)
+        .map_err(|e|format!("Invalid Hyprland device JSON: {e}"))?;
+    let keyboards=value.get("keyboards").and_then(Value::as_array)
+        .ok_or("Hyprland omitted the keyboards list.")?;
+    if keyboards.len()>MAX_INSPECTED_KEYBOARDS {
+        return Err("Hyprland returned too many keyboard entries.".into());
+    }
+    let mut seen=HashSet::new();
+    let mut found=Vec::with_capacity(keyboards.len());
+    for item in keyboards {
+        // Hyprland addresses identify *inspection rows* across hotplug
+        // refreshes. A blank or duplicate identity cannot safely preserve
+        // a selected row; do not invent one from its array index/name.
+        let Some(address)=item.get("address").and_then(Value::as_str) else {continue};
+        if !usable_metadata(address,256) || !seen.insert(address.to_owned()) {
+            continue;
+        }
+        let field=|key:&str,max_len|item.get(key).and_then(Value::as_str)
+            .filter(|v|v.len()<=max_len && !v.chars().any(char::is_control))
+            .unwrap_or("").to_owned();
+        let name=field("name",256);
+        found.push(Keyboard{
+            name:if name.is_empty(){"Unlabeled keyboard".into()}else{name},
+            address:address.to_owned(),
+            active_keymap:field("active_keymap",128),
+            layout:field("layout",128),
+            variant:field("variant",128),
+        });
+    }
+    if !keyboards.is_empty() && found.is_empty() {
+        return Err("Hyprland returned no keyboard entries with usable unique addresses.".into());
+    }
+    Ok(found)
 }
 #[cfg(test)]
 mod tests {
@@ -149,6 +185,35 @@ mod tests {
         assert_eq!(found.len(),2);
         assert_eq!(found[0].active_keymap,"English (US)");
         assert_eq!(found[1].layout,"de");
+    }
+    #[test] fn duplicate_or_unaddressed_keyboards_cannot_hijack_inspection_selection() {
+        let input=br#"{"keyboards":[
+            {"name":"First","address":"0x1","active_keymap":"English (US)"},
+            {"name":"Imposter","address":"0x1","active_keymap":"German"},
+            {"name":"No identity","active_keymap":"Spanish"},
+            {"name":"Control","address":"bad\naddress"},
+            {"name":"USB","address":"0x2","active_keymap":"German"},
+            {"name":"Broken label\nline","address":"0x3","active_keymap":"English (US)"}
+        ]}"#;
+        let found=parse_json(input).unwrap();
+        assert_eq!(found.len(),3);
+        assert_eq!(found[0].name,"First");
+        assert_eq!(found[0].active_keymap,"English (US)");
+        assert_eq!(found[1].address,"0x2");
+        assert_eq!(found[2].name,"Unlabeled keyboard");
+        assert_eq!(preserve_selection(Some("0x2"),&found),1);
+        assert_eq!(preserve_selection(Some("bad\naddress"),&found),0);
+        assert!(parse_json(br#"{"keyboards":[{"name":"anonymous"}]}"#).is_err());
+        assert!(parse_json(br#"{"keyboards":[]}"#).unwrap().is_empty());
+    }
+    #[test] fn compositor_inventory_is_bounded_and_never_executable() {
+        assert!(parse_json(&vec![b'a';MAX_HYPRLAND_RESPONSE_BYTES+1]).is_err());
+        let entries=(0..MAX_INSPECTED_KEYBOARDS+1)
+            .map(|i|serde_json::json!({"address":format!("0x{i:x}"),"name":"K"}))
+            .collect::<Vec<_>>();
+        let huge=serde_json::to_vec(&serde_json::json!({"keyboards":entries})).unwrap();
+        assert!(parse_json(&huge).is_err());
+        assert!(parse_json(br#"{"keyboards":[{"address":"bad\u0000id"}]}"#).is_err());
     }
     #[test] fn invalid_device_json_fails_explicitly() { assert!(parse_json(b"[]").is_err()); }
     #[test] fn blank_keyboard_defaults_do_not_grant_input_access() {

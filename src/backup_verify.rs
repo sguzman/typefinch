@@ -6,6 +6,16 @@ use std::{collections::HashSet,fs,path::Path};
 
 #[derive(Debug)]
 pub struct BackupSummary {pub profiles:usize,pub sessions:i64,pub schema:i64}
+/// F8 writes a paired settings/SQLite backup with this fixed basename rule.
+/// This is a filename transformation only; no files are opened here.
+pub fn paired_database_path(settings:&Path)->Result<std::path::PathBuf,String> {
+    let name=settings.file_name().and_then(|x|x.to_str())
+        .ok_or("Select an F8 settings backup filename")?;
+    let stem=name.strip_suffix("-settings.json")
+        .ok_or("Settings backup filename must end in -settings.json")?;
+    if stem.is_empty() {return Err("Backup stem is empty".into());}
+    Ok(settings.with_file_name(format!("{stem}-sessions.sqlite3")))
+}
 fn require_file(path:&Path,label:&str)->Result<(),String>{
     let metadata=fs::symlink_metadata(path).map_err(|e|format!("{label}: {e}"))?;
     if !metadata.file_type().is_file(){
@@ -117,6 +127,13 @@ mod tests {
         fs::write(&settings,serde_json::to_vec(&prefs).unwrap()).unwrap();
         assert!(verify(&settings,&database).unwrap_err().contains("identifier"));
         fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn pair_inference_only_accepts_explicit_settings_backup_names(){
+        let settings=Path::new("/tmp/private/typefinch-backup-12-settings.json");
+        assert_eq!(paired_database_path(settings).unwrap(),
+            Path::new("/tmp/private/typefinch-backup-12-sessions.sqlite3"));
+        assert!(paired_database_path(Path::new("/tmp/private/settings.json")).is_err());
+        assert!(paired_database_path(Path::new("/tmp/private/-settings.json")).is_err());
     }
     #[cfg(unix)]
     #[test] fn refuse_backup_symlinks(){

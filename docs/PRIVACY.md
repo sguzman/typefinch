@@ -37,3 +37,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Profile-goal transfer:** A manual versioned JSON export contains only goal values, not profile names, identifiers, or typed text. Importing from an explicit local regular file applies only to the currently selected profile's goals. Transfer paths are transient UI state, not persisted. Export file permissions are owner-only on Linux.
 
 - **Settings corruption guard:** When a settings file exists but is invalid or unreadable, the original remains untouched. New default values are temporary and never written over it; scored sessions and profile-mutation persistence are disabled to protect the existing identity/history association. The UI visibly warns about recovery.
+
+- **Backup verification:** The optional in-app checker accepts an explicit private settings-backup path only in memory, derives the matching SQLite filename and validates both as read-only inputs. It neither opens the live profile directory for writing nor stores the path with preferences or history.

@@ -135,3 +135,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 The guarded startup path also avoids opening or migrating the saved SQLite database until the settings identity is recovered, and prevents publishing fallback profile statistics or goals as if they were genuine.
 
 **Orphaned-history safeguard:** If `settings.json` disappears but `sessions.sqlite3` still exists, startup now enters guarded recovery mode instead of assigning a new profile UUID. Original session data remains untouched while a matching settings backup is recovered.
+
+**In-app backup inspection:** The profile studio and guarded recovery screen now accept an explicit F8 settings-backup path, infer its companion SQLite file, and report a read-only validity check. Paths and validation feedback are transient UI state; Typefinch never restores or overwrites anything from this inspection.

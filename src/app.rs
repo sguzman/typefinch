@@ -1,5 +1,6 @@
 use crate::{
     achievements,
+    backup_verify,
     custom_layout::CustomLayout,
     daily,
     goal_transfer,
@@ -117,6 +118,8 @@ pub struct Typefinch {
     custom_text: String,
     custom_import_path:String,
     goal_import_path:String,
+    backup_settings_path:String,
+    backup_check_result:String,
     message: String,
 }
 impl Typefinch {
@@ -164,7 +167,8 @@ impl Typefinch {
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), message: startup_warning }
+               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
+            backup_check_result:String::new(), message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -1261,6 +1265,32 @@ impl Typefinch {
                 font(12.0),ink(palette.footer));
         }
     }
+    fn show_backup_verifier(&mut self,ui:&mut egui::Ui) {
+        ui.group(|ui| {
+            ui.label(RichText::new("Verify private backup (read-only)").strong());
+            ui.small("Paste an F8 settings-backup file path; the companion SQLite filename is inferred. Nothing is restored or overwritten.");
+            ui.horizontal_wrapped(|ui| {
+                ui.add(egui::TextEdit::singleline(&mut self.backup_settings_path)
+                    .hint_text(".../typefinch-backup-...-settings.json")
+                    .desired_width(ui.available_width().min(490.0)));
+                if ui.button("Verify backup pair").clicked() {
+                    let input=std::path::Path::new(self.backup_settings_path.trim());
+                    self.backup_check_result=match backup_verify::paired_database_path(input) {
+                        Ok(database)=>match backup_verify::verify(input,&database) {
+                            Ok(summary)=>format!("Verified: {} profiles, {} sessions, SQLite v{}. No files changed.",
+                                summary.profiles,summary.sessions,summary.schema),
+                            Err(err)=>format!("Backup rejected: {err}"),
+                        },
+                        Err(err)=>format!("Backup rejected: {err}"),
+                    };
+                }
+            });
+            if !self.backup_check_result.is_empty() {
+                ui.label(&self.backup_check_result);
+            }
+            ui.small("Only a matching, independently preserved settings + SQLite pair is valid; this check never repairs damaged files.");
+        });
+    }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
         ui.label("Design and export a script-free static SVG card and matching Markdown.");
@@ -1304,6 +1334,10 @@ impl Typefinch {
                 self.message = "Markdown image embed copied to clipboard.".into();
             }
         });
+        if !self.settings_read_only {
+            ui.add_space(10.0);
+            self.show_backup_verifier(ui);
+        }
     }
 }
 impl eframe::App for Typefinch {
@@ -1413,6 +1447,7 @@ impl eframe::App for Typefinch {
                                 RichText::new("⚠ Settings recovery required — original file preserved").strong());
                             ui.label("This session is temporary: preference saves and scored-session recording are disabled to avoid replacing or orphaning existing data.");
                             ui.small("Repair settings.json or restore a valid matching backup. Do not delete the existing database.");
+                            self.show_backup_verifier(ui);
                         });
                         ui.add_space(12.0);
                     }

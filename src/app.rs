@@ -18,7 +18,7 @@ use eframe::egui::{self, Color32, RichText};
 use std::{sync::mpsc::{self, Receiver, TryRecvError},time::{Duration, Instant}};
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 enum PreviewLayer {Base,Shift,AltGr,ShiftAltGr}
 impl PreviewLayer {
     const ALL:[Self;4]=[Self::Base,Self::Shift,Self::AltGr,Self::ShiftAltGr];

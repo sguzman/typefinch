@@ -174,11 +174,23 @@ fn parse_x11_query(data:&[u8])->Result<Vec<Keyboard>,String>{
         .map_err(|_|"X11 seat query was not UTF-8.".to_string())?;
     let mut layout=None;
     let mut variant=String::new();
+    let mut seen_variant=false;
     for line in body.lines() {
         let Some((key,value))=line.split_once(':') else {continue};
         match key.trim() {
-            "layout"=>layout=Some(value.trim().to_string()),
-            "variant"=>variant=value.trim().to_string(),
+            "layout"=>{
+                if layout.is_some() {
+                    return Err("X11 seat query returned conflicting layout fields.".into());
+                }
+                layout=Some(value.trim().to_string());
+            },
+            "variant"=>{
+                if seen_variant {
+                    return Err("X11 seat query returned conflicting variant fields.".into());
+                }
+                seen_variant=true;
+                variant=value.trim().to_string();
+            },
             _=>{},
         }
     }
@@ -362,6 +374,8 @@ mod tests {
         assert!(parse_x11_query(b"rules: evdev\nvariant: intl\n").is_err());
         assert!(parse_x11_query(b"layout: \n").is_err());
         assert!(parse_x11_query(b"layout: us\nvariant: ok\rno\n").is_err());
+        assert!(parse_x11_query(b"layout: us\nlayout: de\n").is_err());
+        assert!(parse_x11_query(b"layout: us\nvariant: \nvariant: intl\n").is_err());
         assert!(parse_x11_query(&[255,254]).is_err());
         assert!(parse_x11_query(&vec![b'a';16*1024+1]).is_err());
     }

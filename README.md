@@ -129,3 +129,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Independent goal transfer:** The profile panel now exports a versioned private goals JSON file and accepts a local goals JSON path for import. Import modifies only the selected profile's speed/accuracy/daily targets and optional streak setting. It cannot replace profile identities, completed tests, personal records or SQLite sessions. Inputs are capped at 8 KiB and validated before applying.
 
 **Corrupt settings safeguard:** If an existing settings file cannot be read or decoded, Typefinch preserves it byte-for-byte and clearly enters a read-only recovery state rather than creating a replacement profile on disk. Preferences writes, goals import, full backup from fallback defaults, and scored session persistence are disabled until the settings file is repaired or recovered. Missing settings on a genuine first run still bootstrap normally.
+
+The guarded startup path also avoids opening or migrating the saved SQLite database until the settings identity is recovered, and prevents publishing fallback profile statistics or goals as if they were genuine.

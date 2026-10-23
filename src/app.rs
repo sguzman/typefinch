@@ -143,9 +143,16 @@ impl Typefinch {
         let emulator = Emulator::compile(&prefs.layout).ok();
         let initial_mode=if prefs.custom_layouts.iter().any(|l|l.id==prefs.layout && l.validate().is_ok()) {Mode::Emulated} else {Mode::System};
         let installed_layouts = registry::discover().unwrap_or_default();
-        let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        let all_history=history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
+        // Do not open or migrate the user's existing database when the settings
+        // identity is unknown. Even reading history currently initializes schema.
+        let (history,completed_lessons,all_history)=if settings_read_only {
+            (Vec::new(),std::collections::HashSet::<String>::new(),Vec::new())
+        } else {
+            let id=&prefs.profiles[prefs.active_profile].id;
+            (history::recent(id).unwrap_or_default(),
+             history::completed_lessons(id).unwrap_or_default(),
+             history::all_for_profile(id).unwrap_or_default())
+        };
         let earned_badges=achievements::earned(&all_history);
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
@@ -377,11 +384,13 @@ impl Typefinch {
             ui.small("Profile selection is locked until this typing test finishes.");
         }
         if self.prefs.active_profile != previous {
-            let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
-            self.history = history::recent(&id).unwrap_or_default();
-            self.completed_lessons = history::completed_lessons(&id).unwrap_or_default();
-            self.all_history=history::all_for_profile(&id).unwrap_or_default();
-            self.earned_badges=achievements::earned(&self.all_history);
+            if !self.settings_read_only {
+                let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
+                self.history = history::recent(&id).unwrap_or_default();
+                self.completed_lessons = history::completed_lessons(&id).unwrap_or_default();
+                self.all_history=history::all_for_profile(&id).unwrap_or_default();
+                self.earned_badges=achievements::earned(&self.all_history);
+            }
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
@@ -436,7 +445,9 @@ impl Typefinch {
             ui.add(egui::TextEdit::singleline(&mut self.goal_import_path)
                 .hint_text("Local path to goals JSON").desired_width(ui.available_width()));
         });
-        if export_requested {
+        if export_requested && self.settings_read_only {
+            self.message="Goal export disabled: fallback profile targets do not represent recovered settings.".into();
+        } else if export_requested {
             let goals=&self.prefs.profiles[self.prefs.active_profile].goals;
             self.message=match goal_transfer::export(goals) {
                 Ok(path)=>format!("Local goals exported: {}",path.display()),
@@ -1115,6 +1126,10 @@ impl Typefinch {
             });
     }
     fn export_widget(&mut self) {
+        if self.settings_read_only {
+            self.message="Profile and statistics exports are disabled while original settings are protected for recovery.".into();
+            return;
+        }
         let p = &self.prefs.profiles[self.prefs.active_profile];
         let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
             .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
@@ -1125,6 +1140,10 @@ impl Typefinch {
         };
     }
     fn export_png(&mut self) {
+        if self.settings_read_only {
+            self.message="Profile and statistics exports are disabled while original settings are protected for recovery.".into();
+            return;
+        }
         let p=&self.prefs.profiles[self.prefs.active_profile];
         let display=self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
             .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
@@ -1135,6 +1154,10 @@ impl Typefinch {
         };
     }
     fn export_statistics(&mut self) {
+        if self.settings_read_only {
+            self.message="Profile and statistics exports are disabled while original settings are protected for recovery.".into();
+            return;
+        }
         let profile=&self.prefs.profiles[self.prefs.active_profile];
         self.message=match export::save_stats_json(profile) {
             Ok(path)=>format!("Exported all saved sessions: {}",path.display()),

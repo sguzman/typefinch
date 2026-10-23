@@ -248,7 +248,14 @@ impl Typefinch {
             s.visuals.selection.stroke.color = selection_text(s.visuals.dark_mode);
             s.visuals.hyperlink_color = accent_ink(s.visuals.dark_mode);
         });
-        let (keyboards, device_error) = Self::query_devices();
+        // Never block the initial GUI window on a compositor utility.
+        // The initial read-only inventory uses the same single-flight,
+        // bounded inspector as manual and focus-triggered refreshes.
+        let keyboards=Vec::new();
+        let device_error=None;
+        let mut pending_device_query=None;
+        let _=launch_device_inspection(
+            &mut pending_device_query,Some(cc.egui_ctx.clone()),devices::inspect);
         let input = if prefs.test_mode == TestMode::Lesson {lesson::get(&prefs.lesson_id).passage} else {""};
         let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
         let session = Session::new_with_settings(duration, prefs.test_mode, input, prefs.language, prefs.word_difficulty);
@@ -299,7 +306,7 @@ impl Typefinch {
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
+               device_poll_started:Instant::now(), pending_device_query, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
             backup_check_result:String::new(), preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -345,12 +352,6 @@ impl Typefinch {
         }
         if focused && hyprland {
             ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
-        }
-    }
-    fn query_devices() -> (Vec<Keyboard>, Option<String>) {
-        match devices::inspect() {
-            Ok(k) => (k, None),
-            Err(e) => (Vec::new(), Some(e)),
         }
     }
     fn save(&mut self) {

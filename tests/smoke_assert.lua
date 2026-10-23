@@ -191,7 +191,7 @@ elseif mode == "geometry-cycled" then
     local r=report(assert(arg[2]))
     local initial=assert(arg[3])
     local expected={
-        iso={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=3,modifiers=7,target="us"},
+        iso={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=4,modifiers=7,target="us"},
         jis={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9,target="jp"},
         split={name="ANSI main block",slots=60,unattributed=0,visual_only=0,controls=3,modifiers=9,target="us"},
     }

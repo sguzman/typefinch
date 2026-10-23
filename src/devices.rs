@@ -31,8 +31,8 @@ pub struct Keyboard {
     pub layout: String,
     pub variant: String,
 }
-/// Preserve a user-selected physical keyboard by Hyprland address through
-/// enumeration changes. Selection is inspection-only, not event attribution.
+/// Preserve selection by opaque inspection identity through enumeration
+/// changes. Neither a Hyprland address nor Wayland registry ID attributes events.
 pub fn preserve_selection(previous:Option<&str>, devices:&[Keyboard])->usize {
     previous.and_then(|address|devices.iter().position(|k|k.address==address)).unwrap_or(0)
 }
@@ -141,15 +141,18 @@ fn parse_wayland_seats(raw:&[u8])->Result<Vec<Keyboard>,String>{
     let mut identities=HashSet::new();
     let mut found=Vec::new();
     for seat in seats {
+        // A protocol name is descriptive but not guaranteed unique. Use
+        // wl_registry global IDs to distinguish seats even if names collide.
+        // These identities are compositor-local, never hardware identities.
+        if !usable_metadata(&seat.name,128) || !identities.insert(seat.id) {
+            return Err("Wayland returned an invalid name or duplicate registry seat ID.".into());
+        }
         if !seat.keyboard {continue;}
         // wl_seat groups input devices, never physical keyboards. Neither
         // wl_seat names nor capabilities reveal the active XKB keymap.
-        if !usable_metadata(&seat.name,128) || !identities.insert(seat.name.clone()) {
-            return Err("Wayland returned an invalid or duplicate seat name.".into());
-        }
         found.push(Keyboard {
-            name:format!("Wayland seat {} (not a physical keyboard)",seat.name),
-            address:format!("wayland:seat:{}",seat.name),
+            name:format!("Wayland seat {} (registry {}, not a physical keyboard)",seat.name,seat.id),
+            address:format!("wayland:seat:{}",seat.id),
             active_keymap:String::new(),
             layout:String::new(),
             variant:String::new(),
@@ -285,18 +288,28 @@ mod tests {
         ]).unwrap();
         let devices=parse_wayland_seats(&payload).unwrap();
         assert_eq!(devices.len(),1);
-        assert_eq!(devices[0].address,"wayland:seat:seat0");
+        assert_eq!(devices[0].address,"wayland:seat:10");
         assert!(devices[0].name.contains("not a physical keyboard"));
         assert!(devices[0].active_keymap.is_empty());
         assert!(devices[0].layout.is_empty());
         assert!(devices[0].variant.is_empty());
         assert!(parse_wayland_seats(b"not json").is_err());
         assert!(parse_wayland_seats(&vec![b'a';X11_QUERY_MAX_BYTES+1]).is_err());
-        let duplicate=serde_json::to_vec(&vec![
+        // Distinct seats are allowed to have the same descriptive name.
+        let same_name=serde_json::to_vec(&vec![
             crate::wayland_seat::Seat{id:1,name:"seat0".into(),keyboard:true},
             crate::wayland_seat::Seat{id:2,name:"seat0".into(),keyboard:true},
         ]).unwrap();
-        assert!(parse_wayland_seats(&duplicate).is_err());
+        let distinct=parse_wayland_seats(&same_name).unwrap();
+        assert_eq!(distinct.len(),2);
+        assert_ne!(distinct[0].address,distinct[1].address);
+        assert!(distinct.iter().all(|seat|seat.active_keymap.is_empty()));
+        assert_eq!(preserve_selection(Some("wayland:seat:2"),&distinct),1);
+        let duplicate_id=serde_json::to_vec(&vec![
+            crate::wayland_seat::Seat{id:1,name:"seat0".into(),keyboard:true},
+            crate::wayland_seat::Seat{id:1,name:"seat1".into(),keyboard:true},
+        ]).unwrap();
+        assert!(parse_wayland_seats(&duplicate_id).is_err());
     }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";

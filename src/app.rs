@@ -695,6 +695,8 @@ impl Typefinch {
                         });
                     if missed>0 {
                         cell.response.on_hover_text(format!("{missed} missed attempt(s) for this character in the current session"));
+                    } else if let Some(ms)=value.chars().next().and_then(|ch|self.session.average_key_latency_ms(ch)) {
+                        cell.response.on_hover_text(format!("{ms:.0} ms average interval for this character; session only"));
                     }
                 }
             });
@@ -702,6 +704,13 @@ impl Typefinch {
         }
         ui.small("Finger hints: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Standard ANSI guidance only.");
         ui.small("Red symbols had mistakes in the current session. Hover for the in-memory count.");
+        let slow=self.session.slowest_keys();
+        if !slow.is_empty() {
+            ui.small("Slower single-key intervals (current session only; ≥2 samples each):");
+            for (ch,ms) in slow.iter().take(5) {
+                ui.label(format!("{} · {:.0} ms average between committed keys",ch,ms));
+            }
+        }
         ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {

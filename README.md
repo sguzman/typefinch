@@ -101,3 +101,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Verified card templates:** [70 Rust tests and a native Compact+Daybreak+monospace SVG/PNG export](https://github.com/sguzman/typefinch/actions/runs/39949282753).
 
 **Device refresh:** The Hyprland keyboard inventory now refreshes when Typefinch regains window focus, preserving the selected inspection device by address where possible; manual Refresh remains available. This does not grant per-device input attribution or interception.
+
+**Ephemeral key timing:** The keyboard preview reports slower characters after at least two valid correctly typed single-key intervals (25–2000 ms). It excludes batch/composition commits and resets when starting a new session. No per-character timing or typed contents are stored or exported.

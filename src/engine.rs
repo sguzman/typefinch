@@ -126,6 +126,22 @@ fn corpus(mode: TestMode, language:Language, difficulty:WordDifficulty) -> Strin
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum State { Ready, Running, Finished }
 
+#[derive(Clone,Copy,Debug,Default,PartialEq,Eq)]
+pub struct KeyTiming {
+    pub count:u32,
+    total_ms:u64,
+}
+impl KeyTiming {
+    fn add(&mut self,interval:Duration) {
+        let ms=interval.as_millis();
+        if !(25..=2000).contains(&ms) {return;}
+        self.count=self.count.saturating_add(1);
+        self.total_ms=self.total_ms.saturating_add(ms as u64);
+    }
+    pub fn average_ms(self)->Option<f64> {
+        (self.count>=2).then(||self.total_ms as f64/self.count as f64)
+    }
+}
 pub struct Session {
     pub mode: TestMode,
     pub language: Language,
@@ -140,6 +156,8 @@ pub struct Session {
     pub attempts: u32,
     pub mistakes: u32,
     weak_keys: BTreeMap<char,u32>,
+    key_timings:BTreeMap<char,KeyTiming>,
+    last_key_at:Option<Instant>,
     pending_completion: Option<Instant>,
 }
 #[derive(Clone, Copy, Debug, Default)]
@@ -179,7 +197,7 @@ impl Session {
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
-            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),pending_completion:None }
+            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
     }
     pub fn history_mode(&self)->String {
         if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
@@ -201,13 +219,35 @@ impl Session {
         self.attempts = 0;
         self.mistakes = 0;
         self.weak_keys.clear();
+        self.key_timings.clear();
+        self.last_key_at=None;
         self.pending_completion=None;
         self.elapsed = Duration::ZERO;
         self.started = Some(Instant::now());
         self.state = State::Running;
     }
+    fn observe_interval(&mut self,key:char,correct:bool,now:Instant) {
+        let last=self.last_key_at.replace(now);
+        if correct && !key.is_control() && !key.is_whitespace() {
+            if let Some(interval)=last.and_then(|when|now.checked_duration_since(when)) {
+                self.key_timings.entry(key).or_default().add(interval);
+            }
+        }
+    }
+    /// Only display timing from at least two valid single-commit intervals.
+    pub fn average_key_latency_ms(&self,key:char)->Option<f64> {
+        self.key_timings.get(&key).and_then(|t|t.average_ms())
+    }
+    pub fn slowest_keys(&self)->Vec<(char,f64)> {
+        let mut keys=self.key_timings.iter().filter_map(|(ch,t)|t.average_ms().map(|ms|(*ch,ms)))
+            .collect::<Vec<_>>();
+        keys.sort_by(|a,b|b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        keys
+    }
     pub fn type_text(&mut self, text: &str) {
         if self.state != State::Running { return; }
+        let single=text.chars().filter(|c|!c.is_control()).count()==1;
+        if !single {self.last_key_at=None;}
         let total=grapheme_count(&self.target);
         for ch in text.chars().filter(|c|!c.is_control()) {
             let cursor=grapheme_count(&self.typed);
@@ -225,6 +265,12 @@ impl Session {
                 if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
                     let errors=self.weak_keys.entry(key).or_default();
                     *errors=errors.saturating_add(1);
+                }
+            }
+            if single {
+                let correct=canonically_equal(expected,actual);
+                if let Some(key)=expected.chars().next() {
+                    self.observe_interval(key,correct,Instant::now());
                 }
             }
         }
@@ -258,6 +304,7 @@ impl Session {
         if let Some((start,_))=self.typed.grapheme_indices(true).last() {
             self.typed.truncate(start);
             self.pending_completion=None;
+            self.last_key_at=None;
             self.corrections=self.corrections.saturating_add(1);
         }
     }
@@ -481,6 +528,23 @@ mod tests {
         assert_eq!(a.accuracy,0.0);
         assert_eq!(a.wpm,0.0);
         assert_eq!(a.entered,0);
+    }
+    #[test] fn per_key_latency_is_bounded_requires_samples_and_resets() {
+        let mut session=Session::new_with_custom(30,TestMode::Custom,"abc abc abc");
+        session.begin();
+        let t=Instant::now();
+        session.observe_interval('a',true,t);
+        session.observe_interval('b',true,t+Duration::from_millis(100));
+        session.observe_interval('b',true,t+Duration::from_millis(200));
+        assert_eq!(session.average_key_latency_ms('b'),Some(100.0));
+        assert_eq!(session.average_key_latency_ms('a'),None);
+        session.observe_interval('c',false,t+Duration::from_millis(300));
+        assert_eq!(session.average_key_latency_ms('c'),None);
+        session.observe_interval('a',true,t+Duration::from_millis(8000));
+        assert_eq!(session.average_key_latency_ms('a'),None);
+        assert_eq!(session.slowest_keys(),vec![('b',100.0)]);
+        session.begin();
+        assert!(session.slowest_keys().is_empty());
     }
     #[test] fn adaptive_drill_is_deterministic_ephemeral_and_resettable() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");

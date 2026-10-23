@@ -90,6 +90,23 @@ elseif mode == "stats" then
         assert(item.typed==nil and item.raw_text==nil)
     end
     print("Full JSON history export PASS: three records, versioned aggregate-only payload")
+elseif mode == "backup" then
+    local database=assert(arg[2])
+    local settings=assert(json.decode(read(assert(arg[3]))))
+    assert(settings.profiles and #settings.profiles>=1)
+    assert(settings.language=="es-MX")
+    local query="sqlite3 -json "..quoted(database).." "..quoted("SELECT COUNT(*) AS n FROM sessions")
+    local pipe=assert(io.popen(query,"r"))
+    local rows=assert(json.decode(assert(pipe:read("*a"))))
+    local ok=pipe:close()
+    assert(ok,"SQLite backup must open cleanly")
+    equals(rows[1].n,5)
+    local modequery="sqlite3 -json "..quoted(database).." "..quoted("PRAGMA user_version")
+    local p=assert(io.popen(modequery,"r"))
+    local versions=assert(json.decode(assert(p:read("*a"))))
+    assert(p:close())
+    equals(versions[1].user_version,3)
+    print("Private backup PASS: paired JSON settings and complete consistent SQLite snapshot")
 elseif mode == "set-theme" then
     local path, theme=assert(arg[2]),assert(arg[3])
     assert(theme=="light" or theme=="dark")

@@ -196,3 +196,18 @@ sleep 0.3
 xdotool type --clearmodifiers --delay 35 "casa mesa gato perro"
 sleep 2.4
 lua5.4 tests/smoke_assert.lua spanish "$tmp/report.json"
+
+# An explicitly requested F8 backup must preserve every profile record.
+# This test uses only synthetic disposable profile settings.
+xdotool key --clearmodifiers F8
+for _ in $(seq 1 40); do
+  shopt -s nullglob
+  backups=("$XDG_CONFIG_HOME/typefinch/exports"/typefinch-backup-*-sessions.sqlite3)
+  [[ ${#backups[@]} -gt 0 ]] && break
+  sleep 0.1
+done
+[[ ${#backups[@]} -eq 1 ]] || { echo "Full backup was not created"; exit 1; }
+backup_db="${backups[0]}"
+backup_settings="${backup_db%-sessions.sqlite3}-settings.json"
+[[ -s "$backup_settings" ]] || { echo "Full backup settings are missing"; exit 1; }
+lua5.4 tests/smoke_assert.lua backup "$backup_db" "$backup_settings"

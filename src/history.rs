@@ -178,11 +178,11 @@ mod tests {
         let mut content=b.clone();content.test_mode="numbers".into();
         let mut old=b.clone();old.scoring_version=999;
         let items=vec![old,content,layout,b,a];
-        let comparable=comparable(&items,"us(colemak)","words",30000,"Emulated");
-        assert_eq!(comparable.len(),2);
-        assert_eq!(comparable[0].wpm,50.0);
-        assert_eq!(comparable[1].wpm,70.0);
-        let stats=trend(&comparable).unwrap();
+        let matches=comparable(&items,"us(colemak)","words",30000,"Emulated");
+        assert_eq!(matches.len(),2);
+        assert_eq!(matches[0].wpm,50.0);
+        assert_eq!(matches[1].wpm,70.0);
+        let stats=trend(&matches).unwrap();
         assert!((stats.mean_wpm-60.0).abs()<0.001);
         assert!((stats.deviation_wpm-10.0).abs()<0.001);
         assert_eq!(stats.best_wpm,70.0);

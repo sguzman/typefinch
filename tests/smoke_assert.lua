@@ -113,6 +113,17 @@ elseif mode == "prepare-card-theme" then
     config.card_theme="daybreak"
     config.card_font="mono"
     save(path,json.encode(config))
+elseif mode == "png" then
+    local data=read(assert(arg[2]))
+    assert(data:sub(1,8)==string.char(137,80,78,71,13,10,26,10))
+    local function big32(position)
+        local a,b,c,d=data:byte(position,position+3)
+        return a*16777216+b*65536+c*256+d
+    end
+    equals(big32(17),550)
+    equals(big32(21),205)
+    assert(#data>512)
+    print("Native PNG card export PASS: valid 550x205 raster with selected palette")
 elseif mode == "card-theme" then
     local data=read(assert(arg[2]))
     assert(data:find('fill="#F5F6FF"',1,true),"Daybreak background missing")

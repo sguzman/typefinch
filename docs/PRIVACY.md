@@ -27,3 +27,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Daily target:** Uses the device's local date and existing stored aggregate session timestamps. It does not create a separate activity log, communicate with a calendar service, or require any account. Today's totals are recomputed from the active profile's history.
 
 - **Optional streak display:** Disabled by default; when enabled, derives qualifying consecutive calendar days from the same local aggregate session timestamps. No additional log is created and it can be hidden instantly.
+
+- **PNG profile card:** Generated only on explicit F9/button action. It contains the same user-selected profile name and aggregate performance values as the SVG card; no raw typed passages or network requests are included.

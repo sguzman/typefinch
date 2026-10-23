@@ -16,7 +16,7 @@ cleanup() {
     done
   fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
-    for file in "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"; do
+    for file in "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.png"; do
       if [[ -s "$file" ]]; then cp "$file" "$GITHUB_WORKSPACE/"; fi
     done
   fi
@@ -240,3 +240,11 @@ for _ in $(seq 1 40); do
 done
 xmllint --noout "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
 lua5.4 tests/smoke_assert.lua card-theme "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
+
+xdotool key --clearmodifiers F9
+png="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.png"
+for _ in $(seq 1 100); do
+  [[ -s "$png" ]] && break
+  sleep 0.1
+done
+lua5.4 tests/smoke_assert.lua png "$png"

@@ -37,4 +37,5 @@ jobs:
             typefinch-window-manager.log
             typefinch-profile.svg
             typefinch-profile.md
+            typefinch-profile.png
           if-no-files-found: ignore

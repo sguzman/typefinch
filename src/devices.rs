@@ -62,12 +62,11 @@ fn parse_x11_query(data:&[u8])->Result<Vec<Keyboard>,String>{
     if variant.len()>128 || variant.chars().any(char::is_control) {
         return Err("X11 seat query returned an invalid variant.".into());
     }
-    let active_keymap=if variant.is_empty(){layout.clone()}
-        else{format!("{layout} ({variant})")};
     Ok(vec![Keyboard {
         name:"X11 aggregate seat (not a physical keyboard)".into(),
         address:"x11:aggregate-seat".into(),
-        active_keymap,
+        // A configured set of X11 groups is not an observed active group.
+        active_keymap:String::new(),
         layout,
         variant,
     }])
@@ -92,7 +91,8 @@ mod tests {
         assert_eq!(found[0].address,"x11:aggregate-seat");
         assert_eq!(found[0].layout,"us,ru");
         assert_eq!(found[0].variant,",phonetic");
-        assert_eq!(found[0].active_keymap,"us,ru (,phonetic)");
+        assert!(found[0].active_keymap.is_empty(),
+            "configured X11 groups must not be reported as observed input");
     }
     #[test] fn x11_bad_or_unavailable_layout_is_not_guessed() {
         assert!(parse_x11_query(b"rules: evdev\nvariant: intl\n").is_err());
@@ -112,6 +112,7 @@ mod tests {
         assert_eq!(found.len(),1);
         assert_eq!(found[0].address,"x11:aggregate-seat");
         assert!(!found[0].layout.is_empty());
+        assert!(found[0].active_keymap.is_empty());
         assert!(found[0].name.contains("not a physical keyboard"));
     }
     #[test] fn hotplug_refresh_preserves_selected_device_or_uses_safe_first() {

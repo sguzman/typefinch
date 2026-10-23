@@ -114,7 +114,13 @@ impl Typefinch {
         match history::insert(&record) {
             Ok(_) => {
                 if self.session.mode==TestMode::Lesson {
-                    self.completed_lessons.insert(self.prefs.lesson_id.clone());
+                    if history::mastered_lesson(&record) {
+                        self.completed_lessons.insert(self.prefs.lesson_id.clone());
+                        self.message = format!("Lesson mastered: {}. You can continue to the next lesson.",
+                            lesson::get(&self.prefs.lesson_id).name);
+                    } else {
+                        self.message = "Practice saved. Correct every character to master this lesson. Retry when ready.".into();
+                    }
                 }
                 match history::recent(&identity) {
                     Ok(records) => self.history = records,
@@ -434,6 +440,9 @@ impl Typefinch {
             ui.label(match self.session.state {
                 State::Ready=>"Ready · press Start to capture typing",
                 State::Running=>"Typing · Esc cancels · Backspace corrects",
+                State::Finished if self.session.mode == TestMode::Lesson =>
+                    if self.session.score().accuracy >= 99.999 { "Lesson mastered!" }
+                    else { "Passage finished · retry to master at 100% final accuracy" },
                 State::Finished=>"Finished · result saved to this local profile",
             });
         });

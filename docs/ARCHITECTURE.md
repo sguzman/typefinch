@@ -39,3 +39,7 @@ The static catalog is recognition-oriented. When the operating system provides t
 GitHub Actions runs Cargo checks and unit tests, then builds a native Linux executable and launches it under Xvfb + Openbox + software OpenGL. `tests/gui_smoke.sh` injects synthetic typing with `xdotool` and asserts results through a temporary explicitly opt-in `TYPEFINCH_QA_REPORT` file plus the local SQLite record, then uploads a screenshot. This gives reproducible *X11 graphical* evidence, not real Hyprland hardware acceptance.
 
 The [acceptance ledger](progress.json) is the only basis for percentages and its Markdown presentation must be regenerated from it.
+
+## Lesson mastery
+
+A finished untimed lesson is recorded as an attempt. Only records with nonzero entry, full final-position correctness, 100% final accuracy and zero prescribed duration count toward course completion. Corrected mistakes affect raw metrics without disqualifying an otherwise correct passage. Incomplete or incorrect lesson records remain in history but never inflate the course progress count.

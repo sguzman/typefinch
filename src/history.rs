@@ -154,8 +154,17 @@ pub fn trend(records: &[&Record]) -> Option<Trend> {
     let best=records.iter().map(|r|r.wpm).fold(0.0_f64, f64::max);
     Some(Trend {mean_wpm:mean,best_wpm:best,deviation_wpm:spread})
 }
+/// A completed lesson requires an entirely correct final passage, not merely
+/// reaching the last character. Corrected mistakes are allowed.
+pub fn mastered_lesson(record:&Record)->bool {
+    record.test_mode.starts_with("lesson/") &&
+        record.duration_ms==0 && record.entered>0 && record.correct==record.entered &&
+        record.accuracy>=99.999
+}
 fn completed_lessons_with(db:&Connection, profile_id:&str)->Result<HashSet<String>,rusqlite::Error> {
-    let mut stmt=db.prepare("SELECT DISTINCT test_mode FROM sessions WHERE profile_id=?1 AND test_mode LIKE 'lesson/%'")?;
+    let mut stmt=db.prepare("SELECT DISTINCT test_mode FROM sessions
+        WHERE profile_id=?1 AND test_mode LIKE 'lesson/%'
+          AND duration_ms=0 AND entered>0 AND correct=entered AND accuracy>=99.999")?;
     let rows=stmt.query_map(params![profile_id], |row|row.get::<_,String>(0))?;
     let mut result=HashSet::new();
     for row in rows {
@@ -210,18 +219,42 @@ mod tests {
         init(&db).unwrap();
         let mut home=item("finch-a");
         home.test_mode="lesson/home".into();
+        home.duration_ms=0;
+        home.correct=home.entered;
+        home.accuracy=100.0;
         insert_with(&db,&home).unwrap();
         insert_with(&db,&home).unwrap();
         let mut top=item("finch-a");
         top.test_mode="lesson/top".into();
+        top.duration_ms=0;
+        top.correct=top.entered;
+        top.accuracy=100.0;
         insert_with(&db,&top).unwrap();
         let mut other=item("finch-b");
         other.test_mode="lesson/bottom".into();
+        other.duration_ms=0;
+        other.correct=other.entered;
+        other.accuracy=100.0;
         insert_with(&db,&other).unwrap();
         let ours=completed_lessons_with(&db,"finch-a").unwrap();
         assert_eq!(ours.len(),2);
         assert!(ours.contains("home") && ours.contains("top"));
         assert_eq!(completed_lessons_with(&db,"finch-b").unwrap().len(),1);
+        let mut inaccurate=item("finch-a");
+        inaccurate.test_mode="lesson/symbols".into();
+        inaccurate.duration_ms=0;
+        insert_with(&db,&inaccurate).unwrap();
+        assert!(!mastered_lesson(&inaccurate));
+        assert_eq!(completed_lessons_with(&db,"finch-a").unwrap().len(),2);
+        let mut corrected=item("finch-a");
+        corrected.test_mode="lesson/pairs".into();
+        corrected.duration_ms=0;
+        corrected.correct=corrected.entered;
+        corrected.accuracy=100.0;
+        corrected.mistakes=3;
+        assert!(mastered_lesson(&corrected));
+        insert_with(&db,&corrected).unwrap();
+        assert_eq!(completed_lessons_with(&db,"finch-a").unwrap().len(),3);
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
         let db=Connection::open_in_memory().unwrap();

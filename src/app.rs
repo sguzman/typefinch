@@ -958,6 +958,12 @@ impl Typefinch {
                 State::Finished=>"Finished · result saved to this local profile",
             });
         });
+        if self.session.state==State::Running && self.mode==Mode::Emulated
+            && self.composition.as_ref().is_some_and(|state|
+                state.status()==xkbcommon::xkb::compose::Status::Composing) {
+            ui.colored_label(accent_ink(ui.visuals().dark_mode),
+                "Accent pending: type the next key, or press Backspace to cancel it.");
+        }
         let score = self.session.score();
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(accent_ink(ui.visuals().dark_mode)).strong());

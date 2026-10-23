@@ -356,6 +356,10 @@ sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 40 "Con pr"
+# Cancel a pending accent; Backspace must not erase the already-entered r.
+xdotool key --clearmodifiers apostrophe
+xdotool key --clearmodifiers BackSpace
+# Compose the accent on a second attempt, which must count only once.
 xdotool key --clearmodifiers apostrophe
 xdotool type --clearmodifiers --delay 40 "actica"
 sleep 2.4

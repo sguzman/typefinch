@@ -169,7 +169,7 @@ elseif mode == "xkb-compose" then
     equals(x.correct,12)
     equals(x.attempts,12,"dead key must not create an extra attempt")
     equals(x.accuracy,100)
-    print("Real X11 Spanish XKB dead-key Compose PASS: 12 correct graphemes, 12 scored attempts")
+    print("Real X11 Spanish XKB dead-key Compose + Backspace cancellation PASS: 12 correct graphemes, 12 scored attempts")
 elseif mode == "prepare-card-theme" then
     local path=assert(arg[2])
     local config=assert(json.decode(read(path)))

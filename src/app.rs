@@ -1,5 +1,6 @@
 use crate::{
     achievements,
+    custom_layout::CustomLayout,
     daily,
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
@@ -236,7 +237,10 @@ impl Typefinch {
                     // Crucially use the physical key, not an OS-translated logical letter.
                     // If unavailable, do not silently claim emulation works.
                     if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
-                        let mapped = if let Some(emulator) = &self.emulator {
+                        let mapped = if let Some(personal)=self.prefs.custom_layouts.iter()
+                            .find(|l|l.id==self.prefs.layout) {
+                            personal.translate(physical,modifiers.shift)
+                        } else if let Some(emulator) = &self.emulator {
                             emulator.translate(physical, modifiers.shift)
                         } else {
                             layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
@@ -498,6 +502,7 @@ impl Typefinch {
             let selected_name = self.installed_layouts.iter()
                 .find(|l|l.id==self.prefs.layout).map(|l|l.name.as_str())
                 .or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+                .or_else(||self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout).map(|l|l.name.as_str()))
                 .unwrap_or("Unknown layout");
             egui::ComboBox::from_id_salt("layout").width(ui.available_width().min(270.0))
                 .selected_text(selected_name)
@@ -507,6 +512,11 @@ impl Typefinch {
                         if !filter.is_empty() && !format!("{} {} {}",l.name,l.id,l.region).to_lowercase().contains(&filter) { continue; }
                         let suffix = if l.rows.is_some() { " · built-in" } else { " · XKB if installed" };
                         ui.selectable_value(&mut self.prefs.layout, l.id.to_owned(), format!("{}{}", l.name, suffix));
+                    }
+                    for l in &self.prefs.custom_layouts {
+                        if filter.is_empty() || format!("{} {}",l.name,l.id).to_lowercase().contains(&filter) {
+                            ui.selectable_value(&mut self.prefs.layout,l.id.clone(),format!("{} · personal ANSI",l.name));
+                        }
                     }
                     if filter.is_empty() {
                         ui.label("Search below to browse installed XKB variants.");
@@ -524,7 +534,10 @@ impl Typefinch {
                 });
             if self.prefs.layout != last {
                 self.emulator = Emulator::compile(&self.prefs.layout).ok();
-                if self.emulator.is_none() && !layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some()) {
+                if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {
+                    self.mode=Mode::Emulated;
+                    self.message="Personal ANSI emulation selected inside Typefinch; the OS layout remains unchanged.".into();
+                } else if self.emulator.is_none() && !layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some()) {
                     self.mode = Mode::System;
                     self.message = "The selected XKB layout/variant is not installed; using OS input.".into();
                 }
@@ -532,7 +545,8 @@ impl Typefinch {
             }
             ui.separator();
             ui.selectable_value(&mut self.mode, Mode::System, "OS input");
-            if self.emulator.is_some() || layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some()) {
+            if self.emulator.is_some() || layouts::find(&self.prefs.layout).is_some_and(|l|l.rows.is_some())
+                || self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {
                 ui.selectable_value(&mut self.mode, Mode::Emulated, "Software emulation");
             } else {
                 ui.add_enabled(false, egui::Button::new("Software emulation (not available)"));
@@ -550,7 +564,13 @@ impl Typefinch {
         if self.session.state == State::Running { ui.small("Layout and input mode are locked while a test is running."); }
         if self.mode == Mode::Emulated {
             ui.colored_label(accent_ink(ui.visuals().dark_mode), "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
-            ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });
+            ui.small(if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {
+                "Personal ANSI mapping uses physical-key events. It cannot change your system layout; Compose/AltGr/IME are not supported."
+            } else if self.emulator.is_some() {
+                "Compiled using installed XKB symbols; initial physical ANSI keys supported. Compose, AltGr, IME pending."
+            } else {
+                "Using starter ANSI table; physical-key events required. Compose, AltGr, IME pending."
+            });
         }
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
@@ -691,13 +711,16 @@ impl Typefinch {
         ui.heading("Keyboard mapping preview");
         ui.small(format!("Selected target: {} · ANSI base positions · {}",
             self.prefs.layout,
-            if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
+            if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {"personal key positions"}
+            else if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
         ui.add_space(6.0);
         for (row_index, keys) in ROWS.iter().enumerate() {
             ui.horizontal(|ui| {
                 ui.add_space((row_index*12) as f32);
                 for key in keys {
-                    let value = self.emulator.as_ref().and_then(|x|x.translate(*key,false))
+                    let value=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout)
+                        .and_then(|l|l.translate(*key,false))
+                        .or_else(||self.emulator.as_ref().and_then(|x|x.translate(*key,false)))
                         .or_else(||layouts::emulate(*key,&self.prefs.layout,false).map(|c|c.to_string()))
                         .unwrap_or_else(||"–".into());
                     let missed=if value.chars().count()==1 {

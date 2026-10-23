@@ -220,10 +220,10 @@ impl Typefinch {
         })();
         match imported {
             Ok(passage)=>{
-                let count=passage.chars().count();
+                let count=passage.graphemes(true).count();
                 self.custom_text=passage;
                 self.rebuild_session();
-                self.message=format!("Loaded {count} characters into memory. The passage will not be saved.");
+                self.message=format!("Loaded {count} graphemes into memory. The passage will not be saved.");
             },
             Err(reason)=>self.message=format!("Custom text import rejected: {reason}"),
         }
@@ -391,7 +391,7 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
                 ui.label("Custom passage (in memory only)");
-                ui.small("Drop a UTF-8 .txt or .md file onto this window to load up to 4096 characters.");
+                ui.small("Drop a UTF-8 .txt or .md file onto this window to load up to 4096 graphemes.");
                 let edit = ui.add_enabled(
                     self.session.state != State::Running,
                     egui::TextEdit::multiline(&mut self.custom_text)
@@ -400,7 +400,7 @@ impl Typefinch {
                         .hint_text("Paste or write text for your private typing test")
                 );
                 if edit.changed() { self.rebuild_session(); }
-                ui.small(format!("{} characters entered; only the first 4096 will be used. Text is not saved.", self.custom_text.chars().count()));
+                ui.small(format!("{} graphemes entered; only the first 4096 will be used. Text is not saved.", self.custom_text.graphemes(true).count()));
             }
             ui.add_space(6.0);
             ui.label("Theme");

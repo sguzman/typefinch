@@ -131,7 +131,7 @@ pub fn insert(record: &Record) -> Result<i64, String> {
 /// Custom passages have different targets and are excluded from comparability.
 pub fn comparable<'a>(records: &'a [Record], layout: &str, content: &str,
     duration_ms: i64, input_mode: &str) -> Vec<&'a Record> {
-    if content == "custom" || layout == "os:unknown" { return Vec::new(); }
+    if content == "custom" || content.starts_with("lesson/") || layout == "os:unknown" { return Vec::new(); }
     let mut entries: Vec<_> = records.iter().filter(|r|
         r.layout == layout && r.test_mode == content && r.duration_ms == duration_ms &&
         r.input_mode == input_mode && r.scoring_version == SCORING_VERSION
@@ -188,6 +188,7 @@ mod tests {
         assert_eq!(stats.best_wpm,70.0);
         assert!(comparable(&items,"us(colemak)","custom",30000,"Emulated").is_empty());
         assert!(comparable(&items,"os:unknown","words",30000,"OS").is_empty());
+        assert!(comparable(&items,"us(colemak)","lesson/home",0,"Emulated").is_empty());
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
         let db=Connection::open_in_memory().unwrap();

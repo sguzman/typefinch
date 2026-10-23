@@ -3,6 +3,7 @@ use crate::{
     engine::{Session, State, TestMode},
     export,
     history::{self, Record},
+    lesson,
     layouts::{self, Mode},
     preferences::{Preferences, Profile, Theme},
     registry::{self, InstalledLayout},
@@ -79,7 +80,9 @@ impl Typefinch {
             s.visuals.hyperlink_color = accent_ink(s.visuals.dark_mode);
         });
         let (keyboards, device_error) = Self::query_devices();
-        let session = Session::new_with_mode(prefs.duration_seconds, prefs.test_mode);
+        let input = if prefs.test_mode == TestMode::Lesson {lesson::get(&prefs.lesson_id).passage} else {""};
+        let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
+        let session = Session::new_with_custom(duration, prefs.test_mode, input);
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
@@ -102,7 +105,10 @@ impl Typefinch {
             return;
         }
         let identity = self.prefs.profiles[self.prefs.active_profile].id.clone();
-        let record = Record::completed(&identity, &self.session_layout, &self.session_input_mode, &self.session);
+        let mut record = Record::completed(&identity, &self.session_layout, &self.session_input_mode, &self.session);
+        if self.session.mode==TestMode::Lesson {
+            record.test_mode=format!("lesson/{}", self.prefs.lesson_id);
+        }
         match history::insert(&record) {
             Ok(_) => match history::recent(&identity) {
                 Ok(records) => self.history = records,
@@ -121,7 +127,11 @@ impl Typefinch {
         }
     }
     fn rebuild_session(&mut self) {
-        self.session = Session::new_with_custom(self.prefs.duration_seconds, self.prefs.test_mode, &self.custom_text);
+        let input=if self.prefs.test_mode==TestMode::Lesson {
+            lesson::get(&self.prefs.lesson_id).passage
+        } else { &self.custom_text };
+        let duration=if self.prefs.test_mode==TestMode::Lesson {0} else {self.prefs.duration_seconds};
+        self.session = Session::new_with_custom(duration, self.prefs.test_mode, input);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
         if self.session.target.is_empty() {
@@ -217,6 +227,7 @@ impl Typefinch {
         ui.vertical(|ui| {
             ui.label("Duration");
             let previous = self.prefs.duration_seconds;
+            ui.add_enabled_ui(self.prefs.test_mode!=TestMode::Lesson, |ui| {
             egui::ComboBox::from_id_salt("duration").selected_text(format!("{} seconds", previous))
                 .show_ui(ui, |ui| {
                     for sec in [15, 30, 60, 120] {
@@ -231,6 +242,8 @@ impl Typefinch {
                     self.save();
                 }
             }
+            });
+            if self.prefs.test_mode==TestMode::Lesson { ui.small("Untimed: finish the passage to complete the lesson."); }
             ui.add_space(6.0);
             ui.label("Test content");
             let last_mode = self.prefs.test_mode;
@@ -247,6 +260,24 @@ impl Typefinch {
                     self.rebuild_session();
                     self.save();
                 }
+            }
+            if self.prefs.test_mode == TestMode::Lesson {
+                ui.add_space(6.0);
+                ui.label("Lesson");
+                let before=self.prefs.lesson_id.clone();
+                ui.add_enabled_ui(self.session.state != State::Running, |ui| {
+                    egui::ComboBox::from_id_salt("lesson").selected_text(lesson::get(&self.prefs.lesson_id).name)
+                        .show_ui(ui, |ui| {
+                            for l in lesson::LESSONS {
+                                ui.selectable_value(&mut self.prefs.lesson_id,l.id.to_owned(),format!("{} · {}",l.level,l.name));
+                            }
+                        });
+                });
+                if before!=self.prefs.lesson_id {
+                    self.rebuild_session();
+                    self.save();
+                }
+                ui.small(lesson::get(&self.prefs.lesson_id).hint);
             }
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
@@ -399,10 +430,17 @@ impl Typefinch {
             ui.label(format!("{:.1}% raw accuracy", score.raw_accuracy));
             ui.label(format!("{} mistakes · {} corrections", score.mistakes, self.session.corrections));
             ui.label(format!("{} chars · {:.1} s elapsed", score.entered, score.elapsed.as_secs_f64()));
-            ui.label(format!("{:.1} s left", self.session.seconds_left()));
+            if self.session.duration.is_zero() {
+                ui.label("Untimed practice");
+            } else {
+                ui.label(format!("{:.1} s left", self.session.seconds_left()));
+            }
         });
         ui.add(egui::ProgressBar::new(
-            if self.session.duration.is_zero() { 0.0 } else {
+            if self.session.duration.is_zero() {
+                let total=self.session.target.chars().count().max(1);
+                self.session.typed.chars().count() as f32 / total as f32
+            } else {
                 (1.0 - self.session.seconds_left() / self.session.duration.as_secs_f64()) as f32
             }
         ).show_percentage());

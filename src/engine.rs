@@ -6,14 +6,14 @@ pub const WORDS: &str = "little finches practice every day with patient rhythm g
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TestMode { #[default] Words, Quotes, Numbers, Punctuation, Paragraphs, Custom }
+pub enum TestMode { #[default] Words, Quotes, Numbers, Punctuation, Paragraphs, Custom, Lesson }
 impl TestMode {
-    pub const ALL: [TestMode;6] = [Self::Words, Self::Quotes, Self::Numbers, Self::Punctuation, Self::Paragraphs, Self::Custom];
+    pub const ALL: [TestMode;7] = [Self::Words, Self::Quotes, Self::Numbers, Self::Punctuation, Self::Paragraphs, Self::Custom, Self::Lesson];
     pub fn label(self) -> &'static str {
-        match self { Self::Words=>"Words", Self::Quotes=>"Quotes", Self::Numbers=>"Numbers", Self::Punctuation=>"Punctuation", Self::Paragraphs=>"Paragraphs", Self::Custom=>"Custom text" }
+        match self { Self::Words=>"Words", Self::Quotes=>"Quotes", Self::Numbers=>"Numbers", Self::Punctuation=>"Punctuation", Self::Paragraphs=>"Paragraphs", Self::Custom=>"Custom text", Self::Lesson=>"Practice lesson" }
     }
     pub fn key(self) -> &'static str {
-        match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation", Self::Paragraphs=>"paragraphs", Self::Custom=>"custom" }
+        match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation", Self::Paragraphs=>"paragraphs", Self::Custom=>"custom", Self::Lesson=>"lesson" }
     }
 }
 fn corpus(mode: TestMode) -> String {
@@ -23,7 +23,7 @@ fn corpus(mode: TestMode) -> String {
         TestMode::Numbers => ("17 42 63 85 91 24 56 78 30 49 12 75 64 83 29 50 04 68", 28),
         TestMode::Punctuation => ("Wait, is that correct? Yes! Write clearly: commas, colons; parentheses (like these), and a final period.", 13),
         TestMode::Paragraphs => ("A bird learns to fly through careful repetition, just as a typist learns rhythm from patient practice. Every attempt records a small improvement.\n\nThe best progress is steady and deliberate: watch each symbol, keep the hands comfortable, and let consistency grow.", 10),
-        TestMode::Custom => ("",0),
+        TestMode::Custom | TestMode::Lesson => ("",0),
     };
     std::iter::repeat_n(text, repeats).collect::<Vec<_>>().join(" ")
 }
@@ -63,7 +63,7 @@ impl Session {
     pub fn new_with_custom(seconds: u64, mode: TestMode, custom: &str) -> Self {
         // Newline/whitespace are normalized to spaces so the target remains
         // typable by the existing committed-character pipeline.
-        let source = if mode == TestMode::Custom { custom.to_owned() } else { corpus(mode) };
+        let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) { custom.to_owned() } else { corpus(mode) };
         let target = source.chars().take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, target, typed:String::new(), duration:Duration::from_secs(seconds),
@@ -99,6 +99,7 @@ impl Session {
     pub fn tick(&mut self) -> bool {
         if self.state != State::Running { return false; }
         self.elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
+        if self.duration.is_zero() { return false; }
         if self.elapsed >= self.duration {
             self.elapsed = self.duration;
             self.state = State::Finished;
@@ -107,7 +108,8 @@ impl Session {
         false
     }
     fn finish(&mut self) {
-        self.elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed()).min(self.duration);
+        let elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
+        self.elapsed = if self.duration.is_zero() { elapsed } else { elapsed.min(self.duration) };
         self.state = State::Finished;
     }
     pub fn score(&self) -> Score {
@@ -159,12 +161,25 @@ mod tests {
     use super::*;
     #[test] fn distinct_content_modes_build_different_targets() {
         let targets:Vec<_> = TestMode::ALL.iter()
-            .filter(|mode|**mode!=TestMode::Custom)
+            .filter(|mode|!matches!(mode,TestMode::Custom | TestMode::Lesson))
             .map(|mode|Session::new_with_mode(30,*mode).target).collect();
         let mut unique=std::collections::HashSet::new();
         for t in &targets { assert!(unique.insert(t)); assert!(t.len()>300); }
         assert!(Session::new_with_mode(30,TestMode::Numbers).target.contains("42"));
         assert!(Session::new_with_mode(30,TestMode::Punctuation).target.contains('?'));
+    }
+    #[test] fn untimed_lesson_finishes_on_passage_completion_not_deadline() {
+        let mut s=Session::new_with_custom(0,TestMode::Lesson,"asdf");
+        s.begin();
+        assert!(!s.tick());
+        assert_eq!(s.state,State::Running);
+        s.type_text("asd");
+        assert!(!s.tick());
+        assert_eq!(s.state,State::Running);
+        s.type_text("f");
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.typed,"asdf");
+        assert!(s.score().elapsed < Duration::from_secs(10));
     }
     #[test] fn custom_text_is_ephemeral_normalized_and_bounded() {
         let source = format!("  Hello,\nworld!  {} ", "x".repeat(5000));

@@ -45,3 +45,7 @@ GitHub Actions runs a real X11/virtual-display smoke test using Openbox and soft
 **Export acceptance:** [F6 native SVG + Markdown integration passed in CI](https://github.com/sguzman/typefinch/actions/runs/39873211637).
 
 **Latest acceptance evidence:** [39 Rust tests + native X11 corrected-error, paste, theme and export QA](https://github.com/sguzman/typefinch/actions/runs/39880764327). Hyprland physical-device QA remains pending.
+
+## 🪶 Practice lessons
+
+Five starter lessons (home row, top row, bottom row, common pairs, symbols) run **untimed** until the whole passage is typed. Completion is saved locally with a `lesson/<id>` content label, but lesson sessions are not pooled with timed tests in comparable-score charts. The lesson passages are original project text. This is an initial curriculum scaffold, not yet adaptive practice.

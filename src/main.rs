@@ -5,6 +5,7 @@ mod engine;
 mod history;
 mod export;
 mod layouts;
+mod lesson;
 mod preferences;
 mod registry;
 mod qa;

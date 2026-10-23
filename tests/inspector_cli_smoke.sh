@@ -4,10 +4,12 @@
 set -euo pipefail
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-env -u DISPLAY -u WAYLAND_DISPLAY -u WAYLAND_SOCKET \
+if env -u DISPLAY -u WAYLAND_DISPLAY -u WAYLAND_SOCKET \
     -u HYPRLAND_INSTANCE_SIGNATURE XDG_SESSION_TYPE=tty \
-    ./target/debug/typefinch --inspect-keyboards >"$tmp/unavailable.json" 2>"$tmp/unavailable.err" \
-    && { echo "Inspector incorrectly succeeded without a compositor" >&2; exit 1; } || true
+    ./target/debug/typefinch --inspect-keyboards >"$tmp/unavailable.json" 2>"$tmp/unavailable.err"; then
+  echo "Inspector incorrectly succeeded without a compositor" >&2
+  exit 1
+fi
 [[ ! -s "$tmp/unavailable.json" ]]
 grep -F 'Keyboard inspection unavailable:' "$tmp/unavailable.err"
 xvfb-run -a -s "-screen 0 1280x900x24" \

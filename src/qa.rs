@@ -19,3 +19,12 @@ pub fn write_smoke_report(session: &Session, completed_tests: u32) -> Result<(),
     fs::write(path, serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())
 }
+
+/// Test-only marker proving that a focused timed session actually reached the
+/// persistence guard. No typed text or profile identities are included.
+pub fn write_guarded_report()->Result<(),String> {
+    let Some(path)=env::var_os("TYPEFINCH_QA_REPORT") else {return Ok(());};
+    let report=serde_json::json!({"state":"blocked","synthetic":true});
+    fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

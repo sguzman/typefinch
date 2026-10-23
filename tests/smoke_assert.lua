@@ -171,8 +171,10 @@ elseif mode == "recovery" then
     local current=read(assert(arg[2]))
     local original=read(assert(arg[3]))
     equals(current,original,"Invalid settings preserved byte-for-byte")
-    local report=io.open(assert(arg[5]),"rb")
-    assert(report==nil,"Guarded session must not write scored QA report")
+    local state=report(assert(arg[5]))
+    equals(state.state,"blocked","Actual session must hit the read-only persistence guard")
+    assert(state.synthetic==true)
+    assert(state.entered==nil and state.wpm==nil,"Read-only QA must never claim a score")
     local path=assert(arg[4])
     local f=io.open(path,"rb")
     if f then

@@ -215,6 +215,7 @@ impl Typefinch {
     }
     fn finish(&mut self) {
         if self.settings_read_only {
+            let _=crate::qa::write_guarded_report();
             self.message="Session not recorded: existing settings need recovery, and the original file has been preserved.".into();
             return;
         }

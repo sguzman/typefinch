@@ -361,6 +361,11 @@ xdotool windowactivate --sync "$window" 2>/dev/null || true
 xdotool windowfocus --sync "$window"
 sleep 0.4
 import -window "$window" "$tmp/typefinch-recovery.png"
+# Image capture can disturb the X11 focus; prove the guarded session is
+# actually started instead of accepting a false-positive empty database.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 35 "little finches practice"

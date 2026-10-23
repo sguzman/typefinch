@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██████░░░░ 57%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██████░░░░ 59%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -131,24 +131,24 @@
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
-## 🎓 M2 — Typing academy — `███████░░░ 67%`
+## 🎓 M2 — Typing academy — `█████████░ 92%`
 
 **Acceptance gate:** Adaptive lessons, weak-key drills, and course progression.
 
-### 🧠 P5 — Practice and learning — `███████░░░ 67%`
+### 🧠 P5 — Practice and learning — `█████████░ 92%`
 
 - 📚 **T501** Courses and lessons — `██████████ 100%`
   - [x] Lesson content schema — src/lesson.rs: five original licensed-by-author lesson definitions; Actions 39888678045
   - [x] Progression UI — src/app.rs: lesson picker, completion labels and course progress; Actions 39888678045
   - [x] Course completion tests — src/history.rs: full-accuracy mastery rules and profile isolation; GitHub Actions 39888678045, 46 Rust tests and native untimed lesson
-- 🎯 **T502** Character and n-gram drills — `███░░░░░░░ 33%`
-  - [ ] Per-key timing metrics
+- 🎯 **T502** Character and n-gram drills — `███████░░░ 67%`
+  - [x] Per-key timing metrics — src/engine.rs bounded ephemeral single-key timing and deterministic interval tests; src/app.rs slowest-key feedback; CI 39950437760 (73 Rust tests)
   - [x] Adaptive drill generation — src/engine.rs: ephemeral missed-key drill generation and deterministic tests; Actions 39896389227
   - [ ] Training efficacy tests
-- 🖐️ **T503** Finger assignments and visual guidance — `███░░░░░░░ 33%`
+- 🖐️ **T503** Finger assignments and visual guidance — `██████████ 100%`
   - [x] Finger models — src/layouts.rs and src/app.rs: tested ANSI positional finger assignments and keycap guide; Actions 39896389227
-  - [ ] Heatmaps
-  - [ ] Accessibility tests
+  - [x] Heatmaps — src/app.rs graded severity keycap heatmap with per-character hover counts; native X11 graphical CI 39950437760
+  - [x] Accessibility tests — src/app.rs tests for WCAG >=4.5 error ink on each light/dark heatmap severity; CI 39950437760
 - 🌱 **T504** Daily targets and accuracy-first practice — `██████████ 100%`
   - [x] Goal engine — src/preferences.rs and src/app.rs: user-configured benchmark targets and progress calculations; Actions 39888678045
   - [x] Challenge UI — src/app.rs: editable per-profile daily benchmark slider, progress bar and optional streak control; CI 39947014970
@@ -157,7 +157,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🎓 Structured curriculum — `██████████ 100%`
-- 🧠 Adaptive exercises — `███░░░░░░░ 33%`
+- 🧠 Adaptive exercises — `████████░░ 84%`
 
 ## 📊 M3 — Statistics and achievements — `████████░░ 75%`
 

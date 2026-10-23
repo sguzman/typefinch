@@ -643,11 +643,12 @@
               "id": "T502",
               "emoji": "🎯",
               "name": "Character and n-gram drills",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Per-key timing metrics",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs bounded ephemeral single-key timing and deterministic interval tests; src/app.rs slowest-key feedback; CI 39950437760 (73 Rust tests)"
                 },
                 {
                   "text": "Adaptive drill generation",
@@ -664,7 +665,7 @@
               "id": "T503",
               "emoji": "🖐️",
               "name": "Finger assignments and visual guidance",
-              "progress": 33,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Finger models",
@@ -673,11 +674,13 @@
                 },
                 {
                   "text": "Heatmaps",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs graded severity keycap heatmap with per-character hover counts; native X11 graphical CI 39950437760"
                 },
                 {
                   "text": "Accessibility tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs tests for WCAG >=4.5 error ink on each light/dark heatmap severity; CI 39950437760"
                 }
               ]
             },

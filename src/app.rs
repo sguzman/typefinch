@@ -158,30 +158,27 @@ impl Typefinch {
         if self.session.mode==TestMode::Lesson {
             record.test_mode=format!("lesson/{}", self.prefs.lesson_id);
         }
-        match history::insert(&record) {
-            Ok(_) => {
-                if self.session.mode==TestMode::Lesson {
-                    if history::mastered_lesson(&record) {
-                        self.completed_lessons.insert(self.prefs.lesson_id.clone());
-                        self.message = format!("Lesson mastered: {}. You can continue to the next lesson.",
-                            lesson::get(&self.prefs.lesson_id).name);
-                    } else {
-                        self.message = "Practice saved. Correct every character to master this lesson. Retry when ready.".into();
-                    }
-                }
-                match history::recent(&identity) {
-                    Ok(records) => self.history = records,
-                    Err(e) => self.message = format!("History read failed: {e}"),
-                }
-            },
-            Err(e) => self.message = format!("History not saved: {e}"),
+        // The session count, personal best, achievements and QA report must
+        // never claim success if SQLite refused the record.
+        if let Err(error) = history::insert(&record) {
+            self.message=format!("History not saved: {error}. Profile totals were not changed.");
+            return;
+        }
+        if self.session.mode==TestMode::Lesson {
+            if history::mastered_lesson(&record) {
+                self.completed_lessons.insert(self.prefs.lesson_id.clone());
+                self.message = format!("Lesson mastered: {}. You can continue to the next lesson.",
+                    lesson::get(&self.prefs.lesson_id).name);
+            } else {
+                self.message = "Practice saved. Correct every character to master this lesson. Retry when ready.".into();
+            }
+        }
+        match history::recent(&identity) {
+            Ok(records) => self.history=records,
+            Err(error) => self.message=format!("Session saved, but history refresh failed: {error}"),
         }
         let profile = &mut self.prefs.profiles[self.prefs.active_profile];
-        profile.tests = profile.tests.saturating_add(1);
-        if self.session.mode.counts_for_benchmark() {
-            profile.best_wpm = profile.best_wpm.max(result.wpm);
-            profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
-        }
+        profile.record_saved_score(self.session.mode,&result);
         let completed_tests = profile.tests;
         let prior=self.earned_badges.clone();
         if let Ok(records)=history::all_for_profile(&identity) {

@@ -63,6 +63,17 @@ pub struct Profile {
     #[serde(default)]
     pub goals: Goals,
 }
+impl Profile {
+    /// Call only after the corresponding session was successfully committed
+    /// to local SQLite. Private exercises cannot set benchmark personal bests.
+    pub fn record_saved_score(&mut self,mode:TestMode,score:&crate::engine::Score) {
+        self.tests=self.tests.saturating_add(1);
+        if mode.counts_for_benchmark() {
+            self.best_wpm=self.best_wpm.max(score.wpm);
+            self.best_accuracy=self.best_accuracy.max(score.accuracy);
+        }
+    }
+}
 fn new_profile_id() -> String { uuid::Uuid::new_v4().to_string() }
 impl Default for Profile {
     fn default() -> Self { Self { id:new_profile_id(), name:"Finch".into(), tests:0, best_wpm:0.0, best_accuracy:0.0, goals:Goals::default() } }
@@ -140,6 +151,19 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn saved_practice_sessions_never_inflate_benchmark_bests() {
+        let mut profile=Profile::default();
+        let clean=crate::engine::score("abcdefghij","abcdefghij",
+            std::time::Duration::from_secs(30));
+        profile.record_saved_score(TestMode::Lesson,&clean);
+        profile.record_saved_score(TestMode::Custom,&clean);
+        assert_eq!(profile.tests,2);
+        assert_eq!(profile.best_wpm,0.0);
+        profile.record_saved_score(TestMode::Words,&clean);
+        assert_eq!(profile.tests,3);
+        assert!(profile.best_wpm>0.0);
+        assert_eq!(profile.best_accuracy,100.0);
+    }
     #[test] fn legacy_profile_ids_are_migrated_and_stable_when_serialized() {
         let old = br#"{"theme":"system","layout":"us","profiles":[
             {"name":"Old","tests":3,"best_wpm":60.0,"best_accuracy":95.0}

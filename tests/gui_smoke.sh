@@ -328,6 +328,39 @@ xdotool type --clearmodifiers --delay 29 "cat dog sun moon"
 sleep 2.4
 lua5.4 tests/smoke_assert.lua personal-keymap "$tmp/report.json"
 
+# Real X11 physical-key integration for installed Spanish XKB + Compose.
+# Synthetic opt-in mode is scoped to this disposable QA process; no user
+# input mode is modified or persisted. The default X11 keymap remains US,
+# so apostrophe is the physical ANSI key mapped to Spanish dead acute.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+lua5.4 tests/smoke_assert.lua prepare-xkb-compose "$XDG_CONFIG_HOME/typefinch/settings.json"
+rm -f "$tmp/report.json"
+TYPEFINCH_QA_XKB_COMPOSE=1 ./target/debug/typefinch >"$tmp/app-xkb-compose.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-xkb-compose.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No XKB Compose test window" >&2; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 40 "Con pr"
+xdotool key --clearmodifiers apostrophe
+xdotool type --clearmodifiers --delay 40 "actica"
+sleep 2.4
+lua5.4 tests/smoke_assert.lua xkb-compose "$tmp/report.json"
+
 # Responsive screenshots from the actual graphical binary, not mocks.
 # Retain captures as CI artifacts for visual inspection; dimensions alone do
 # not establish that every text label is unclipped.

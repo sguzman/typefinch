@@ -168,7 +168,15 @@ impl Typefinch {
         let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
         let session = Session::new_with_settings(duration, prefs.test_mode, input, prefs.language, prefs.word_difficulty);
         let emulator = Emulator::compile(&prefs.layout).ok();
-        let initial_mode=if prefs.custom_layouts.iter().any(|l|l.id==prefs.layout && l.validate().is_ok()) {Mode::Emulated} else {Mode::System};
+        // A temporary synthetic X11 smoke process may force installed-XKB
+        // emulation without a mouse. Both guards are required; ordinary users
+        // always retain the normal explicitly selected input-mode behavior.
+        let synthetic_xkb = std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+            && std::env::var_os("TYPEFINCH_QA_XKB_COMPOSE").is_some();
+        let initial_mode=if synthetic_xkb ||
+            prefs.custom_layouts.iter().any(|l|l.id==prefs.layout && l.validate().is_ok()) {
+            Mode::Emulated
+        } else {Mode::System};
         let installed_layouts = registry::discover().unwrap_or_default();
         // Do not open or migrate the user's existing database when the settings
         // identity is unknown. Even reading history currently initializes schema.

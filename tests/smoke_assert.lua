@@ -144,6 +144,32 @@ elseif mode == "personal-keymap" then
     equals(rows[1].test_mode,"words/easy")
     assert(rows[1].correct>=10,rows[1].correct)
     print("Personal ANSI native QA PASS: physical events scored through a persisted custom keymap")
+elseif mode == "prepare-xkb-compose" then
+    local path=assert(arg[2])
+    local config=assert(json.decode(read(path)))
+    config.test_mode="quotes"
+    config.language="es-MX"
+    config.layout="es"
+    config.custom_layouts={}
+    save(path,json.encode(config))
+elseif mode == "xkb-compose" then
+    local r=report(assert(arg[2]))
+    assert(r.state=="finished" and r.synthetic)
+    equals(r.tests,7,"XKB compose test count")
+    equals(r.entered,12,"Con práctica graphemes")
+    equals(r.correct,12,"composed text must match quote")
+    equals(r.accuracy,100,"composed-text accuracy")
+    local rows=dbquery("SELECT layout,input_mode,test_mode,entered,correct,attempts,accuracy FROM sessions ORDER BY id DESC LIMIT 1")
+    equals(#rows,1)
+    local x=rows[1]
+    equals(x.layout,"es")
+    equals(x.input_mode,"Emulated")
+    equals(x.test_mode,"quotes/es-MX")
+    equals(x.entered,12)
+    equals(x.correct,12)
+    equals(x.attempts,12,"dead key must not create an extra attempt")
+    equals(x.accuracy,100)
+    print("Real X11 Spanish XKB dead-key Compose PASS: 12 correct graphemes, 12 scored attempts")
 elseif mode == "prepare-card-theme" then
     local path=assert(arg[2])
     local config=assert(json.decode(read(path)))

@@ -4,7 +4,7 @@
 
 **Overall:** `████████░░ 76%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████████░ 85%`
+## 🐣 M0 — Native typing MVP — `█████████░ 86%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -44,7 +44,7 @@
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
   - [ ] Native GUI goal import/export interaction and persistence
 
-### ⌨️ P2 — Tests and core scoring — `█████████░ 87%`
+### ⌨️ P2 — Tests and core scoring — `█████████░ 90%`
 
 - ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
   - [x] Input handlers implemented — src/app.rs
@@ -60,14 +60,14 @@
   - [x] Monotonic timer coded — src/engine.rs
   - [x] Live timing edge-case QA — src/engine.rs and src/app.rs: exact monotonic deadline checked before delayed GUI key processing; focus-loss cancel wins; incomplete grapheme grace never crosses timed cutoff. CI 40038837832 passed 153 Rust tests, native X11 2-second deadline (exact 2000 ms, three pre-deadline keys, late input excluded from SQLite), and full GUI/Wayland/X11 suites.
   - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
-- 📚 **T204** Word, quote, punctuation and custom tests — `█████████░ 86%`
+- 📚 **T204** Word, quote, punctuation and custom tests — `██████████ 100%`
   - [x] Starter English corpus — src/engine.rs
   - [x] Quote passages — src/engine.rs quotes corpus; GitHub Actions 39872686067
   - [x] Dedicated paragraph test content — src/engine.rs: paragraph content; GitHub Actions 39880764327: 39 tests passed
   - [x] Punctuation and numbers — src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067
   - [x] Editable private custom passages — src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327
   - [x] Bounded local UTF-8 file import into custom passages — src/engine.rs and src/app.rs: explicit Load local file and drag/drop into in-memory custom passage, 64 KiB/4096 grapheme cap, rejects symlinks/devices/controls and invalid UTF-8; Unicode ZWJ cluster and file fixture QA in CI 40025534946, 141 Rust tests and graphical suite pass
-  - [ ] Native GUI local-file import interaction and isolation
+  - [x] Native GUI local-file import interaction and isolation — src/app.rs F11 keyboard navigation and normal local file-path importer; tests/gui_import_smoke.sh plus tests/smoke_assert.lua use real X11 egui focus, Enter and F5/F2 scoring in disposable profiles. CI 40040560022: 155 Rust tests and native GUI suite passed; Custom session 16/16 correct, no passage/path in persisted settings, independent symlink attempt produced no scored record. No live Hyprland or physical-device attribution implied.
 - 🧮 **T205** Scoring taxonomy and fair comparisons — `████████░░ 75%`
   - [x] Raw vs corrected WPM — src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA
   - [x] Per-language speed definitions — docs/SCORING.md and src/engine.rs: both supported languages use five correctly matched extended grapheme clusters per standardized corrected WPM unit, with explicit comparability limits; test english_and_mexican_spanish_share_explicit_five_grapheme_wpm_units and native X11 QA green in GitHub Actions 40039799888. No CJK/RTL equivalence or active keyboard attribution claimed.
@@ -76,7 +76,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `█████████░ 87%`
+- ⌨️ Typing tests — `█████████░ 90%`
 - 🐦 Local identity — `█████████░ 92%`
 - 🌗 Appearance — `████████░░ 81%`
 

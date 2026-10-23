@@ -276,7 +276,7 @@
               "id": "T204",
               "emoji": "📚",
               "name": "Word, quote, punctuation and custom tests",
-              "progress": 86,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Starter English corpus",
@@ -310,7 +310,8 @@
                 },
                 {
                   "text": "Native GUI local-file import interaction and isolation",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs F11 keyboard navigation and normal local file-path importer; tests/gui_import_smoke.sh plus tests/smoke_assert.lua use real X11 egui focus, Enter and F5/F2 scoring in disposable profiles. CI 40040560022: 155 Rust tests and native GUI suite passed; Custom session 16/16 correct, no passage/path in persisted settings, independent symlink attempt produced no scored record. No live Hyprland or physical-device attribution implied."
                 }
               ]
             },

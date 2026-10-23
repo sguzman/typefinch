@@ -27,6 +27,8 @@
 
 A read-only terminal inspector is also available: `typefinch --inspect-keyboards` prints versioned JSON containing compositor/X11 seat and reported layout metadata. The command does not open a GUI, capture keystrokes, identify the physical source of typing, or modify the system. It returns a nonzero exit status when inspection is unavailable.
 
+Native custom passage file import was verified end to end under X11: F11 opens the normal path editor, Enter imports bounded UTF-8, and the saved Custom score contains no source text or path. Symbolic-link import is rejected. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022).
+
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
 ```sh

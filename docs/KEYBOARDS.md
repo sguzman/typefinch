@@ -144,7 +144,7 @@ When no supported compositor or X11 session is available, the command emits an e
 
 ## Keyboard-operated custom passage import
 
-F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. Native X11 QA drives this actual UI control, verifies a completed custom session, and tests a rejected symlink in an independent disposable profile. It does not establish Hyprland keyboard-only accessibility.
+F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022) passed 155 Rust tests and native X11 QA: F11 focused the real import path editor, Enter loaded a synthetic 16-grapheme passage, and scoring saved 16/16 correctly as Custom without persisting the passage/path. A separate symlink import produced no scored session. It does not establish Hyprland keyboard-only accessibility.
 
 ## Private passage and goal transfer checks
 

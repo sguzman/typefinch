@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██████░░░░ 56%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██████░░░░ 57%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -187,19 +187,19 @@
 - 📊 Statistics — `███████░░░ 67%`
 - 🏆 Achievements — `██████████ 100%`
 
-## 🎨 M4 — Profile card studio — `██████░░░░ 61%`
+## 🎨 M4 — Profile card studio — `███████░░░ 69%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `██████░░░░ 61%`
+### 🐤 P7 — Widgets and publishing — `███████░░░ 69%`
 
 - 🪄 **T701** GitHub-safe SVG card — `████████░░ 75%`
   - [x] SVG generator coded — src/export.rs
   - [x] XML escaping and test authored — src/export.rs
   - [ ] Rendered validation on GitHub
   - [x] Filesystem export test passes — GitHub Actions run 39873211637: F6 native GUI writes valid SVG and paired Markdown, parsed by XML validator
-- 🎛️ **T702** Widget designer — `███████░░░ 67%`
-  - [ ] Template system
+- 🎛️ **T702** Widget designer — `██████████ 100%`
+  - [x] Template system — src/export.rs Classic 550×205 and Compact 550×145 versioned templates, live egui preview and native PNG/SVG export; CI 39949282753 (70 tests and X11 verification)
   - [x] Color and type controls — src/preferences.rs card theme/font settings; src/export.rs static palettes and escaped SVG; native Daybreak/mono export CI 39948044402
   - [x] Live preview — src/app.rs immediate native egui palette/typography preview; Rust tests + graphical native CI 39948522387
 - 📝 **T703** Markdown, PNG, JSON exports — `██████████ 100%`
@@ -213,7 +213,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `████████░░ 81%`
+- 🐤 GitHub widget — `█████████░ 92%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `█████░░░░░ 50%`

@@ -890,11 +890,12 @@
               "id": "T702",
               "emoji": "🎛️",
               "name": "Widget designer",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Template system",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/export.rs Classic 550×205 and Compact 550×145 versioned templates, live egui preview and native PNG/SVG export; CI 39949282753 (70 tests and X11 verification)"
                 },
                 {
                   "text": "Color and type controls",

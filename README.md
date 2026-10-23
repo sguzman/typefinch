@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `██████░░░░ 56%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `██████░░░░ 57%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -97,3 +97,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Latest verified export:** [native Rust SVG-to-PNG, 550×205 output plus Daybreak/mono F9 graphical verification](https://github.com/sguzman/typefinch/actions/runs/39948522387). Card layout templates beyond the original format remain open.
 
 **Card layouts:** Classic (550×205) and Compact (550×145) are distinct native-preview/SVG/PNG templates; either can use Dusk, Daybreak, Fern, sans-serif or monospace. Classic remains the persisted default for existing installs.
+
+**Verified card templates:** [70 Rust tests and a native Compact+Daybreak+monospace SVG/PNG export](https://github.com/sguzman/typefinch/actions/runs/39949282753).

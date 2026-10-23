@@ -14,7 +14,7 @@
 - 🐦 Multiple local profiles, versioned SQLite session history, and saved high-water statistics without online accounts.
 - 🌗 System/Light/Dark egui appearance and persisted preference.
 - 🗺️ Curated keyboard-layout catalog plus installed XKB layout and variant discovery with four initial ANSI fallback emulation tables: QWERTY, Dvorak, Colemak and Colemak-DH. Installed XKB layout/variant identities can also be compiled for provisional in-app ANSI-position emulation; unavailable identities remain recognition-only. AltGr/dead-key/IME and non-ANSI behavior still need QA.
-- 🔌 Read-only Hyprland device discovery with a chooser for device metadata. **Not yet a per-keyboard typing input filter.**
+- 🔌 Read-only Hyprland keyboard metadata, standard Wayland aggregate seat capabilities and configured X11 seat metadata. **No physical per-keyboard typing attribution or event capture.**
 - 🎨 Static XML-escaped SVG GitHub-card exporter.
 
 ## Progress and development

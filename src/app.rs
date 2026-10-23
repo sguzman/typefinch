@@ -260,7 +260,8 @@ impl Typefinch {
                 self.save();
             }
         });
-        ui.vertical(|ui| {
+        ui.add_enabled_ui(self.session.state != State::Running, |ui| {
+          ui.vertical(|ui| {
             ui.label("Target layout");
             let last = self.prefs.layout.clone();
             let selected_name = self.installed_layouts.iter()
@@ -305,11 +306,13 @@ impl Typefinch {
             } else {
                 ui.add_enabled(false, egui::Button::new("Software emulation (not available)"));
             }
+          });
         });
         ui.add(egui::TextEdit::singleline(&mut self.layout_search).hint_text("Search installed layouts / variants").desired_width(285.0));
         ui.small(format!("{} system XKB layouts and variants discovered · emulation compiled: {}",
             self.installed_layouts.len(), if self.emulator.is_some() { "yes" } else { "no" }));
         ui.small("OS input follows the active system layout; this selection controls the emulation target.");
+        if self.session.state == State::Running { ui.small("Layout and input mode are locked while a test is running."); }
         if self.mode == Mode::Emulated {
             ui.colored_label(accent_ink(ui.visuals().dark_mode), "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
             ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });

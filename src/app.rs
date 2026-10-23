@@ -1048,7 +1048,7 @@ impl Typefinch {
         let cell=frame.show(ui,|ui| {
             let finger=layouts::finger_hint(key).unwrap_or("·");
             ui.add_sized([34.0,43.0],egui::Label::new(
-                RichText::new(format!("{value}\\n{finger}")).monospace().size(13.0).color(ink)
+                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
             ).selectable(false));
         });
         if let Some(name)=dead {

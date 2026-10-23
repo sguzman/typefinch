@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███████░░░ 65%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `███████░░░ 66%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -117,3 +117,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Guaranteed PNG text:** The native PNG converter reuses the fonts already embedded in egui, without installing or exporting font files. PNG generation now refuses to save a card if the heading failed to render (for example on a fontless Linux CI image); the test suite checks actual glyph pixels, not only PNG dimensions.
 
 **Linux preview distribution:** Passing CI produces a checksum-protected x86_64 tarball, a user-local installer, and one-level rollback tested in a disposable prefix. This is not an MVP release. See [installation instructions](docs/RELEASE.md).
+
+**Verified versioned Linux preview:** [80 Rust tests, real X11 QA, optimized package and safe user-local upgrade/rollback](https://github.com/sguzman/typefinch/actions/runs/39958743350). This is a development preview; the MVP release gate is still open.

@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███████░░░ 65%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███████░░░ 66%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 72%`
 
@@ -244,11 +244,11 @@
 - 🌏 Languages — `███░░░░░░░ 33%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
-## 📦 M6 — Release quality — `███░░░░░░░ 33%`
+## 📦 M6 — Release quality — `█████░░░░░ 50%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `███░░░░░░░ 33%`
+### 🧪 P9 — Acceptance and release — `█████░░░░░ 50%`
 
 - 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
@@ -262,13 +262,13 @@
   - [ ] Keyboard-only audit
   - [ ] Contrast/reduced motion
   - [ ] Unicode fonts
-- 🚀 **T904** Reproducible Linux release — `░░░░░░░░░░ 0%`
-  - [ ] Versioned packages
-  - [ ] Install/rollback tests
+- 🚀 **T904** Reproducible Linux release — `███████░░░ 67%`
+  - [x] Versioned packages — GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal
+  - [x] Install/rollback tests — GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal
   - [ ] MVP gate accepted
 
 **Feature inventory** (computed from associated task progress):
 
 - 🧪 Automated QA — `███████░░░ 67%`
-- 🚀 Release readiness — `░░░░░░░░░░ 0%`
+- 🚀 Release readiness — `███░░░░░░░ 34%`
 

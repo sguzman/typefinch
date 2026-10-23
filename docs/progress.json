@@ -1182,15 +1182,17 @@
               "id": "T904",
               "emoji": "🚀",
               "name": "Reproducible Linux release",
-              "progress": 0,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Versioned packages",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal"
                 },
                 {
                   "text": "Install/rollback tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal"
                 },
                 {
                   "text": "MVP gate accepted",

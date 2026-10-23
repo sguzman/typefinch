@@ -890,7 +890,7 @@
               "id": "T702",
               "emoji": "🎛️",
               "name": "Widget designer",
-              "progress": 0,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Template system",
@@ -898,11 +898,13 @@
                 },
                 {
                   "text": "Color and type controls",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/preferences.rs card theme/font settings; src/export.rs static palettes and escaped SVG; native Daybreak/mono export CI 39948044402"
                 },
                 {
                   "text": "Live preview",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs immediate native egui palette/typography preview; Rust tests + graphical native CI 39948522387"
                 }
               ]
             },
@@ -910,7 +912,7 @@
               "id": "T703",
               "emoji": "📝",
               "name": "Markdown, PNG, JSON exports",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "README Markdown",
@@ -919,7 +921,8 @@
                 },
                 {
                   "text": "PNG renderer",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/export.rs resvg/tiny-skia native PNG raster at 550×205, unit test plus F9 X11 GUI and Lua PNG validation; CI 39948522387"
                 },
                 {
                   "text": "Privacy-aware data exports",

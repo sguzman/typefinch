@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████░░░░░ 53%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██████░░░░ 56%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -187,24 +187,24 @@
 - 📊 Statistics — `███████░░░ 67%`
 - 🏆 Achievements — `██████████ 100%`
 
-## 🎨 M4 — Profile card studio — `████░░░░░░ 36%`
+## 🎨 M4 — Profile card studio — `██████░░░░ 61%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `████░░░░░░ 36%`
+### 🐤 P7 — Widgets and publishing — `██████░░░░ 61%`
 
 - 🪄 **T701** GitHub-safe SVG card — `████████░░ 75%`
   - [x] SVG generator coded — src/export.rs
   - [x] XML escaping and test authored — src/export.rs
   - [ ] Rendered validation on GitHub
   - [x] Filesystem export test passes — GitHub Actions run 39873211637: F6 native GUI writes valid SVG and paired Markdown, parsed by XML validator
-- 🎛️ **T702** Widget designer — `░░░░░░░░░░ 0%`
+- 🎛️ **T702** Widget designer — `███████░░░ 67%`
   - [ ] Template system
-  - [ ] Color and type controls
-  - [ ] Live preview
-- 📝 **T703** Markdown, PNG, JSON exports — `███████░░░ 67%`
+  - [x] Color and type controls — src/preferences.rs card theme/font settings; src/export.rs static palettes and escaped SVG; native Daybreak/mono export CI 39948044402
+  - [x] Live preview — src/app.rs immediate native egui palette/typography preview; Rust tests + graphical native CI 39948522387
+- 📝 **T703** Markdown, PNG, JSON exports — `██████████ 100%`
   - [x] README Markdown — src/export.rs produces paired local Markdown/SVG and validates the embed; GitHub Actions 39872686067
-  - [ ] PNG renderer
+  - [x] PNG renderer — src/export.rs resvg/tiny-skia native PNG raster at 550×205, unit test plus F9 X11 GUI and Lua PNG validation; CI 39948522387
   - [x] Privacy-aware data exports — src/export.rs, src/history.rs: entire profile's versioned JSON aggregate export; Actions 39888678045 native F7 export QA
 - 🔄 **T704** Optional GitHub profile updates — `░░░░░░░░░░ 0%`
   - [ ] Explicit opt-in
@@ -213,7 +213,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `█████░░░░░ 47%`
+- 🐤 GitHub widget — `████████░░ 81%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `█████░░░░░ 50%`

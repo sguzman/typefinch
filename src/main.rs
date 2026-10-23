@@ -6,6 +6,7 @@ mod goal_transfer;
 mod custom_layout;
 mod app;
 mod devices;
+mod wayland_seat;
 mod engine;
 mod history;
 mod export;
@@ -21,13 +22,14 @@ use eframe::egui;
 use std::path::PathBuf;
 
 #[derive(Debug,PartialEq,Eq)]
-enum LaunchIntent {Gui,Version,Help,VerifyBackup(PathBuf,PathBuf),
+enum LaunchIntent {Gui,Version,Help,ProbeWaylandSeats,VerifyBackup(PathBuf,PathBuf),
     StageBackup(PathBuf,PathBuf,PathBuf),Invalid}
 fn intent(args:&[String])->LaunchIntent {
     match args {
         []=>LaunchIntent::Gui,
         [flag] if flag=="--version" || flag=="-V"=>LaunchIntent::Version,
         [flag] if flag=="--help" || flag=="-h"=>LaunchIntent::Help,
+        [flag] if flag=="--_probe_wayland_seats"=>LaunchIntent::ProbeWaylandSeats,
         [flag,settings,database] if flag=="--verify-backup"=>
             LaunchIntent::VerifyBackup(PathBuf::from(settings),PathBuf::from(database)),
         [flag,settings,database,destination] if flag=="--restore-backup-to-new-dir"=>
@@ -41,6 +43,16 @@ fn main() -> eframe::Result {
         LaunchIntent::Gui=>{},
         LaunchIntent::Version=>{
             println!("typefinch {}",env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        },
+        LaunchIntent::ProbeWaylandSeats=>{
+            match wayland_seat::read_only_seats() {
+                Ok(seats)=>println!("{}",serde_json::to_string(&seats).expect("seat metadata serializable")),
+                Err(err)=>{
+                    eprintln!("Wayland seat inspection failed: {err}");
+                    std::process::exit(2);
+                },
+            }
             return Ok(());
         },
         LaunchIntent::Help=>{
@@ -105,6 +117,7 @@ mod cli_tests {
             assert_eq!(intent(&[x.to_owned()]),LaunchIntent::Help);
         }
         assert_eq!(intent(&["--unsupported".into()]),LaunchIntent::Invalid);
+        assert_eq!(intent(&["--_probe_wayland_seats".into()]),LaunchIntent::ProbeWaylandSeats);
         assert_eq!(intent(&["--version".into(),"junk".into()]),LaunchIntent::Invalid);
         let expected=LaunchIntent::VerifyBackup(PathBuf::from("a.json"),PathBuf::from("b.sqlite3"));
         assert_eq!(intent(&["--verify-backup".into(),"a.json".into(),"b.sqlite3".into()]),expected);

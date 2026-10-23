@@ -171,15 +171,48 @@ pub fn save_backup(prefs:&Preferences)->Result<(PathBuf,PathBuf),String> {
 }
 /// Render only Typefinch-generated, script-free SVG using Rust libraries.
 /// Text outlines are resolved locally with the system font database.
+/// All project-owned SVG templates place the heading in this region, away
+/// from the border and bird illustration. Reject blank-font PNGs rather than
+/// silently producing a card with no readable statistics.
+fn card_heading_visible(pixmap:&resvg::tiny_skia::Pixmap)->bool {
+    if pixmap.width()<150 || pixmap.height()<50 {return false;}
+    let pixels=pixmap.data();
+    let width=pixmap.width() as usize;
+    let baseline=((15*width)+20)*4;
+    let background=&pixels[baseline..baseline+3];
+    for y in 16..48 {
+        for x in 28..146 {
+            let at=((y*width)+x)*4;
+            if &pixels[at..at+3]!=background && pixels[at+3]>0 {
+                return true;
+            }
+        }
+    }
+    false
+}
 pub fn rasterize_card(svg:&str)->Result<Vec<u8>,String> {
     let mut opts=resvg::usvg::Options::default();
     opts.fontdb_mut().load_system_fonts();
+    // Resvg has no bundled fallback fonts of its own. egui already embeds
+    // freely redistributable UI fonts in the application binary; reuse those
+    // *in memory* to ensure PNG text also renders on minimal Linux installs.
+    // Do not write or redistribute separate font assets.
+    let builtin=eframe::egui::FontDefinitions::default();
+    for data in builtin.font_data.values() {
+        let bytes:&[u8]=data.as_ref().as_ref();
+        opts.fontdb_mut().load_font_data(bytes.to_vec());
+    }
+    opts.fontdb_mut().set_sans_serif_family("Ubuntu");
+    opts.fontdb_mut().set_monospace_family("Hack");
     let tree=resvg::usvg::Tree::from_str(svg,&opts).map_err(|e|e.to_string())?;
     let size=tree.size().to_int_size();
     if size.width()>4096 || size.height()>4096 {return Err("Card dimensions exceed 4096 px".into());}
     let mut pixmap=resvg::tiny_skia::Pixmap::new(size.width(),size.height())
         .ok_or("Could not allocate card pixmap")?;
     resvg::render(&tree,resvg::tiny_skia::Transform::default(),&mut pixmap.as_mut());
+    if !card_heading_visible(&pixmap) {
+        return Err("SVG font rendering produced no heading; PNG not saved".into());
+    }
     pixmap.encode_png().map_err(|e|e.to_string())
 }
 pub fn save_card_png(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
@@ -268,6 +301,12 @@ mod tests {
         let height=u32::from_be_bytes(png[20..24].try_into().unwrap());
         assert_eq!((width,height),(550,205));
         assert!(png.len()>512);
+        let rendered=resvg::tiny_skia::Pixmap::decode_png(&png).unwrap();
+        assert!(card_heading_visible(&rendered),"SVG text silently vanished");
+        let compact=rasterize_card(&card_with_template(&p,"us",CardTheme::Daybreak,
+            CardFont::Mono,CardTemplate::Compact)).unwrap();
+        let compact=resvg::tiny_skia::Pixmap::decode_png(&compact).unwrap();
+        assert!(card_heading_visible(&compact),"Compact card heading vanished");
     }
     #[test] fn markdown_link_uses_local_svg_without_remote_fetch() {
         assert_eq!(markdown_embed(),"![Typefinch typing profile](./typefinch-profile.svg)\n");

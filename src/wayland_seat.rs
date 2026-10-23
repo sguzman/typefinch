@@ -32,6 +32,15 @@ impl State {
         });
         true
     }
+    fn update_capability(&mut self,id:u32,keyboard:bool){
+        if let Some(seat)=self.seats.get_mut(&id) {seat.keyboard=keyboard;}
+    }
+    fn update_name(&mut self,id:u32,name:&str){
+        if name.is_empty() || name.len()>128 || name.chars().any(char::is_control) {
+            return;
+        }
+        if let Some(seat)=self.seats.get_mut(&id) {seat.name=name.into();}
+    }
 }
 impl Dispatch<wl_registry::WlRegistry,()> for State {
     fn event(state:&mut Self,registry:&wl_registry::WlRegistry,
@@ -57,18 +66,12 @@ impl Dispatch<wl_registry::WlRegistry,()> for State {
 impl Dispatch<wl_seat::WlSeat,u32> for State {
     fn event(state:&mut Self,_:&wl_seat::WlSeat,
         event:wl_seat::Event,id:&u32,_:&Connection,_:&QueueHandle<Self>) {
-        let Some(seat)=state.seats.get_mut(id) else{return;};
         match event {
             wl_seat::Event::Capabilities{capabilities}=>{
-                seat.keyboard=matches!(capabilities,
-                    WEnum::Value(c) if c.contains(wl_seat::Capability::Keyboard));
+                state.update_capability(*id,matches!(capabilities,
+                    WEnum::Value(c) if c.contains(wl_seat::Capability::Keyboard)));
             },
-            wl_seat::Event::Name{name}=>{
-                if !name.is_empty() && name.len()<=128
-                    && !name.chars().any(char::is_control) {
-                    seat.name=name;
-                }
-            },
+            wl_seat::Event::Name{name}=>state.update_name(*id,&name),
             _=>{},
         }
     }
@@ -94,6 +97,22 @@ pub fn read_only_seats()->Result<Vec<Seat>,String>{
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn seat_name_and_capability_changes_do_not_imply_a_key_event_stream() {
+        let mut state=State::default();
+        assert!(state.add_seat(7));
+        state.update_capability(7,true);
+        state.update_name(7,"seat0");
+        assert_eq!(state.seats.get(&7).unwrap().name,"seat0");
+        assert!(state.seats.get(&7).unwrap().keyboard);
+        state.update_name(7,"bad\nname");
+        assert_eq!(state.seats.get(&7).unwrap().name,"seat0");
+        state.update_name(7,"");
+        assert_eq!(state.seats.get(&7).unwrap().name,"seat0");
+        state.update_capability(7,false);
+        assert!(!state.seats.get(&7).unwrap().keyboard);
+        assert_eq!(state.seats.get(&7).unwrap().id,7);
+        assert!(!state.overflow);
+    }
     #[test] fn oversized_wayland_registry_fails_closed() {
         let mut state=State::default();
         for id in 0..MAX_SEATS as u32 {

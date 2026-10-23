@@ -43,6 +43,12 @@ fn accent_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(170,181,255) }
     else { Color32::from_rgb(69,89,181) }
 }
+fn selection_fill(dark:bool)->Color32 {
+    if dark {PERIWINKLE} else {accent_ink(false)}
+}
+fn selection_text(dark:bool)->Color32 {
+    if dark {Color32::from_rgb(32,38,69)} else {Color32::WHITE}
+}
 fn correct_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(124,213,165) }
     else { Color32::from_rgb(39,114,73) }
@@ -133,7 +139,8 @@ impl Typefinch {
             s.animation_time=motion_seconds(prefs.reduce_motion,normal_animation_time);
             s.spacing.item_spacing = egui::vec2(10.0, 9.0);
             s.spacing.button_padding = egui::vec2(11.0, 7.0);
-            s.visuals.selection.bg_fill = PERIWINKLE;
+            s.visuals.selection.bg_fill = selection_fill(s.visuals.dark_mode);
+            s.visuals.selection.stroke.color = selection_text(s.visuals.dark_mode);
             s.visuals.hyperlink_color = accent_ink(s.visuals.dark_mode);
         });
         let (keyboards, device_error) = Self::query_devices();
@@ -1352,7 +1359,7 @@ impl eframe::App for Typefinch {
                     ));
                     ui.add_space(5.0);
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("Typefinch").size(28.0).strong().color(PERIWINKLE));
+                        ui.label(RichText::new("Typefinch").size(28.0).strong().color(accent_ink(ui.visuals().dark_mode)));
                         ui.label(RichText::new("Find your rhythm.").size(12.0).weak());
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1513,6 +1520,8 @@ mod palette_tests {
         for ink in [accent_ink(true),correct_ink(true),reference_ink(true),error_ink(true)] {
             assert!(contrast(ink,dark)>=4.5, "dark foreground {ink:?}");
         }
+        assert!(contrast(selection_text(false),selection_fill(false))>=4.5);
+        assert!(contrast(selection_text(true),selection_fill(true))>=4.5);
         assert!(contrast(PERIWINKLE,light)<4.5); // Never use accent swatch as white-background text.
     }
 }

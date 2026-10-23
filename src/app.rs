@@ -107,6 +107,7 @@ pub struct Typefinch {
     device_error: Option<String>,
     new_profile: String,
     custom_text: String,
+    custom_import_path:String,
     message: String,
 }
 impl Typefinch {
@@ -143,7 +144,7 @@ impl Typefinch {
         Self { prefs, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), message: String::new() }
+               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), message: String::new() }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -310,31 +311,26 @@ impl Typefinch {
             }
         }
     }
-    fn accept_custom_file(&mut self, ctx:&egui::Context) {
-        if self.prefs.test_mode!=TestMode::Custom || self.session.state==State::Running {return;}
-        let files=ctx.input(|i|i.raw.dropped_files.clone());
-        let Some(drop)=files.into_iter().next() else {return;};
-        let Some(path)=drop.path else {
-            self.message="Drop a local file with a readable filesystem path.".into();
-            return;
-        };
-        let imported=(|| -> Result<String,String> {
-            use std::io::Read;
-            let input=std::fs::File::open(&path).map_err(|e|e.to_string())?;
-            // Read one extra byte for strict size detection, never the entire
-            // contents of a potentially huge file.
-            let mut data=Vec::new();
-            input.take(65_537).read_to_end(&mut data).map_err(|e|e.to_string())?;
-            crate::engine::import_custom_passage(&data)
-        })();
-        match imported {
+    fn load_custom_file(&mut self,path:&std::path::Path) {
+        if self.session.state==State::Running || self.prefs.test_mode!=TestMode::Custom {return;}
+        match crate::engine::import_custom_file(path) {
             Ok(passage)=>{
                 let count=passage.graphemes(true).count();
                 self.custom_text=passage;
                 self.rebuild_session();
-                self.message=format!("Loaded {count} graphemes into memory. The passage will not be saved.");
+                self.message=format!("Loaded {count} graphemes into memory. The passage is not saved.");
             },
             Err(reason)=>self.message=format!("Custom text import rejected: {reason}"),
+        }
+    }
+    fn accept_custom_file(&mut self,ctx:&egui::Context) {
+        if self.prefs.test_mode!=TestMode::Custom || self.session.state==State::Running {return;}
+        let files=ctx.input(|i|i.raw.dropped_files.clone());
+        let Some(drop)=files.into_iter().next() else {return;};
+        if let Some(path)=drop.path {
+            self.load_custom_file(&path);
+        } else {
+            self.message="Drop a local file with a readable filesystem path.".into();
         }
     }
     fn show_profile(&mut self, ui: &mut egui::Ui) {
@@ -643,7 +639,25 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
                 ui.label("Custom passage (in memory only)");
-                ui.small("Drop a UTF-8 .txt or .md file onto this window to load up to 4096 graphemes.");
+                ui.small("Import a private UTF-8 text file by path or drag-and-drop (64 KiB limit, 4096 graphemes).");
+                let mut load_requested=false;
+                ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        let response=ui.add(
+                            egui::TextEdit::singleline(&mut self.custom_import_path)
+                                .hint_text("Path to local .txt or .md file")
+                                .desired_width(ui.available_width().min(230.0))
+                        );
+                        if response.lost_focus() && ui.input(|i|i.key_pressed(egui::Key::Enter)) {
+                            load_requested=true;
+                        }
+                        if ui.button("Load local file").clicked() {load_requested=true;}
+                    });
+                });
+                if load_requested {
+                    let path=std::path::PathBuf::from(self.custom_import_path.trim());
+                    self.load_custom_file(&path);
+                }
                 let edit = ui.add_enabled(
                     self.session.state != State::Running,
                     egui::TextEdit::multiline(&mut self.custom_text)

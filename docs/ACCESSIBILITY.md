@@ -9,3 +9,5 @@
 
 ## Unverified acceptance
 A complete keyboard-only run through every control, accessibility-tree output, screen-reader labeling, reduced-motion evaluation on real Hyprland hardware, all contrast states, and broad Unicode font coverage are not yet independently accepted. Do not report those gates as complete on the basis of the guide or style settings alone.
+
+- **Custom text input:** A keyboard-operated local path field and Load local file button complement drag-and-drop. Input size/encoding validation is shared between both paths.

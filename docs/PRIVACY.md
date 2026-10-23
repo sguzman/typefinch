@@ -31,3 +31,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **PNG profile card:** Generated only on explicit F9/button action. It contains the same user-selected profile name and aggregate performance values as the SVG card; no raw typed passages or network requests are included.
 
 - **Key latency:** Mean per-character latency is computed from ordinary foreground committed input only, held in session memory, and cleared when a new test starts. Corrections reset the interval clock; batch text input is excluded. The database retains only aggregate speed/accuracy, not per-key timestamps or the training map.
+
+- **Keyboard path import:** The optional local file path is held only in the current UI process. It is never saved with preferences, uploaded or included in typing history. Paths to directories, devices and symbolic links are rejected. File reading is bounded to 65,537 bytes for strict 64-KiB rejection.

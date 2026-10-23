@@ -23,6 +23,20 @@ fn extends_previous_grapheme(ch:char, typed:&str)->bool {
 }
 
 /// Parse a local custom passage in bounded memory; the bytes are never logged.
+/// Both drag-and-drop and the keyboard-operated path field use the same
+/// strict local file import route. No selected path or content is persisted.
+pub fn import_custom_file(path:&std::path::Path)->Result<String,String> {
+    use std::io::Read;
+    let metadata=std::fs::symlink_metadata(path).map_err(|e|e.to_string())?;
+    if !metadata.file_type().is_file() {
+        return Err("Choose a regular file (not a directory, device or symbolic link)".into());
+    }
+    if metadata.len()>65_536 {return Err("Text file exceeds 64 KiB".into());}
+    let mut bytes=Vec::new();
+    std::fs::File::open(path).map_err(|e|e.to_string())?
+        .take(65_537).read_to_end(&mut bytes).map_err(|e|e.to_string())?;
+    import_custom_passage(&bytes)
+}
 pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
     if bytes.len()>65_536 {return Err("Text file exceeds 64 KiB".into());}
     let text=std::str::from_utf8(bytes).map_err(|_|"Only UTF-8 text files are supported")?;
@@ -418,6 +432,22 @@ mod tests {
         session.backspace();
         assert!(session.typed.is_empty());
         assert_eq!(session.corrections,1);
+    }
+    #[test] fn keyboard_path_and_drop_import_share_a_bounded_file_reader() {
+        let path=std::env::temp_dir().join(format!("typefinch-import-{}.txt",uuid::Uuid::new_v4()));
+        {
+            use std::io::Write;
+            let mut file=std::fs::OpenOptions::new().create_new(true).write(true).open(&path).unwrap();
+            file.write_all("mañana café".as_bytes()).unwrap();
+        }
+        assert_eq!(import_custom_file(&path).unwrap(),"mañana café");
+        std::fs::write(&path,vec![b'a';65_537]).unwrap();
+        assert!(import_custom_file(&path).unwrap_err().contains("64 KiB"));
+        std::fs::write(&path,[0xFF]).unwrap();
+        assert!(import_custom_file(&path).unwrap_err().contains("UTF-8"));
+        std::fs::remove_file(&path).unwrap();
+        assert!(import_custom_file(&path).is_err());
+        assert!(import_custom_file(&std::env::temp_dir()).is_err());
     }
     #[test] fn private_text_file_import_is_utf8_and_bounded() {
         assert_eq!(import_custom_passage(b"hello\nworld").unwrap(),"hello\nworld");

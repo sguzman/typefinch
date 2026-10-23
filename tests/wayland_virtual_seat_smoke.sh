@@ -53,3 +53,47 @@ LUA
 TYPEFINCH_QA_WAYLAND_INSPECTOR="$PWD/target/debug/typefinch" \
   TYPEFINCH_QA_REQUIRE_KEYBOARD_SEAT=1 \
   cargo test devices::tests::native_wayland_child_inspector_is_bounded_and_unattributed -- --nocapture
+
+# The same real X11-backed compositor can advertise a seat WITHOUT keyboard
+# capability. The inspector must not invent a keyboard from that seat/global.
+kill "$weston_pid" 2>/dev/null || true
+wait "$weston_pid" 2>/dev/null || true
+weston_pid=""
+export WAYLAND_DISPLAY=typefinch-virtual-no-input
+weston --backend=x11-backend.so --renderer=pixman --no-input \
+  --socket="$WAYLAND_DISPLAY" --no-config --idle-time=0 \
+  --width=800 --height=600 --log="$tmp/weston-no-input.log" \
+  >"$tmp/weston-no-input.stdout" 2>&1 &
+weston_pid=$!
+for _ in $(seq 1 100); do
+  [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break
+  if ! kill -0 "$weston_pid" 2>/dev/null; then
+    echo "No-input Weston exited before creating socket" >&2
+    cat "$tmp/weston-no-input.stdout" "$tmp/weston-no-input.log" >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+[[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] || {
+  echo "No-input Weston Wayland socket not created" >&2
+  cat "$tmp/weston-no-input.stdout" "$tmp/weston-no-input.log" >&2
+  exit 1
+}
+./target/debug/typefinch --_probe_wayland_seats >"$tmp/no-input-seats.json"
+lua5.4 - "$tmp/no-input-seats.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local seats,_,err=json.decode(f:read("*a"))
+f:close()
+assert(not err and type(seats)=="table")
+assert(#seats>0,"No-input Weston should still advertise its aggregate seat")
+for _,seat in ipairs(seats) do
+  assert(type(seat.id)=="number" and type(seat.name)=="string")
+  assert(seat.keyboard==false,"Input-disabled Weston must not advertise keyboard capability")
+  assert(seat.active_keymap==nil and seat.physical_device==nil)
+end
+print("Native nested Weston no-input PASS: "..#seats.." seat(s) with no keyboard capability")
+LUA
+TYPEFINCH_QA_WAYLAND_INSPECTOR="$PWD/target/debug/typefinch" \
+  TYPEFINCH_QA_EXPECT_NO_KEYBOARD_SEAT=1 \
+  cargo test devices::tests::native_wayland_child_inspector_is_bounded_and_unattributed -- --nocapture

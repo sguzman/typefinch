@@ -371,6 +371,9 @@ mod tests {
         if std::env::var_os("TYPEFINCH_QA_REQUIRE_KEYBOARD_SEAT").is_some() {
             assert!(!devices.is_empty(),"virtual compositor must advertise a keyboard-capable wl_seat");
         }
+        if std::env::var_os("TYPEFINCH_QA_EXPECT_NO_KEYBOARD_SEAT").is_some() {
+            assert!(devices.is_empty(),"pointer-only/no-input wl_seat must not be treated as keyboard");
+        }
         assert!(devices.iter().all(|seat|
             seat.address.starts_with("wayland:seat:")
             && seat.active_keymap.is_empty()

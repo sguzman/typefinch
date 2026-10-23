@@ -124,6 +124,22 @@ fn validated_session_layout(
     } else { current.to_owned() }
 }
 
+/// The user's next OS-input session may begin before a focus-triggered
+/// inventory read finishes. Only a fresh, focused inspector response may
+/// contribute detected layout provenance; emulation keeps its explicit target.
+fn layout_for_new_session(mode:Mode,target:&str,keyboards:&[Keyboard],
+    installed:&[InstalledLayout],inventory_fresh:bool)->String {
+    if mode==Mode::System && !inventory_fresh {"os:unknown".into()}
+    else {recorded_layout(mode,target,keyboards,installed)}
+}
+fn layout_after_focus_change(current:&str,mode:Mode,
+    previously_focused:bool,focused:bool)->String {
+    if previously_focused && !focused && mode==Mode::System
+        && current.starts_with("detected/") {
+        "os:unknown".into()
+    } else {current.to_owned()}
+}
+
 // The brand swatch is too light for text on white. Use theme-specific ink.
 fn accent_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(170,181,255) }
@@ -199,6 +215,8 @@ pub struct Typefinch {
     last_window_focused:bool,
     device_poll_started:Instant,
     pending_device_query:Option<Receiver<Result<Vec<Keyboard>,String>>>,
+    device_inventory_fresh:bool,
+    pending_device_obsolete:bool,
     device_error: Option<String>,
     new_profile: String,
     custom_text: String,
@@ -306,11 +324,14 @@ impl Typefinch {
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
+               device_poll_started:Instant::now(), pending_device_query,
+               device_inventory_fresh:false, pending_device_obsolete:false,
+               new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
             backup_check_result:String::new(), preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
-    fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
+    fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>,focused:bool) {
+        self.device_inventory_fresh=focused && result.is_ok();
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
         let (updated,error)=match result {
             Ok(found)=>(found,None),
@@ -332,6 +353,7 @@ impl Typefinch {
         if launch_device_inspection(
             &mut self.pending_device_query,Some(ctx.clone()),devices::inspect) {
             self.device_poll_started=Instant::now();
+            self.pending_device_obsolete=false;
         }
     }
     fn refresh_keyboards(&mut self,ctx:&egui::Context) {
@@ -339,10 +361,19 @@ impl Typefinch {
     }
     fn poll_keyboard_hotplug(&mut self,ctx:&egui::Context,focused:bool) {
         if let Some(result)=take_device_query_result(&mut self.pending_device_query) {
-            // A disconnected inspector must invalidate the old inventory,
-            // just like any other failed query. Never leave a stale row
-            // visible as a currently connected physical keyboard.
-            self.apply_device_result(result);
+            if self.pending_device_obsolete {
+                // The worker was launched before a focus-loss boundary.
+                // Its result cannot certify a keymap after focus returns.
+                self.pending_device_obsolete=false;
+                self.device_inventory_fresh=false;
+                // Let Hyprland's normal periodic logic immediately issue
+                // a fresh query (still only one query in flight).
+                self.device_poll_started=Instant::now()-KEYBOARD_POLL_INTERVAL;
+            } else {
+                // A disconnected inspector invalidates the old inventory,
+                // as does a failed query; neither leaves a trusted row.
+                self.apply_device_result(result,focused);
+            }
         }
         let hyprland=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
         let focus_gained=focused && !self.last_window_focused;
@@ -424,8 +455,8 @@ impl Typefinch {
             self.message = "Enter some custom text before starting this test.".into();
             return;
         }
-        self.session_layout = recorded_layout(self.mode,&self.prefs.layout,
-            &self.keyboards,&self.installed_layouts);
+        self.session_layout = layout_for_new_session(self.mode,&self.prefs.layout,
+            &self.keyboards,&self.installed_layouts,self.device_inventory_fresh);
         self.session_input_mode = if self.mode == Mode::System { "OS".into() } else { "Emulated".into() };
         self.composition = if self.mode == Mode::Emulated {
             self.emulator.as_ref().and_then(Emulator::compose_state)
@@ -1002,6 +1033,9 @@ impl Typefinch {
         ui.colored_label(accent_ink(ui.visuals().dark_mode),
             devices::CAPTURE_POLICY.explanation());
         ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
+        if !self.device_inventory_fresh {
+            ui.small("Keyboard inventory unverified after startup, focus change or failed inspection; recorded OS layout stays unknown.");
+        }
         ui.vertical(|ui| {
             let pending=self.pending_device_query.is_some();
             if ui.add_enabled(!pending,
@@ -1619,6 +1653,16 @@ impl Typefinch {
 impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let focused=ctx.input(|i|i.focused);
+        if self.last_window_focused && !focused {
+            self.device_inventory_fresh=false;
+            self.pending_device_obsolete=self.pending_device_query.is_some();
+            let safer=layout_after_focus_change(
+                &self.session_layout,self.mode,self.last_window_focused,focused);
+            if safer!=self.session_layout && self.session.state==State::Running {
+                self.session_layout=safer;
+                self.message="Session layout attribution set to unknown after focus loss; no physical keyboard is inferred.".into();
+            }
+        }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
@@ -1914,6 +1958,27 @@ mod palette_tests {
             assert_eq!(recorded_layout(Mode::System,"us",&[seat],&xkb),"os:unknown");
         }
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[single],&xkb),"us");
+    }
+    #[test] fn focus_changes_never_promote_stale_keyboard_metadata_to_session_provenance() {
+        let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];
+        let keyboards=vec![Keyboard{
+            address:"0x1".into(),active_keymap:"English (US)".into(),
+            ..Default::default()
+        }];
+        assert_eq!(layout_for_new_session(Mode::System,"us",
+            &keyboards,&installed,true),"detected/us");
+        assert_eq!(layout_for_new_session(Mode::System,"us",
+            &keyboards,&installed,false),"os:unknown");
+        assert_eq!(layout_for_new_session(Mode::Emulated,"us",
+            &keyboards,&installed,false),"us");
+        assert_eq!(layout_after_focus_change(
+            "detected/us",Mode::System,true,false),"os:unknown");
+        assert_eq!(layout_after_focus_change(
+            "detected/us",Mode::System,true,true),"detected/us");
+        assert_eq!(layout_after_focus_change(
+            "os:unknown",Mode::System,true,false),"os:unknown");
+        assert_eq!(layout_after_focus_change(
+            "us",Mode::Emulated,true,false),"us");
     }
     #[test] fn active_session_layout_is_downgraded_not_relabelled_on_hotplug() {
         let installed=vec![

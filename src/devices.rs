@@ -510,7 +510,7 @@ mod tests {
             "skipping an unknown keyboard could misattribute OS input layout");
         let safe=br#"{"keyboards":[
             {"name":"First","address":"0x1","active_keymap":"English (US)"},
-            {"name":"Broken label\\nline","address":"0x2","active_keymap":"German"}
+            {"name":"Broken label\nline","address":"0x2","active_keymap":"German"}
         ]}"#;
         let found=parse_json(safe).unwrap();
         assert_eq!(found.len(),2);

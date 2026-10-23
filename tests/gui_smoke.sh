@@ -56,8 +56,11 @@ if [[ -z "$window" ]]; then
   exit 1
 fi
 if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
-  xdotool windowfocus --sync "$window"
+  echo "EWMH activation unavailable; forcing X11 keyboard focus"
 fi
+xdotool windowfocus --sync "$window"
+# The native window can become visible before its first egui input frame.
+sleep 0.4
 xdotool key --clearmodifiers F5
 sleep 0.4
 xdotool type --clearmodifiers --delay 55 "little finches practice every day"
@@ -127,8 +130,11 @@ for theme in light dark; do
   done
   [[ -n "$window" ]] || { echo "No $theme window"; exit 1; }
   if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
-  xdotool windowfocus --sync "$window"
+  echo "EWMH activation unavailable; forcing X11 keyboard focus"
 fi
+xdotool windowfocus --sync "$window"
+# The native window can become visible before its first egui input frame.
+sleep 0.4
   sleep 0.5
   import -window "$window" "$tmp/typefinch-$theme.png"
   [[ -s "$tmp/typefinch-$theme.png" ]] || { echo "Missing $theme screenshot"; exit 1; }
@@ -154,8 +160,11 @@ for _ in $(seq 1 60); do
 done
 [[ -n "$window" ]] || { echo "No lesson window"; exit 1; }
 if ! xdotool windowactivate --sync "$window" 2>/dev/null; then
-  xdotool windowfocus --sync "$window"
+  echo "EWMH activation unavailable; forcing X11 keyboard focus"
 fi
+xdotool windowfocus --sync "$window"
+# The native window can become visible before its first egui input frame.
+sleep 0.4
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"

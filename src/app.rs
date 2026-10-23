@@ -12,6 +12,20 @@ use eframe::egui::{self, Color32, RichText};
 use std::time::Duration;
 
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
+// The brand swatch is too light for text on white. Use theme-specific ink.
+fn accent_ink(dark: bool) -> Color32 {
+    if dark { Color32::from_rgb(170,181,255) }
+    else { Color32::from_rgb(69,89,181) }
+}
+fn correct_ink(dark: bool) -> Color32 {
+    if dark { Color32::from_rgb(124,213,165) }
+    else { Color32::from_rgb(39,114,73) }
+}
+fn error_ink(dark: bool) -> Color32 {
+    if dark { Color32::from_rgb(255,136,148) }
+    else { Color32::from_rgb(177,47,70) }
+}
+
 
 pub struct Typefinch {
     prefs: Preferences,
@@ -44,7 +58,7 @@ impl Typefinch {
             s.spacing.item_spacing = egui::vec2(10.0, 9.0);
             s.spacing.button_padding = egui::vec2(11.0, 7.0);
             s.visuals.selection.bg_fill = PERIWINKLE;
-            s.visuals.hyperlink_color = PERIWINKLE;
+            s.visuals.hyperlink_color = accent_ink(s.visuals.dark_mode);
         });
         let (keyboards, device_error) = Self::query_devices();
         let session = Session::new_with_mode(prefs.duration_seconds, prefs.test_mode);
@@ -297,7 +311,7 @@ impl Typefinch {
             self.installed_layouts.len(), if self.emulator.is_some() { "yes" } else { "no" }));
         ui.small("OS input follows the active system layout; this selection controls the emulation target.");
         if self.mode == Mode::Emulated {
-            ui.colored_label(PERIWINKLE, "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
+            ui.colored_label(accent_ink(ui.visuals().dark_mode), "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
             ui.small(if self.emulator.is_some() { "Compiled using installed XKB symbols; physical-key mapping covers the initial ANSI positions. Compose, AltGr, and IME are pending." } else { "Using starter ANSI table; physical key events required. Compose, AltGr, and IME are pending." });
         }
     }
@@ -352,7 +366,7 @@ impl Typefinch {
         });
         let score = self.session.score();
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(PERIWINKLE).strong());
+            ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(accent_ink(ui.visuals().dark_mode)).strong());
             ui.label(format!("{:.1}% accuracy", score.accuracy));
             ui.label(format!("{:.0} raw WPM", score.raw_wpm));
             ui.label(format!("{:.1}% raw accuracy", score.raw_accuracy));
@@ -375,9 +389,9 @@ impl Typefinch {
         for (i, ch) in expected.iter().enumerate() {
             let position = first + i;
             let color = match actual.get(i) {
-                Some(c) if c == ch => Color32::from_rgb(91, 184, 137),
-                Some(_) => Color32::from_rgb(239, 102, 112),
-                None if position == entered && self.session.state == State::Running => PERIWINKLE,
+                Some(c) if c == ch => correct_ink(ui.visuals().dark_mode),
+                Some(_) => error_ink(ui.visuals().dark_mode),
+                None if position == entered && self.session.state == State::Running => accent_ink(ui.visuals().dark_mode),
                 None => ui.visuals().text_color().gamma_multiply(0.75),
             };
             job.append(&ch.to_string(), 0.0, egui::TextFormat {
@@ -584,10 +598,37 @@ impl eframe::App for Typefinch {
                     self.show_export(ui);
                     if !self.message.is_empty() {
                         ui.add_space(12.0);
-                        ui.colored_label(PERIWINKLE, &self.message);
+                        ui.colored_label(accent_ink(ui.visuals().dark_mode), &self.message);
                     }
                     ui.add_space(24.0);
                 });
             });
+    }
+}
+
+#[cfg(test)]
+mod palette_tests {
+    use super::*;
+    fn brightness(c:Color32)->f64 {
+        let v=[c.r(),c.g(),c.b()].map(|v|{
+            let x=v as f64/255.0;
+            if x<=0.04045 { x/12.92 } else { ((x+0.055)/1.055).powf(2.4) }
+        });
+        v[0]*0.2126 + v[1]*0.7152 + v[2]*0.0722
+    }
+    fn contrast(a:Color32,b:Color32)->f64 {
+        let x=brightness(a);let y=brightness(b);
+        (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn brand_ink_and_feedback_meet_normal_text_contrast() {
+        let light=Color32::WHITE;
+        let dark=Color32::from_rgb(32,38,69);
+        for ink in [accent_ink(false),correct_ink(false),error_ink(false)] {
+            assert!(contrast(ink,light)>=4.5, "light foreground {ink:?}");
+        }
+        for ink in [accent_ink(true),correct_ink(true),error_ink(true)] {
+            assert!(contrast(ink,dark)>=4.5, "dark foreground {ink:?}");
+        }
+        assert!(contrast(PERIWINKLE,light)<4.5); // Never use accent swatch as white-background text.
     }
 }

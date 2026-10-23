@@ -839,53 +839,77 @@ impl Typefinch {
     }
     fn show_card_preview(&self,ui:&mut egui::Ui) {
         let palette=export::palette(self.prefs.card_theme);
-        // Only literal, project-owned palette hex strings reach this parser.
         let ink=|hex:&str| {
             let rgb=u32::from_str_radix(hex.trim_start_matches('#'),16).unwrap_or(0);
             Color32::from_rgb((rgb>>16) as u8,(rgb>>8) as u8,rgb as u8)
         };
+        let compact=self.prefs.card_template==CardTemplate::Compact;
         let width=ui.available_width().min(550.0).max(260.0);
         let scale=width/550.0;
-        let (rect,_)=ui.allocate_exact_size(egui::vec2(width,205.0*scale),egui::Sense::hover());
+        let height=if compact {145.0} else {205.0};
+        let (rect,_)=ui.allocate_exact_size(egui::vec2(width,height*scale),egui::Sense::hover());
         let painter=ui.painter_at(rect);
         let pos=|x:f32,y:f32|rect.min+egui::vec2(x*scale,y*scale);
-        let font=|size:f32| {
-            if self.prefs.card_font==CardFont::Mono {
-                egui::FontId::monospace(size*scale)
-            } else {
-                egui::FontId::proportional(size*scale)
-            }
+        let font=|size:f32|if self.prefs.card_font==CardFont::Mono {
+            egui::FontId::monospace(size*scale)
+        } else {
+            egui::FontId::proportional(size*scale)
         };
         painter.rect_filled(rect,22.0*scale,ink(palette.border));
         painter.rect_filled(rect.shrink(2.0*scale),20.0*scale,ink(palette.bg));
-        painter.text(pos(28.0,22.0),egui::Align2::LEFT_TOP,"Typefinch",
-            font(22.0),ink(palette.heading));
-        painter.rect_filled(egui::Rect::from_min_size(pos(465.0,18.0),
-            egui::vec2(62.0,62.0)*scale),17.0*scale,ink(palette.emblem_bg));
-        painter.circle_filled(pos(492.0,51.0),16.0*scale,ink(palette.bird));
-        painter.circle_filled(pos(507.0,36.0),10.0*scale,ink(palette.bird));
-        painter.circle_filled(pos(510.0,33.0),2.0*scale,ink(palette.eye));
-        painter.add(egui::Shape::convex_polygon(
-            vec![pos(517.0,38.0),pos(527.0,42.0),pos(517.0,46.0)],
-            ink(palette.beak),egui::Stroke::NONE));
         let profile=&self.prefs.profiles[self.prefs.active_profile];
         let name=profile.name.chars().take(32).collect::<String>();
-        painter.text(pos(28.0,57.0),egui::Align2::LEFT_TOP,name,
-            font(19.0),ink(palette.name));
-        for (x,title,value) in [
-            (29.0,"BEST WPM",format!("{:.0}",profile.best_wpm)),
-            (200.0,"SESSIONS",profile.tests.to_string()),
-            (370.0,"BEST ACCURACY",format!("{:.1}%",profile.best_accuracy)),
-        ] {
-            painter.text(pos(x,98.0),egui::Align2::LEFT_TOP,title,
-                font(13.0),ink(palette.labels));
-            painter.text(pos(x,120.0),egui::Align2::LEFT_TOP,value,
-                font(28.0),ink(palette.numbers));
+        let fields=[
+            ("BEST WPM",format!("{:.0}",profile.best_wpm)),
+            ("SESSIONS",profile.tests.to_string()),
+            ("BEST ACCURACY",format!("{:.1}%",profile.best_accuracy)),
+        ];
+        if compact {
+            painter.text(pos(23.0,12.0),egui::Align2::LEFT_TOP,"Typefinch",
+                font(20.0),ink(palette.heading));
+            painter.text(pos(155.0,12.0),egui::Align2::LEFT_TOP,name,
+                font(16.0),ink(palette.name));
+            painter.rect_filled(egui::Rect::from_min_size(pos(500.0,11.0),
+                egui::vec2(34.0,34.0)*scale),10.0*scale,ink(palette.emblem_bg));
+            painter.circle_filled(pos(516.0,30.0),9.0*scale,ink(palette.bird));
+            painter.circle_filled(pos(521.0,23.0),5.0*scale,ink(palette.wing));
+            painter.circle_filled(pos(523.0,21.0),1.5*scale,ink(palette.eye));
+            for (index,(label,value)) in fields.iter().enumerate() {
+                let x=[23.0,204.0,379.0][index];
+                painter.text(pos(x,53.0),egui::Align2::LEFT_TOP,*label,
+                    font(11.0),ink(palette.labels));
+                painter.text(pos(x,71.0),egui::Align2::LEFT_TOP,value,
+                    font(27.0),ink(palette.numbers));
+            }
+            let layout=self.prefs.layout.chars().take(34).collect::<String>();
+            painter.text(pos(23.0,113.0),egui::Align2::LEFT_TOP,
+                format!("Layout: {layout} · Timed bests · All sessions counted"),
+                font(11.0),ink(palette.footer));
+        } else {
+            painter.text(pos(28.0,22.0),egui::Align2::LEFT_TOP,"Typefinch",
+                font(22.0),ink(palette.heading));
+            painter.rect_filled(egui::Rect::from_min_size(pos(465.0,18.0),
+                egui::vec2(62.0,62.0)*scale),17.0*scale,ink(palette.emblem_bg));
+            painter.circle_filled(pos(492.0,51.0),16.0*scale,ink(palette.bird));
+            painter.circle_filled(pos(507.0,36.0),10.0*scale,ink(palette.bird));
+            painter.circle_filled(pos(510.0,33.0),2.0*scale,ink(palette.eye));
+            painter.add(egui::Shape::convex_polygon(
+                vec![pos(517.0,38.0),pos(527.0,42.0),pos(517.0,46.0)],
+                ink(palette.beak),egui::Stroke::NONE));
+            painter.text(pos(28.0,57.0),egui::Align2::LEFT_TOP,name,
+                font(19.0),ink(palette.name));
+            for (index,(label,value)) in fields.iter().enumerate() {
+                let x=[29.0,200.0,370.0][index];
+                painter.text(pos(x,98.0),egui::Align2::LEFT_TOP,*label,
+                    font(13.0),ink(palette.labels));
+                painter.text(pos(x,120.0),egui::Align2::LEFT_TOP,value,
+                    font(28.0),ink(palette.numbers));
+            }
+            let layout=self.prefs.layout.chars().take(28).collect::<String>();
+            painter.text(pos(29.0,169.0),egui::Align2::LEFT_TOP,
+                format!("Layout: {layout} · Timed-test bests, all sessions counted"),
+                font(12.0),ink(palette.footer));
         }
-        let layout=self.prefs.layout.chars().take(28).collect::<String>();
-        painter.text(pos(29.0,169.0),egui::Align2::LEFT_TOP,
-            format!("Layout: {layout} · Timed-test bests, all sessions counted"),
-            font(12.0),ink(palette.footer));
     }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");

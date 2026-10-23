@@ -2,6 +2,20 @@
 use serde_json::Value;
 use std::{collections::HashSet,process::Command};
 
+/// Input originates from the compositor's aggregate seat. This application
+/// only inspects physical keyboard metadata; no per-device stream, grant,
+/// privileged input backend, or independent event filter exists.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum CapturePolicy { InspectionOnly }
+pub const CAPTURE_POLICY:CapturePolicy=CapturePolicy::InspectionOnly;
+impl CapturePolicy {
+    pub const fn explanation(self)->&'static str {
+        match self {
+            Self::InspectionOnly=>
+                "Per-device typing: unsupported. Selection inspects metadata only; scored input remains seat-level.",
+        }
+    }
+}
 #[derive(Clone, Debug, Default)]
 pub struct Keyboard {
     pub name: String,
@@ -126,6 +140,19 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn per_device_input_is_an_explicit_unsupported_mode() {
+        assert_eq!(CAPTURE_POLICY,CapturePolicy::InspectionOnly);
+        assert!(CAPTURE_POLICY.explanation().contains("unsupported"));
+        let input=br#"{"keyboards":[
+            {"name":"First","address":"0xa","active_keymap":"English (US)"},
+            {"name":"Second","address":"0xb","active_keymap":"German"}]}"#;
+        let found=parse_json(input).unwrap();
+        assert_eq!(found.len(),2);
+        // These are two *inspection rows*, not two event streams. No
+        // selector or keyboard address grants input-device attribution.
+        assert_ne!(found[0].address,found[1].address);
+        assert_eq!(CAPTURE_POLICY,CapturePolicy::InspectionOnly);
+    }
     #[test] fn xwayland_display_is_never_used_as_native_x11_seat_evidence() {
         use InspectorBackend::*;
         assert_eq!(backend_for_session(false,Some("wayland"),true),Unavailable);

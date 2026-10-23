@@ -993,6 +993,8 @@ impl Typefinch {
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
         ui.heading("Keyboard / seat inspector");
+        ui.colored_label(accent_ink(ui.visuals().dark_mode),
+            devices::CAPTURE_POLICY.explanation());
         ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
         ui.vertical(|ui| {
             let pending=self.pending_device_query.is_some();

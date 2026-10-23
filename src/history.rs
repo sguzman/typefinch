@@ -1,11 +1,12 @@
 //! Versioned local SQLite history, no raw typed text or device IDs.
 use crate::{engine::Session, preferences::base_dir};
 use rusqlite::{params, Connection};
+use serde::Serialize;
 use std::{collections::HashSet, fs, time::{SystemTime, UNIX_EPOCH}};
 
 pub const SCORING_VERSION: i64 = 1;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Record {
     pub id: i64,
     pub profile_id: String,
@@ -114,7 +115,8 @@ fn recent_with(db: &Connection, profile_id: &str, limit: usize) -> Result<Vec<Re
           raw_wpm, raw_accuracy, attempts, mistakes
          FROM sessions WHERE profile_id = ?1 ORDER BY finished_at_ms DESC, id DESC LIMIT ?2"
     )?;
-    stmt.query_map(params![profile_id, limit.min(100) as i64], |row| Ok(Record {
+    let row_limit=if limit==usize::MAX {-1_i64} else {limit.min(100) as i64};
+    stmt.query_map(params![profile_id, row_limit], |row| Ok(Record {
         id:row.get(0)?, profile_id:row.get(1)?, finished_at_ms:row.get(2)?,
         layout:row.get(3)?, input_mode:row.get(4)?, test_mode:row.get(13)?, duration_ms:row.get(5)?,
         elapsed_ms:row.get(6)?, entered:row.get(7)?, correct:row.get(8)?,
@@ -177,6 +179,12 @@ fn completed_lessons_with(db:&Connection, profile_id:&str)->Result<HashSet<Strin
 pub fn completed_lessons(profile_id:&str)->Result<HashSet<String>,String> {
     let db=connect()?;
     completed_lessons_with(&db,profile_id).map_err(|e|e.to_string())
+}
+/// Explicit user-initiated export only. Includes *all* sessions for one profile,
+/// not just the 80-record dashboard cache.
+pub fn all_for_profile(profile_id:&str)->Result<Vec<Record>,String> {
+    let db=connect()?;
+    recent_with(&db,profile_id,usize::MAX).map_err(|e|e.to_string())
 }
 pub fn recent(profile_id: &str) -> Result<Vec<Record>, String> {
     let db=connect()?;
@@ -255,6 +263,15 @@ mod tests {
         assert!(mastered_lesson(&corrected));
         insert_with(&db,&corrected).unwrap();
         assert_eq!(completed_lessons_with(&db,"finch-a").unwrap().len(),3);
+    }
+    #[test] fn unlimited_export_is_not_truncated_by_dashboard_cache() {
+        let db=Connection::open_in_memory().unwrap();
+        init(&db).unwrap();
+        for _ in 0..120 {insert_with(&db,&item("a")).unwrap();}
+        insert_with(&db,&item("other")).unwrap();
+        assert_eq!(recent_with(&db,"a",80).unwrap().len(),80);
+        assert_eq!(recent_with(&db,"a",usize::MAX).unwrap().len(),120);
+        assert_eq!(recent_with(&db,"other",usize::MAX).unwrap().len(),1);
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
         let db=Connection::open_in_memory().unwrap();

@@ -78,6 +78,18 @@ elseif mode == "export" then
     assert(svg:find("Finch",1,true))
     equals((md:gsub("%s+$","")),"![Typefinch typing profile](./typefinch-profile.svg)")
     print("SVG/Markdown export PASS: static local card and relative link")
+elseif mode == "stats" then
+    local data=assert(json.decode(read(assert(arg[2]))))
+    equals(data.version,1)
+    equals(data.format,"typefinch-session-history")
+    equals(data.order,"newest-first")
+    equals(#data.sessions,3)
+    for _, item in ipairs(data.sessions) do
+        assert(item.profile_id==data.profile_id)
+        assert(type(item.scoring_version)=="number")
+        assert(item.typed==nil and item.raw_text==nil)
+    end
+    print("Full JSON history export PASS: three records, versioned aggregate-only payload")
 elseif mode == "set-theme" then
     local path, theme=assert(arg[2]),assert(arg[3])
     assert(theme=="light" or theme=="dark")

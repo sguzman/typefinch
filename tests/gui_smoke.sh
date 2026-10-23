@@ -20,6 +20,9 @@ cleanup() {
       if [[ -s "$file" ]]; then cp "$file" "$GITHUB_WORKSPACE/"; fi
     done
   fi
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$XDG_CONFIG_HOME/typefinch/exports/typefinch-history.json" ]]; then
+    cp "$XDG_CONFIG_HOME/typefinch/exports/typefinch-history.json" "$GITHUB_WORKSPACE/"
+  fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]] && [[ -f "$tmp/app.log" ]]; then
     cp "$tmp/app.log" "$GITHUB_WORKSPACE/typefinch-gui-smoke.log"
   fi
@@ -98,6 +101,13 @@ for _ in $(seq 1 30); do
 done
 xmllint --noout "$svg"
 lua5.4 tests/smoke_assert.lua export "$svg" "$md"
+xdotool key --clearmodifiers F7
+stats="$XDG_CONFIG_HOME/typefinch/exports/typefinch-history.json"
+for _ in $(seq 1 30); do
+  [[ -s "$stats" ]] && break
+  sleep 0.1
+done
+lua5.4 tests/smoke_assert.lua stats "$stats"
 
 # Validate *explicit* appearance overrides on real native rendered frames.
 # System-default screenshot above is still separately preserved.

@@ -1,5 +1,5 @@
 //! A standalone, static, script-free GitHub-compatible SVG snapshot.
-use crate::preferences::{base_dir, Profile};
+use crate::{history::{self, Record}, preferences::{base_dir, Profile}};
 use std::{fs, path::PathBuf};
 
 fn xml(s: &str) -> String {
@@ -38,6 +38,27 @@ pub fn save_widget(profile: &Profile, layout: &str) -> Result<(PathBuf, PathBuf)
     fs::write(&md, markdown_embed()).map_err(|e| e.to_string())?;
     Ok((svg, md))
 }
+/// Versioned, explicit offline export. No profile nickname, typed text,
+/// credentials, or physical keyboard identifiers are part of this payload.
+pub fn stats_json(profile_id:&str,records:&[Record])->Result<Vec<u8>,String> {
+    serde_json::to_vec_pretty(&serde_json::json!({
+        "format":"typefinch-session-history",
+        "version":1,
+        "profile_id":profile_id,
+        "order":"newest-first",
+        "sessions":records,
+    })).map_err(|e|e.to_string())
+}
+pub fn save_stats_json(profile:&Profile)->Result<PathBuf,String> {
+    let records=history::all_for_profile(&profile.id)?;
+    let output=base_dir().join("exports").join("typefinch-history.json");
+    if let Some(parent)=output.parent() {fs::create_dir_all(parent).map_err(|e|e.to_string())?;}
+    let bytes=stats_json(&profile.id,&records)?;
+    let tmp=output.with_extension("json.tmp");
+    fs::write(&tmp,bytes).map_err(|e|e.to_string())?;
+    fs::rename(&tmp,&output).map_err(|e|e.to_string())?;
+    Ok(output)
+}
 pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
     let dir=base_dir().join("exports");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -48,6 +69,20 @@ pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn history_json_is_versioned_and_excludes_raw_text() {
+        let mut session=crate::engine::Session::new_with_custom(30,crate::engine::TestMode::Custom,"a secret test sentence");
+        session.begin();
+        session.type_text("a");
+        let rec=Record::completed("private-id","os:unknown","OS",&session);
+        let serialized=String::from_utf8(stats_json("private-id",&[rec]).unwrap()).unwrap();
+        let parsed:serde_json::Value=serde_json::from_str(&serialized).unwrap();
+        assert_eq!(parsed["version"],1);
+        assert_eq!(parsed["sessions"].as_array().unwrap().len(),1);
+        assert_eq!(parsed["sessions"][0]["test_mode"],"custom");
+        assert!(!serialized.contains("secret test sentence"));
+        assert!(!serialized.contains("typed"));
+        assert!(!serialized.contains("hardware_address"));
+    }
     #[test] fn markdown_link_uses_local_svg_without_remote_fetch() {
         assert_eq!(markdown_embed(),"![Typefinch typing profile](./typefinch-profile.svg)\n");
         assert!(!markdown_embed().contains("http"));

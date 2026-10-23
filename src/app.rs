@@ -637,11 +637,19 @@ impl Typefinch {
             Err(e) => format!("Export failed: {e}"),
         };
     }
+    fn export_statistics(&mut self) {
+        let profile=&self.prefs.profiles[self.prefs.active_profile];
+        self.message=match export::save_stats_json(profile) {
+            Ok(path)=>format!("Exported all saved sessions: {}",path.display()),
+            Err(err)=>format!("Statistics export failed: {err}"),
+        };
+    }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
         ui.label("Export a static SVG card and matching Markdown for your GitHub profile.");
         ui.horizontal_wrapped(|ui| {
             if ui.button("Export SVG + Markdown").clicked() { self.export_widget(); }
+            if ui.button("Export session history JSON").clicked() {self.export_statistics();}
             if ui.button("Copy GitHub Markdown").clicked() {
                 ui.ctx().copy_text(export::markdown_embed().to_owned());
                 self.message = "Markdown image embed copied to clipboard.".into();
@@ -656,6 +664,9 @@ impl eframe::App for Typefinch {
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F6)) {
             self.export_widget();
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F7)) {
+            self.export_statistics();
         }
         let before = self.session.state;
         self.apply_events(ctx);

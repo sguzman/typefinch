@@ -13,3 +13,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Custom test text:** User-provided passages remain in process memory while the window is open. Their text is not written to profile settings, SQLite history, exports, or CI reports. Scored custom-mode sessions store only aggregate metrics and the mode identifier. Closing Typefinch discards the custom passage.
 
 - **Raw speed/accuracy:** The additional stored raw metrics count attempts and mistakes, not the characters themselves. Corrected mistakes stay reflected in raw speed and raw accuracy without saving the original mistyped strings.
+
+- **JSON history export:** F7 (or the explicit export button) writes a versioned, aggregate-only file for the active profile to `exports/typefinch-history.json`. Unlike the dashboard's recent-session cache, it includes every saved session for that profile. The output includes its pseudonymous profile ID and never includes raw passages, typed strings, credentials, or hardware addresses. No automatic publishing takes place.

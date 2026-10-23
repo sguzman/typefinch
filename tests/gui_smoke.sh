@@ -248,3 +248,28 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 lua5.4 tests/smoke_assert.lua png "$png"
+
+# Distinguish actual in-app personal-layout emulation from OS text entry.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+lua5.4 tests/smoke_assert.lua prepare-personal-keymap "$XDG_CONFIG_HOME/typefinch/settings.json"
+rm -f "$tmp/report.json"
+./target/debug/typefinch >"$tmp/app-personal.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-personal.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No personal layout window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 29 "cat dog sun moon"
+sleep 2.4
+lua5.4 tests/smoke_assert.lua personal-keymap "$tmp/report.json"

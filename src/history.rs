@@ -33,7 +33,7 @@ impl Record {
         let at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
         Self {
             id:0, profile_id:profile_id.into(), finished_at_ms:at,
-            layout:layout.into(), input_mode:input_mode.into(), test_mode:session.mode.key().into(),
+            layout:layout.into(), input_mode:input_mode.into(), test_mode:session.history_mode(),
             duration_ms:session.duration.as_millis() as i64,
             elapsed_ms:score.elapsed.as_millis() as i64,
             entered:score.entered as i64, correct:score.correct as i64,
@@ -220,6 +220,7 @@ mod tests {
         assert_eq!(stats.best_wpm,70.0);
         assert!(comparable(&items,"us(colemak)","custom",30000,"Emulated").is_empty());
         assert!(comparable(&items,"os:unknown","words",30000,"OS").is_empty());
+        assert!(comparable(&items,"us(colemak)","words/es-MX",30000,"Emulated").is_empty());
         assert!(comparable(&items,"us(colemak)","lesson/home",0,"Emulated").is_empty());
     }
     #[test] fn lesson_progress_is_isolated_by_profile_and_unique() {

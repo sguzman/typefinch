@@ -43,3 +43,7 @@ The [acceptance ledger](progress.json) is the only basis for percentages and its
 ## Lesson mastery
 
 A finished untimed lesson is recorded as an attempt. Only records with nonzero entry, full final-position correctness, 100% final accuracy and zero prescribed duration count toward course completion. Corrected mistakes affect raw metrics without disqualifying an otherwise correct passage. Incomplete or incorrect lesson records remain in history but never inflate the course progress count.
+
+## Language-scoped tests
+
+The initial locale catalog has `en` and `es-MX` choices. Only word corpora vary with this setting. Spanish word records receive the explicit `words/es-MX` content tag so charts do not compare them with English `words` records. The scoring version still counts Unicode scalar values; combining marks, graphemes and input-method composition remain separate acceptance work.

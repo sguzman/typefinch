@@ -63,3 +63,7 @@ Five starter lessons (home row, top row, bottom row, common pairs, symbols) run 
 **Finger-position guide:** The layout preview now includes conventional ANSI left/right finger labels by physical key position, independent of its selected XKB symbol map. These are hints, not personalized ergonomic guidance or a replacement for future per-key heatmaps.
 
 The ANSI keycap preview now highlights mistakes from the current session in red and provides per-symbol hover counts. These are in-memory practice hints only; no per-character errors are written to disk.
+
+## 🌎 Language foundation
+
+Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. This does not yet mean fully localized quotes, lesson curricula, Unicode grapheme normalization, AltGr/Compose, or IME certification. The OS-input mode is recommended for accented Spanish characters.

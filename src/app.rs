@@ -1,6 +1,6 @@
 use crate::{
     devices::{self, Keyboard},
-    engine::{Session, State, TestMode},
+    engine::{Language, Session, State, TestMode},
     export,
     history::{self, Record},
     lesson,
@@ -83,7 +83,7 @@ impl Typefinch {
         let (keyboards, device_error) = Self::query_devices();
         let input = if prefs.test_mode == TestMode::Lesson {lesson::get(&prefs.lesson_id).passage} else {""};
         let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
-        let session = Session::new_with_custom(duration, prefs.test_mode, input);
+        let session = Session::new_with_language(duration, prefs.test_mode, input, prefs.language);
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
@@ -146,7 +146,7 @@ impl Typefinch {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
         let duration=if self.prefs.test_mode==TestMode::Lesson {0} else {self.prefs.duration_seconds};
-        self.session = Session::new_with_custom(duration, self.prefs.test_mode, input);
+        self.session = Session::new_with_language(duration, self.prefs.test_mode, input, self.prefs.language);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
         if self.session.target.is_empty() {
@@ -321,6 +321,25 @@ impl Typefinch {
                     self.rebuild_session();
                     self.save();
                 }
+            }
+            ui.add_space(6.0);
+            ui.label("Language (word tests)");
+            let previous_language=self.prefs.language;
+            ui.add_enabled_ui(self.session.state != State::Running, |ui| {
+                egui::ComboBox::from_id_salt("language")
+                    .selected_text(self.prefs.language.label())
+                    .show_ui(ui, |ui| {
+                        for locale in Language::ALL {
+                            ui.selectable_value(&mut self.prefs.language,locale,locale.label());
+                        }
+                    });
+            });
+            if self.prefs.language!=previous_language {
+                self.rebuild_session();
+                self.save();
+            }
+            if self.prefs.test_mode!=TestMode::Words {
+                ui.small("Language packs currently change only the Words corpus; other test modes retain their original passages.");
             }
             if self.prefs.test_mode == TestMode::Lesson {
                 ui.add_space(6.0);
@@ -620,7 +639,7 @@ impl Typefinch {
         let mode=if self.mode==Mode::System { "OS" } else { "Emulated" };
         let identity=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
         let comparable=history::comparable(&self.history, &identity,
-            self.prefs.test_mode.key(), self.prefs.duration_seconds as i64*1000, mode);
+            self.session.history_mode().as_str(), self.prefs.duration_seconds as i64*1000, mode);
         if comparable.len()>=2 {
             if let Some(stats)=history::trend(&comparable) {
                 ui.label(format!("Comparable sessions: {} · Avg {:.1} WPM · Best {:.1} WPM · Std. dev. {:.1} WPM",

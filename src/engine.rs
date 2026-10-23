@@ -17,6 +17,25 @@ pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
 }
 
 pub const WORDS: &str = "little finches practice every day with patient rhythm gentle wings make steady progress while fingers learn their keys accuracy grows through focused practice kind habits build confident typing and each new session brings another chance to improve";
+pub const WORDS_ES_MX: &str = "casa camino tiempo palabra ritmo teclado aprender práctica esfuerzo paciencia sonrisa alegría mañana corazón canción rápido lento montaña jardín sueño pequeño grande trabajo comunidad familia amistad libro ventana pueblo memoria historia ciudad México español niña niño café azúcar limón día noche tarde cielo lluvia viento nueva meta claridad futuro";
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Language {
+    #[default]
+    #[serde(rename="en")]
+    English,
+    #[serde(rename="es-MX")]
+    MexicanSpanish,
+}
+impl Language {
+    pub const ALL:[Language;2]=[Self::English,Self::MexicanSpanish];
+    pub fn label(self)->&'static str {
+        match self {Self::English=>"English",Self::MexicanSpanish=>"Español (México)"}
+    }
+    pub fn code(self)->&'static str {
+        match self {Self::English=>"en",Self::MexicanSpanish=>"es-MX"}
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,9 +52,9 @@ impl TestMode {
         match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation", Self::Paragraphs=>"paragraphs", Self::Custom=>"custom", Self::Lesson=>"lesson" }
     }
 }
-fn corpus(mode: TestMode) -> String {
+fn corpus(mode: TestMode, language:Language) -> String {
     let (text, repeats) = match mode {
-        TestMode::Words => (WORDS, 8),
+        TestMode::Words => (if language==Language::MexicanSpanish {WORDS_ES_MX} else {WORDS}, 8),
         TestMode::Quotes => ("A small improvement, repeated carefully, becomes a remarkable skill. Every key is another opportunity to learn.", 14),
         TestMode::Numbers => ("17 42 63 85 91 24 56 78 30 49 12 75 64 83 29 50 04 68", 28),
         TestMode::Punctuation => ("Wait, is that correct? Yes! Write clearly: commas, colons; parentheses (like these), and a final period.", 13),
@@ -49,6 +68,7 @@ pub enum State { Ready, Running, Finished }
 
 pub struct Session {
     pub mode: TestMode,
+    pub language: Language,
     pub target: String,
     pub typed: String,
     pub duration: Duration,
@@ -79,14 +99,24 @@ impl Session {
         Self::new_with_custom(seconds, mode, "")
     }
     pub fn new_with_custom(seconds: u64, mode: TestMode, custom: &str) -> Self {
+        Self::new_with_language(seconds,mode,custom,Language::English)
+    }
+    pub fn new_with_language(seconds:u64, mode:TestMode, custom:&str, language:Language)->Self {
         // Newline/whitespace are normalized to spaces so the target remains
         // typable by the existing committed-character pipeline.
-        let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) { custom.to_owned() } else { corpus(mode) };
+        let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) { custom.to_owned() } else { corpus(mode,language) };
         let target = source.chars().take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
-        Self { mode, target, typed:String::new(), duration:Duration::from_secs(seconds),
+        Self { mode, language, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
             corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new() }
+    }
+    pub fn history_mode(&self)->String {
+        if self.mode==TestMode::Words && self.language!=Language::English {
+            format!("words/{}",self.language.code())
+        } else {
+            self.mode.key().to_owned()
+        }
     }
     pub fn begin(&mut self) {
         self.typed.clear();
@@ -210,6 +240,15 @@ mod tests {
         for mode in TestMode::ALL {
             assert_eq!(mode.counts_for_benchmark(), !matches!(mode,TestMode::Custom|TestMode::Lesson));
         }
+    }
+    #[test] fn english_and_mexican_spanish_word_sessions_are_distinct() {
+        let en=Session::new_with_language(30,TestMode::Words,"",Language::English);
+        let es=Session::new_with_language(30,TestMode::Words,"",Language::MexicanSpanish);
+        assert_ne!(en.target,es.target);
+        assert!(es.target.contains("México") && es.target.contains("mañana"));
+        assert_eq!(en.history_mode(),"words");
+        assert_eq!(es.history_mode(),"words/es-MX");
+        assert_eq!(serde_json::to_string(&Language::MexicanSpanish).unwrap(),"\"es-MX\"");
     }
     #[test] fn distinct_content_modes_build_different_targets() {
         let targets:Vec<_> = TestMode::ALL.iter()

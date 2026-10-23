@@ -109,3 +109,11 @@ When Hyprland is absent **and** the process declares a genuine `XDG_SESSION_TYPE
 ## Optional device capture boundary
 
 The current input capability is explicitly `CapturePolicy::InspectionOnly`, regardless of which keyboard row is selected. Physical-device input capture remains unsupported. Any future implementation must first satisfy the [device-input permission and threat model](DEVICE_INPUT_SECURITY.md), including an OS-scoped permission, visible opt-in, revocation, focus boundaries and no double-scoring; the document alone does not create a capture backend.
+
+## Bounded inspection and session provenance
+
+Typefinch opens its GUI before awaiting any compositor metadata. Startup, manual refresh, and focused Hyprland polling share a **single asynchronous inspection worker**, so repeated clicks cannot accumulate concurrent `hyprctl` processes. Both read-only helper commands have a **three-second runtime limit**, bounded stdout (256 KiB Hyprland JSON; 16 KiB X11 query), and no shell interpolation, global keystroke hook or writable system command. A timeout, oversized response or disconnected worker clears the trusted inventory rather than leaving its previous contents marked current.
+
+Keyboard inventory becomes **unverified** on focus loss. A worker launched before that focus transition cannot restore confidence in the reported keymap; after focus returns, Hyprland must supply a fresh inspection result. A running OS-input session with an earlier `detected/<id>` label downgrades to `os:unknown` when focus is lost or the inventory contradicts the old label. Likewise, a new OS-input session started before refreshed inventory arrives is recorded as `os:unknown`, not a guessed layout. Explicit software emulation retains its chosen target, and the app never upgrades an existing unknown session retroactively.
+
+[Native CI 40020631995](https://github.com/sguzman/typefinch/actions/runs/40020631995) passed 132 Rust tests, the real Xvfb aggregate-seat probe and all existing X11 graphical checks. It covers subprocess timeout, output limits, focus invalidation, fresh-vs-stale layout attribution and nonblocking keyboard inspection. **No live Hyprland hotplug or physical-device event routing is claimed by these tests.**

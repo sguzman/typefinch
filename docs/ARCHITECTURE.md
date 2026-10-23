@@ -57,3 +57,7 @@ The guarded state does not open or initialize the existing SQLite database at st
 ## Preview-only physical geometry
 
 The `geometry` module defines non-authoritative ANSI/ISO/JIS/split main typing-block positions in fractional-key units, with independent Linux evdev codes for ISO/JIS extras. The preview can inspect their XKB symbols but does not synthesize key events or claim connected-device geometry. A second split Space is only visual. The module is unit tested and does not change session persistence or input routing. See [KEYBOARDS.md](KEYBOARDS.md).
+
+## Safe keyboard-inspector lifecycle
+
+The GUI initializes without waiting for `hyprctl` or `setxkbmap`. A single-flight worker reads bounded compositor metadata and requests a repaint upon completion. The inspector process is terminated on timeout, reports no raw input stream, and keeps no persistent hardware identifiers. Focus loss invalidates active OS-input provenance and any pending result issued before the focus transition; a subsequent focused inspection is required before attributing a new OS-input session to a recognized compositor layout. See [KEYBOARDS.md](KEYBOARDS.md) and [CI 40020631995](https://github.com/sguzman/typefinch/actions/runs/40020631995).

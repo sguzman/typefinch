@@ -41,3 +41,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Backup verification:** The optional in-app checker accepts an explicit private settings-backup path only in memory, derives the matching SQLite filename and validates both as read-only inputs. It neither opens the live profile directory for writing nor stores the path with preferences or history.
 
 - **Per-device capture security:** The explicit [permission and threat model](DEVICE_INPUT_SECURITY.md) applies to any proposed future input backend. Today per-device typing is unsupported, the inspector remains metadata-only, and there is no root/global key capture.
+
+- **Inspector failure and focus protection:** External device metadata commands are time- and output-bounded, never use a user-provided shell command, and run off the GUI thread. A focus change or failed inspection invalidates detected OS-layout provenance instead of preserving an unverified physical-keyboard label; ordinary local typing continues. See [keyboard support](KEYBOARDS.md).

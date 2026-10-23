@@ -101,6 +101,28 @@ with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","ses
 assert len(rows)==2 and rows[1]==(len("little finches"),len("little finches")),rows
 print("Clipboard paste suppression PASS: synthetic paste was not counted")
 PY
+# Exercise a real corrected error to separate raw from final metrics.
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 32 "little finchex"
+xdotool key --clearmodifiers BackSpace
+xdotool type --clearmodifiers --delay 35 "s"
+sleep 2.4
+python3 - "$tmp/report.json" <<'PY'
+import json,os,sqlite3,sys
+r=json.load(open(sys.argv[1]))
+assert r["state"]=="finished" and r["tests"]==3,r
+with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
+    version=db.execute("PRAGMA user_version").fetchone()[0]
+    rows=db.execute("SELECT entered, correct, attempts, mistakes, corrections, accuracy, raw_accuracy, wpm, raw_wpm FROM sessions ORDER BY id").fetchall()
+assert version==3,version
+assert len(rows)==3,rows
+entered,correct,attempts,mistakes,corrections,accuracy,raw_accuracy,wpm,raw_wpm=rows[2]
+assert entered==correct==len("little finches"),rows[2]
+assert attempts==entered+1 and mistakes==1 and corrections==1,rows[2]
+assert accuracy==100.0 and 0<raw_accuracy<100 and raw_wpm>wpm,rows[2]
+print("Corrected-error QA PASS: raw mistakes survive backspacing; SQLite v3 round-trips both scores")
+PY
 xdotool key --clearmodifiers F6
 svg="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
 md="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"

@@ -1,7 +1,7 @@
 //! Versioned local SQLite history, no raw typed text or device IDs.
 use crate::{engine::Session, preferences::base_dir};
 use rusqlite::{params, Connection};
-use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashSet, fs, time::{SystemTime, UNIX_EPOCH}};
 
 pub const SCORING_VERSION: i64 = 1;
 
@@ -154,6 +154,21 @@ pub fn trend(records: &[&Record]) -> Option<Trend> {
     let best=records.iter().map(|r|r.wpm).fold(0.0_f64, f64::max);
     Some(Trend {mean_wpm:mean,best_wpm:best,deviation_wpm:spread})
 }
+fn completed_lessons_with(db:&Connection, profile_id:&str)->Result<HashSet<String>,rusqlite::Error> {
+    let mut stmt=db.prepare("SELECT DISTINCT test_mode FROM sessions WHERE profile_id=?1 AND test_mode LIKE 'lesson/%'")?;
+    let rows=stmt.query_map(params![profile_id], |row|row.get::<_,String>(0))?;
+    let mut result=HashSet::new();
+    for row in rows {
+        if let Some(id)=row?.strip_prefix("lesson/") {
+            if !id.is_empty() {result.insert(id.to_owned());}
+        }
+    }
+    Ok(result)
+}
+pub fn completed_lessons(profile_id:&str)->Result<HashSet<String>,String> {
+    let db=connect()?;
+    completed_lessons_with(&db,profile_id).map_err(|e|e.to_string())
+}
 pub fn recent(profile_id: &str) -> Result<Vec<Record>, String> {
     let db=connect()?;
     recent_with(&db, profile_id, 80).map_err(|e| e.to_string())
@@ -189,6 +204,24 @@ mod tests {
         assert!(comparable(&items,"us(colemak)","custom",30000,"Emulated").is_empty());
         assert!(comparable(&items,"os:unknown","words",30000,"OS").is_empty());
         assert!(comparable(&items,"us(colemak)","lesson/home",0,"Emulated").is_empty());
+    }
+    #[test] fn lesson_progress_is_isolated_by_profile_and_unique() {
+        let db=Connection::open_in_memory().unwrap();
+        init(&db).unwrap();
+        let mut home=item("finch-a");
+        home.test_mode="lesson/home".into();
+        insert_with(&db,&home).unwrap();
+        insert_with(&db,&home).unwrap();
+        let mut top=item("finch-a");
+        top.test_mode="lesson/top".into();
+        insert_with(&db,&top).unwrap();
+        let mut other=item("finch-b");
+        other.test_mode="lesson/bottom".into();
+        insert_with(&db,&other).unwrap();
+        let ours=completed_lessons_with(&db,"finch-a").unwrap();
+        assert_eq!(ours.len(),2);
+        assert!(ours.contains("home") && ours.contains("top"));
+        assert_eq!(completed_lessons_with(&db,"finch-b").unwrap().len(),1);
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
         let db=Connection::open_in_memory().unwrap();

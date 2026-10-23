@@ -54,6 +54,7 @@ pub struct Typefinch {
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     history: Vec<Record>,
+    completed_lessons: std::collections::HashSet<String>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
     device_error: Option<String>,
@@ -86,7 +87,8 @@ impl Typefinch {
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, keyboards, device_error,
+        let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
+        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, completed_lessons, keyboards, device_error,
                device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -110,9 +112,14 @@ impl Typefinch {
             record.test_mode=format!("lesson/{}", self.prefs.lesson_id);
         }
         match history::insert(&record) {
-            Ok(_) => match history::recent(&identity) {
-                Ok(records) => self.history = records,
-                Err(e) => self.message = format!("History read failed: {e}"),
+            Ok(_) => {
+                if self.session.mode==TestMode::Lesson {
+                    self.completed_lessons.insert(self.prefs.lesson_id.clone());
+                }
+                match history::recent(&identity) {
+                    Ok(records) => self.history = records,
+                    Err(e) => self.message = format!("History read failed: {e}"),
+                }
             },
             Err(e) => self.message = format!("History not saved: {e}"),
         }
@@ -218,6 +225,7 @@ impl Typefinch {
         if self.prefs.active_profile != previous {
             let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
             self.history = history::recent(&id).unwrap_or_default();
+            self.completed_lessons = history::completed_lessons(&id).unwrap_or_default();
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
@@ -266,12 +274,17 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Lesson {
                 ui.add_space(6.0);
                 ui.label("Lesson");
+                let total=lesson::LESSONS.len().max(1);
+                let completed=lesson::LESSONS.iter().filter(|l|self.completed_lessons.contains(l.id)).count();
+                ui.add(egui::ProgressBar::new(completed as f32 / total as f32)
+                    .text(format!("{completed}/{total} lessons completed")).show_percentage());
                 let before=self.prefs.lesson_id.clone();
                 ui.add_enabled_ui(self.session.state != State::Running, |ui| {
                     egui::ComboBox::from_id_salt("lesson").selected_text(lesson::get(&self.prefs.lesson_id).name)
                         .show_ui(ui, |ui| {
                             for l in lesson::LESSONS {
-                                ui.selectable_value(&mut self.prefs.lesson_id,l.id.to_owned(),format!("{} · {}",l.level,l.name));
+                                let mark=if self.completed_lessons.contains(l.id) {"Completed"} else {"New"};
+                                ui.selectable_value(&mut self.prefs.lesson_id,l.id.to_owned(),format!("{} · {} · {}",mark,l.level,l.name));
                             }
                         });
                 });

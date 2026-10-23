@@ -12,6 +12,22 @@ use eframe::egui::{self, Color32, RichText};
 use std::time::Duration;
 
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
+// Wayland normally combines physical keyboards into a seat-level event stream.
+// Only tag OS input with a detected layout when all reported keyboards agree;
+// selecting a device for inspection does NOT attribute its events to it.
+fn recorded_layout(mode:Mode, target:&str, keyboards:&[Keyboard], installed:&[InstalledLayout])->String {
+    if mode == Mode::Emulated { return target.to_owned(); }
+    let Some(first)=keyboards.first() else { return "os:unknown".to_owned() };
+    if first.active_keymap.trim().is_empty() ||
+        keyboards.iter().any(|k|k.active_keymap != first.active_keymap) {
+        return "os:unknown".to_owned();
+    }
+    match registry::resolve_active(installed,&first.active_keymap) {
+        Some(layout)=>format!("detected/{}",layout.id),
+        None=>"os:unknown".to_owned(),
+    }
+}
+
 // The brand swatch is too light for text on white. Use theme-specific ink.
 fn accent_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(170,181,255) }
@@ -31,6 +47,8 @@ pub struct Typefinch {
     prefs: Preferences,
     session: Session,
     mode: Mode,
+    session_layout: String,
+    session_input_mode: String,
     emulator: Option<Emulator>,
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
@@ -65,7 +83,7 @@ impl Typefinch {
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        Self { prefs, session, mode: Mode::System, emulator, installed_layouts, layout_search: String::new(), history, keyboards, device_error,
+        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, keyboards, device_error,
                device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -84,8 +102,7 @@ impl Typefinch {
             return;
         }
         let identity = self.prefs.profiles[self.prefs.active_profile].id.clone();
-        let mode = if self.mode == Mode::System { "OS" } else { "Emulated" };
-        let record = Record::completed(&identity, &self.prefs.layout, mode, &self.session);
+        let record = Record::completed(&identity, &self.session_layout, &self.session_input_mode, &self.session);
         match history::insert(&record) {
             Ok(_) => match history::recent(&identity) {
                 Ok(records) => self.history = records,
@@ -111,6 +128,9 @@ impl Typefinch {
             self.message = "Enter some custom text before starting this test.".into();
             return;
         }
+        self.session_layout = recorded_layout(self.mode,&self.prefs.layout,
+            &self.keyboards,&self.installed_layouts);
+        self.session_input_mode = if self.mode == Mode::System { "OS".into() } else { "Emulated".into() };
         self.session.begin();
         ctx.memory_mut(|m| m.request_focus(egui::Id::new("typing_surface")));
     }
@@ -312,6 +332,10 @@ impl Typefinch {
         ui.small(format!("{} system XKB layouts and variants discovered · emulation compiled: {}",
             self.installed_layouts.len(), if self.emulator.is_some() { "yes" } else { "no" }));
         ui.small("OS input follows the active system layout; this selection controls the emulation target.");
+        if self.mode==Mode::System {
+            let inferred=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
+            ui.small(format!("Scoring layout attribution: {inferred} (seat-level, not per-keyboard)"));
+        }
         if self.session.state == State::Running { ui.small("Layout and input mode are locked while a test is running."); }
         if self.mode == Mode::Emulated {
             ui.colored_label(accent_ink(ui.visuals().dark_mode), "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");
@@ -425,7 +449,8 @@ impl Typefinch {
             return;
         }
         let mode=if self.mode==Mode::System { "OS" } else { "Emulated" };
-        let comparable=history::comparable(&self.history, &self.prefs.layout,
+        let identity=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
+        let comparable=history::comparable(&self.history, &identity,
             self.prefs.test_mode.key(), self.prefs.duration_seconds as i64*1000, mode);
         if comparable.len()>=2 {
             if let Some(stats)=history::trend(&comparable) {
@@ -622,6 +647,22 @@ mod palette_tests {
     fn contrast(a:Color32,b:Color32)->f64 {
         let x=brightness(a);let y=brightness(b);
         (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn keyboard_layout_attribution_never_uses_selected_inspection_device_as_input_source() {
+        let xkb=vec![
+            InstalledLayout { id:"us".into(),name:"English (US)".into() },
+            InstalledLayout { id:"de".into(),name:"German".into() },
+        ];
+        let mut keyboards=vec![Keyboard {
+            name:"A".into(),active_keymap:"English (US)".into(),..Default::default()
+        }];
+        assert_eq!(recorded_layout(Mode::System,"de",&keyboards,&xkb),"detected/us");
+        assert_eq!(recorded_layout(Mode::Emulated,"us(colemak)",&keyboards,&xkb),"us(colemak)");
+        keyboards.push(Keyboard {
+            name:"B".into(),active_keymap:"German".into(),..Default::default()
+        });
+        assert_eq!(recorded_layout(Mode::System,"us",&keyboards,&xkb),"os:unknown");
+        assert_eq!(recorded_layout(Mode::System,"us",&[],&xkb),"os:unknown");
     }
     #[test] fn brand_ink_and_feedback_meet_normal_text_contrast() {
         let light=Color32::WHITE;

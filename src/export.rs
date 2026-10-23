@@ -267,6 +267,28 @@ mod tests {
         assert!(!serialized.contains("typed"));
         assert!(!serialized.contains("hardware_address"));
     }
+    fn relative_luminance(hex:&str)->f64 {
+        let raw=hex.trim_start_matches('#');
+        assert_eq!(raw.len(),6);
+        let channels=[0,2,4].map(|offset| {
+            let value=u8::from_str_radix(&raw[offset..offset+2],16).unwrap() as f64/255.0;
+            if value<=0.04045 {value/12.92} else {((value+0.055)/1.055).powf(2.4)}
+        });
+        0.2126*channels[0]+0.7152*channels[1]+0.0722*channels[2]
+    }
+    fn ratio(bg:&str,text:&str)->f64 {
+        let a=relative_luminance(bg);
+        let b=relative_luminance(text);
+        (a.max(b)+0.05)/(a.min(b)+0.05)
+    }
+    #[test] fn every_profile_card_palette_meets_normal_text_contrast() {
+        for theme in CardTheme::ALL {
+            let style=palette(theme);
+            for ink in [style.heading,style.name,style.labels,style.numbers,style.footer] {
+                assert!(ratio(style.bg,ink)>=4.5,"Card text contrast is insufficient: {:?} {ink}",theme);
+            }
+        }
+    }
     #[test] fn palettes_and_type_options_keep_static_svg_markup_safe() {
         let p=Profile {name:"<script>&".into(), ..Default::default()};
         for theme in CardTheme::ALL {

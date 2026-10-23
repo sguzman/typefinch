@@ -39,6 +39,9 @@ impl Shape {
 
 /// Units are tenths of one ordinary key width. No slot claims ownership of
 /// real hardware events; `egui_key=None` must not be synthesized from another key.
+/// Presentation semantics, never inferred from XKB modifier symbols.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotKind { Character, Extra, Control, Modifier, Decoration }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Slot {
     pub name: &'static str,
@@ -47,9 +50,20 @@ pub struct Slot {
     pub row: u8,
     pub x: u16,
     pub width: u8,
+    pub kind: SlotKind,
+    pub caption: &'static str,
 }
 fn position(name: &'static str, evdev: u32, key: Option<Key>, row:u8, x:u16, width:u8) -> Slot {
-    Slot { name, evdev, egui_key:key, row, x, width }
+    let kind=if evdev==0 {SlotKind::Decoration}
+        else if key.is_some() {SlotKind::Character} else {SlotKind::Extra};
+    Slot { name, evdev, egui_key:key, row, x, width, kind, caption:"" }
+}
+fn special(name:&'static str, caption:&'static str, evdev:u32,
+    row:u8, x:u16, width:u8, modifier:bool)->Slot {
+    let mut slot=position(name,evdev,None,row,x,width);
+    slot.kind=if modifier {SlotKind::Modifier} else {SlotKind::Control};
+    slot.caption=caption;
+    slot
 }
 const NUMBER: &[(Key,u32,&str)] = &[
     (Key::Backtick,41,"Grave"),
@@ -101,6 +115,30 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
             position("Kana",93,None,4,130,12),
         ]);
     }
+    // Controls and modifiers are illustrated physical slots only. They are
+    // never translated into scored text or left/right-specific key events.
+    let jis=shape==Shape::Jis;
+    let split=shape==Shape::Split;
+    result.extend([
+        special("Backspace","⌫",14,0,if jis {150} else {130},20,false),
+        special("Tab","⇥",15,1,0,15,false),
+        special("Caps Lock","Caps",58,2,0,20,true),
+        special("Enter","↵",28,2,130,if jis {25} else {22},false),
+        special("Left Shift","⇧",42,3,0,if shape==Shape::Iso {20} else {30},true),
+        special("Right Shift","⇧",54,3,
+            if split {158} else if jis {140} else {130},
+            if split {18} else {22},true),
+        special("Left Ctrl","Ctrl",29,4,0,12,true),
+        special("Left Alt","Alt",56,4,if jis {33} else {29},if jis {10} else {13},true),
+        special("Right Alt (AltGr)","Alt",100,4,if jis {143} else {119},12,true),
+        special("Right Ctrl","Ctrl",97,4,if jis {158} else {145},12,true),
+    ]);
+    if !jis {
+        result.extend([
+            special("Left Super","◆",125,4,14,12,true),
+            special("Right Super","◆",126,4,132,12,true),
+        ]);
+    }
     // The ordinary physical Space is longer on ANSI/ISO; shorter in a
     // JIS converter-key row, and shown as two *visual halves* on a split.
     if shape==Shape::Split {
@@ -142,8 +180,35 @@ mod tests {
                 if slot.evdev!=0 {
                     assert!(codes.insert(slot.evdev), "duplicate evdev {} in {:?}",slot.evdev,shape);
                 }
+                if slot.kind!=SlotKind::Character {
+                    assert!(slot.egui_key.is_none(), "non-printable key event: {}",slot.name);
+                }
+                if slot.kind==SlotKind::Decoration {assert_eq!(slot.evdev,0);}
+            }
+            for row in 0..=4 {
+                let keys:Vec<_>=slots.iter().filter(|s|s.row==row).collect();
+                for pair in keys.windows(2) {
+                    assert!(pair[0].x+pair[0].width as u16<=pair[1].x,
+                        "{shape:?}: {} overlaps {}",pair[0].name,pair[1].name);
+                }
             }
             assert_eq!(slots.iter().filter(|s|s.egui_key==Some(Key::Space)).count(),1);
+        }
+    }
+    #[test] fn modifier_and_control_positions_are_explicit_not_scored() {
+        for shape in Shape::ALL {
+            let slots=slots(shape);
+            for code in [14,15,28,29,42,54,56,58,97,100] {
+                let slot=slots.iter().find(|s|s.evdev==code).expect("control position missing");
+                assert!(matches!(slot.kind,SlotKind::Control|SlotKind::Modifier));
+                assert!(slot.egui_key.is_none());
+                assert!(!slot.caption.is_empty());
+            }
+            for code in [125,126] {
+                assert_eq!(slots.iter().any(|s|s.evdev==code),shape!=Shape::Jis);
+            }
+            assert_eq!(slots.iter().filter(|s|s.kind==SlotKind::Extra).count(),
+                match shape { Shape::Iso=>1,Shape::Jis=>5,_=>0 });
         }
     }
     #[test] fn iso_and_jis_extras_do_not_fake_egui_key_events() {

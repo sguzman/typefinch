@@ -7,7 +7,7 @@ use crate::{
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
-    geometry::{self, Shape, Slot},
+    geometry::{self, Shape, Slot, SlotKind},
     history::{self, Record},
     lesson,
     layouts::{self, Mode},
@@ -1091,16 +1091,20 @@ impl Typefinch {
     }
     fn show_preview_extra(&self,ui:&mut egui::Ui,slot:&Slot,shift:bool,alt_gr:bool,width:f32) {
         let personal=self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout);
-        let mapped=if personal {None} else {
+        let inspect_xkb=slot.kind==SlotKind::Extra && !personal;
+        let mapped=if !inspect_xkb {None} else {
             self.emulator.as_ref().and_then(|xkb|
                 xkb.translate_evdev_layer(slot.evdev,shift,alt_gr))
         };
-        let dead=if personal {None} else {
+        let dead=if !inspect_xkb {None} else {
             self.emulator.as_ref().and_then(|xkb|
                 xkb.dead_evdev_name(slot.evdev,shift,alt_gr))
         };
-        let symbol=if slot.evdev==0 {"␣".to_string()} else {
-            mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()})
+        let symbol=match slot.kind {
+            SlotKind::Control|SlotKind::Modifier=>slot.caption.to_string(),
+            SlotKind::Decoration=>"␣".to_string(),
+            SlotKind::Extra=>mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()}),
+            SlotKind::Character=>unreachable!("normal keys use show_preview_key"),
         };
         let frame=egui::Frame::group(ui.style()).inner_margin(egui::Margin::symmetric(7,7));
         let cell=frame.show(ui,|ui|{
@@ -1108,12 +1112,17 @@ impl Typefinch {
                 RichText::new(format!("{symbol}\n·")).monospace().size(13.0)
             ).selectable(false));
         });
-        let note=if slot.evdev==0 {
-            "Illustrative second space half; not a second physical input event.".to_string()
-        } else {
-            format!("{} · Linux evdev {} · XKB {} · preview only; no physical event routing{}",
-                slot.name, slot.evdev, self.prefs.layout,
-                dead.as_deref().map(|name|format!(" · dead key: {name}")).unwrap_or_default())
+        let note=match slot.kind {
+            SlotKind::Decoration=>
+                "Illustrative second space half; not a second physical input event.".to_string(),
+            SlotKind::Control|SlotKind::Modifier=>
+                format!("{} · Linux evdev {} · illustrated control/modifier; no physical-key capture",
+                    slot.name,slot.evdev),
+            SlotKind::Extra=>
+                format!("{} · Linux evdev {} · XKB {} · no attributed input event{}",
+                    slot.name,slot.evdev,self.prefs.layout,
+                    dead.as_deref().map(|name|format!(" · dead key: {name}")).unwrap_or_default()),
+            SlotKind::Character=>unreachable!("normal keys use show_preview_key"),
         };
         cell.response.on_hover_text(note);
     }
@@ -1169,7 +1178,7 @@ impl Typefinch {
                 ui.add_space(2.0);
             }
         });
-        ui.small("Illustrative key shapes, not detected hardware. ISO/JIS extra positions have no trusted egui physical-key attribution; split spacing never duplicates scored Space.");
+        ui.small("Control and modifier positions are illustrations, not separately captured physical events. ISO/JIS extras are unattributed. Split geometry never duplicates scored Space.");
         ui.small("◌ = actual XKB dead key (hover for name); – = unknown/unmapped; ␣ = Space. Shift/AltGr levels shown are inspected symbols, not evidence of physical AltGr input.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty(){

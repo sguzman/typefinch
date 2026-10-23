@@ -174,9 +174,9 @@ elseif mode == "geometry-cycled" then
     local r=report(assert(arg[2]))
     local initial=assert(arg[3])
     local expected={
-        iso={name="JIS main block",slots=53,unattributed=5,visual_only=0,target="us"},
-        jis={name="Split main block",slots=49,unattributed=0,visual_only=1,target="jp"},
-        split={name="ANSI main block",slots=48,unattributed=0,visual_only=0,target="us"},
+        iso={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=3,modifiers=7,target="us"},
+        jis={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9,target="jp"},
+        split={name="ANSI main block",slots=60,unattributed=0,visual_only=0,controls=3,modifiers=9,target="us"},
     }
     local v=assert(expected[initial],"unknown source shape")
     assert(r.synthetic and r.state=="geometry-preview")
@@ -185,14 +185,16 @@ elseif mode == "geometry-cycled" then
     equals(r.slots,v.slots)
     equals(r.unattributed,v.unattributed)
     equals(r.visual_only,v.visual_only)
+    equals(r.controls,v.controls)
+    equals(r.modifiers,v.modifiers)
     print("Native F4 geometry switch PASS: "..initial.." -> "..r.shape)
 elseif mode == "geometry-preview" then
     local r=report(assert(arg[2]))
     local shape=assert(arg[3])
     local expected={
-        iso={name="ISO main block",slots=49,unattributed=1,visual_only=0},
-        jis={name="JIS main block",slots=53,unattributed=5,visual_only=0},
-        split={name="Split main block",slots=49,unattributed=0,visual_only=1},
+        iso={name="ISO main block",slots=61,unattributed=1,visual_only=0,controls=3,modifiers=9},
+        jis={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=3,modifiers=7},
+        split={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9},
     }
     local v=assert(expected[shape],"unknown geometry")
     assert(r.synthetic and r.state=="geometry-preview")
@@ -201,6 +203,8 @@ elseif mode == "geometry-preview" then
     equals(r.slots,v.slots)
     equals(r.unattributed,v.unattributed)
     equals(r.visual_only,v.visual_only)
+    equals(r.controls,v.controls)
+    equals(r.modifiers,v.modifiers)
     print("Native geometry preview PASS: "..r.shape.." ("..r.slots.." slots)")
 elseif mode == "prepare-card-theme" then
     local path=assert(arg[2])

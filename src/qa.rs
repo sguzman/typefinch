@@ -50,7 +50,11 @@ pub fn write_geometry_report(
         "target":target,
         "slots":slots.len(),
         "unattributed":slots.iter().filter(|s|
-            s.egui_key.is_none() && s.evdev!=0).count(),
+            s.kind==crate::geometry::SlotKind::Extra).count(),
+        "controls":slots.iter().filter(|s|
+            s.kind==crate::geometry::SlotKind::Control).count(),
+        "modifiers":slots.iter().filter(|s|
+            s.kind==crate::geometry::SlotKind::Modifier).count(),
         "visual_only":slots.iter().filter(|s|s.evdev==0).count(),
     });
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)

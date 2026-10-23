@@ -19,3 +19,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Dropped files:** Only a user-initiated local file drop in Custom mode is read. Typefinch rejects files above 64 KiB, invalid UTF-8, unsupported control characters and empty passages. Only the first 4,096 characters are retained in memory for practice; file paths and file contents are not stored in session history or remote services.
 
 - **Adaptive missed-key drills:** Expected characters associated with mistakes are collected only in the running session's memory. Generated practice text is not persisted, published, or included in analytics history; the durable database still stores only aggregate counts.
+
+- **Explicit full backup (F8):** The two private backup files include readable settings/profile nicknames and a consistent full SQLite snapshot. The files are unique, written into the local exports directory and never automatically uploaded. On Linux, new backup files are permission-restricted to their owner (0600). The application does not yet offer automated restore; retain both companion files for recovery.

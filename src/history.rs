@@ -2,7 +2,7 @@
 use crate::{engine::Session, preferences::base_dir};
 use rusqlite::{params, Connection};
 use serde::Serialize;
-use std::{collections::HashSet, fs, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::HashSet, fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
 
 pub const SCORING_VERSION: i64 = 1;
 
@@ -182,6 +182,30 @@ pub fn completed_lessons(profile_id:&str)->Result<HashSet<String>,String> {
 }
 /// Explicit user-initiated export only. Includes *all* sessions for one profile,
 /// not just the 80-record dashboard cache.
+/// A consistent SQLite snapshot, safe even if journal/WAL files are present.
+/// The caller chooses a new local destination; never overwrite an existing copy.
+fn snapshot_with(db:&Connection,destination:&Path)->Result<(),rusqlite::Error> {
+    db.execute("VACUUM INTO ?1",params![destination.to_string_lossy().as_ref()])?;
+    Ok(())
+}
+pub fn snapshot_database(destination:&Path)->Result<(),String> {
+    if destination.exists() {return Err("Backup destination already exists".into());}
+    if let Some(parent)=destination.parent() {
+        fs::create_dir_all(parent).map_err(|e|e.to_string())?;
+    }
+    let db=connect()?;
+    if let Err(e)=snapshot_with(&db,destination) {
+        let _=fs::remove_file(destination);
+        return Err(format!("Database snapshot failed: {e}"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(destination,fs::Permissions::from_mode(0o600))
+            .map_err(|e|format!("Restricting snapshot permissions: {e}"))?;
+    }
+    Ok(())
+}
 pub fn all_for_profile(profile_id:&str)->Result<Vec<Record>,String> {
     let db=connect()?;
     recent_with(&db,profile_id,usize::MAX).map_err(|e|e.to_string())
@@ -275,6 +299,22 @@ mod tests {
         assert!(mastered_lesson(&corrected));
         insert_with(&db,&corrected).unwrap();
         assert_eq!(completed_lessons_with(&db,"finch-a").unwrap().len(),3);
+    }
+    #[test] fn vacuum_snapshot_is_consistent_independent_and_complete() {
+        let source=Connection::open_in_memory().unwrap();
+        init(&source).unwrap();
+        insert_with(&source,&item("a")).unwrap();
+        insert_with(&source,&item("b")).unwrap();
+        let file=std::env::temp_dir().join(format!("typefinch-backup-test-{}.sqlite3",uuid::Uuid::new_v4()));
+        snapshot_with(&source,&file).unwrap();
+        insert_with(&source,&item("c")).unwrap();
+        let copy=Connection::open(&file).unwrap();
+        let read: i64=copy.query_row("SELECT COUNT(*) FROM sessions",[],|r|r.get(0)).unwrap();
+        let version:i64=copy.pragma_query_value(None,"user_version",|r|r.get(0)).unwrap();
+        assert_eq!(read,2);
+        assert_eq!(version,3);
+        drop(copy);
+        std::fs::remove_file(file).unwrap();
     }
     #[test] fn unlimited_export_is_not_truncated_by_dashboard_cache() {
         let db=Connection::open_in_memory().unwrap();

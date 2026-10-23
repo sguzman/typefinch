@@ -1,6 +1,6 @@
 //! A standalone, static, script-free GitHub-compatible SVG snapshot.
-use crate::{history::{self, Record}, preferences::{base_dir, Profile}};
-use std::{fs, path::PathBuf};
+use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile}};
+use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
 
 fn xml(s: &str) -> String {
     s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;")
@@ -58,6 +58,38 @@ pub fn save_stats_json(profile:&Profile)->Result<PathBuf,String> {
     fs::write(&tmp,bytes).map_err(|e|e.to_string())?;
     fs::rename(&tmp,&output).map_err(|e|e.to_string())?;
     Ok(output)
+}
+/// Explicit full local backup, separate from publication-safe SVG/JSON exports.
+/// These files contain profile names, settings and complete aggregate history.
+pub fn save_backup(prefs:&Preferences)->Result<(PathBuf,PathBuf),String> {
+    let folder=base_dir().join("exports");
+    fs::create_dir_all(&folder).map_err(|e|e.to_string())?;
+    let stamp=SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e|e.to_string())?.as_nanos();
+    let stem=format!("typefinch-backup-{stamp}");
+    let settings=folder.join(format!("{stem}-settings.json"));
+    let database=folder.join(format!("{stem}-sessions.sqlite3"));
+    let bytes=serde_json::to_vec_pretty(prefs).map_err(|e|e.to_string())?;
+    // Use create_new to protect any existing file against accidental overwrite.
+    use std::io::Write;
+    let mut options=fs::OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut handle=options.open(&settings).map_err(|e|e.to_string())?;
+    if let Err(e)=handle.write_all(&bytes).and_then(|_|handle.sync_all()) {
+        let _=fs::remove_file(&settings);
+        return Err(e.to_string());
+    }
+    drop(handle);
+    if let Err(e)=history::snapshot_database(&database) {
+        let _=fs::remove_file(&settings);
+        return Err(e);
+    }
+    Ok((settings,database))
 }
 pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
     let dir=base_dir().join("exports");

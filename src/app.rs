@@ -739,12 +739,25 @@ impl Typefinch {
             Err(err)=>format!("Statistics export failed: {err}"),
         };
     }
+    fn export_full_backup(&mut self) {
+        if let Err(e)=self.prefs.save() {
+            self.message=format!("Full backup failed saving preferences: {e}");
+            return;
+        }
+        self.message=match export::save_backup(&self.prefs) {
+            Ok((settings, database))=>format!(
+                "Private backup created: {} and {}. Keep both files together.",
+                settings.display(), database.display()),
+            Err(e)=>format!("Full backup failed: {e}"),
+        };
+    }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
         ui.label("Export a static SVG card and matching Markdown for your GitHub profile.");
         ui.horizontal_wrapped(|ui| {
             if ui.button("Export SVG + Markdown").clicked() { self.export_widget(); }
             if ui.button("Export session history JSON").clicked() {self.export_statistics();}
+            if ui.button("Backup settings + SQLite").clicked() {self.export_full_backup();}
             if ui.button("Copy GitHub Markdown").clicked() {
                 ui.ctx().copy_text(export::markdown_embed().to_owned());
                 self.message = "Markdown image embed copied to clipboard.".into();
@@ -762,6 +775,9 @@ impl eframe::App for Typefinch {
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F7)) {
             self.export_statistics();
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F8)) {
+            self.export_full_backup();
         }
         self.accept_custom_file(ctx);
         let before = self.session.state;

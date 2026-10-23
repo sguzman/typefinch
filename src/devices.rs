@@ -125,6 +125,11 @@ fn inspect_wayland_seats()->Result<Vec<Keyboard>,String> {
     let path=std::env::current_exe()
         .map_err(|e|format!("Cannot locate Wayland seat inspector: {e}"))?;
     let exe=path.to_str().ok_or("Wayland inspector executable path is not UTF-8.")?;
+    inspect_wayland_seats_from_executable(exe)
+}
+// The same parent-side bounded subprocess and parser can be exercised in
+// native Weston CI using the built production binary (not the Rust test harness).
+fn inspect_wayland_seats_from_executable(exe:&str)->Result<Vec<Keyboard>,String> {
     let raw=bounded_query(exe,&["--_probe_wayland_seats"],
         X11_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
     parse_wayland_seats(&raw)
@@ -310,6 +315,37 @@ mod tests {
             crate::wayland_seat::Seat{id:1,name:"seat1".into(),keyboard:true},
         ]).unwrap();
         assert!(parse_wayland_seats(&duplicate_id).is_err());
+    }
+    #[test] fn wayland_seat_capability_transitions_do_not_preserve_stale_selection() {
+        let first=serde_json::to_vec(&vec![
+            crate::wayland_seat::Seat{id:10,name:"seat0".into(),keyboard:true},
+            crate::wayland_seat::Seat{id:11,name:"seat1".into(),keyboard:false},
+        ]).unwrap();
+        let before=parse_wayland_seats(&first).unwrap();
+        assert_eq!(before.len(),1);
+        assert_eq!(before[0].address,"wayland:seat:10");
+        let next=serde_json::to_vec(&vec![
+            crate::wayland_seat::Seat{id:10,name:"seat0".into(),keyboard:false},
+            crate::wayland_seat::Seat{id:11,name:"seat1".into(),keyboard:true},
+        ]).unwrap();
+        let after=parse_wayland_seats(&next).unwrap();
+        assert_eq!(after.len(),1);
+        assert_eq!(after[0].address,"wayland:seat:11");
+        assert_eq!(preserve_selection(Some("wayland:seat:10"),&after),0);
+        assert!(after[0].active_keymap.is_empty());
+    }
+    #[test] fn native_wayland_child_inspector_is_bounded_and_unattributed() {
+        // The CI Weston compositor has no attached hardware keyboard.
+        // This checks the actual production probe binary and parent parser,
+        // not seat-capability acceptance with physical keyboard hardware.
+        let Ok(exe)=std::env::var("TYPEFINCH_QA_WAYLAND_INSPECTOR") else {return;};
+        assert_eq!(std::env::var("XDG_SESSION_TYPE").as_deref(),Ok("wayland"));
+        let devices=inspect_wayland_seats_from_executable(&exe).unwrap();
+        assert!(devices.iter().all(|seat|
+            seat.address.starts_with("wayland:seat:")
+            && seat.active_keymap.is_empty()
+            && seat.layout.is_empty()
+            && seat.variant.is_empty()));
     }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";

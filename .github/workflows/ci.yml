@@ -24,6 +24,11 @@ jobs:
         run: cargo test --all-targets
       - name: Build graphical executable
         run: cargo build
+      - name: Verify headless version and help flags
+        run: |
+          ./target/debug/typefinch --version | grep -Fx "typefinch $(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"
+          ./target/debug/typefinch --help | grep -F "GUI shortcuts:"
+          if ./target/debug/typefinch --unsupported; then exit 1; fi
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview

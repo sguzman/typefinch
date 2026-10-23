@@ -39,3 +39,10 @@ workflow manually from GitHub Actions. This prevents the release compiler
 from rebuilding the complete dependency graph on every development commit.
 The archive is attached to that verified workflow run only if its packaging
 and install/rollback tests pass.
+
+## Identifying an installed preview
+
+Newer binary builds support `typefinch --version` and `typefinch --help`
+without opening a window. Compare `--version` to the archive's
+`METADATA.txt`. The first package validated by CI precedes this CLI change;
+the feature applies to subsequent builds, not retroactively to that archive.

@@ -119,3 +119,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Linux preview distribution:** Passing CI produces a checksum-protected x86_64 tarball, a user-local installer, and one-level rollback tested in a disposable prefix. This is not an MVP release. See [installation instructions](docs/RELEASE.md).
 
 **Verified versioned Linux preview:** [80 Rust tests, real X11 QA, optimized package and safe user-local upgrade/rollback](https://github.com/sguzman/typefinch/actions/runs/39958743350). This is a development preview; the MVP release gate is still open.
+
+**Headless CLI:** `typefinch --version` and `typefinch --help` return immediately without opening egui. Unknown flags fail explicitly instead of launching an unexpected window. This is verified by standard CI; packaged previews built before the change retain their original CLI behavior.

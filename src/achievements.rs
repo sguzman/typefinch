@@ -69,9 +69,9 @@ mod tests {
     }
     #[test] fn badges_are_recomputed_from_qualified_records() {
         let r=sample();
-        let earned=earned(&[r.clone()]);
-        assert!(earned.contains(&FIRST) && earned.contains(&PRECISE) && earned.contains(&FAST));
-        assert!(!earned.contains(&PERSISTENT) && !earned.contains(&LANGUAGES));
+        let initial_awards=earned(&[r.clone()]);
+        assert!(initial_awards.contains(&FIRST) && initial_awards.contains(&PRECISE) && initial_awards.contains(&FAST));
+        assert!(!initial_awards.contains(&PERSISTENT) && !initial_awards.contains(&LANGUAGES));
         let mut more=vec![r;10];
         more[1].test_mode="words/es-MX/easy".into();
         let awards=earned(&more);

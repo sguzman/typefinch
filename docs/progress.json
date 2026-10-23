@@ -318,7 +318,7 @@
               "id": "T205",
               "emoji": "🧮",
               "name": "Scoring taxonomy and fair comparisons",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Raw vs corrected WPM",
@@ -327,7 +327,8 @@
                 },
                 {
                   "text": "Per-language speed definitions",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "docs/SCORING.md and src/engine.rs: both supported languages use five correctly matched extended grapheme clusters per standardized corrected WPM unit, with explicit comparability limits; test english_and_mexican_spanish_share_explicit_five_grapheme_wpm_units and native X11 QA green in GitHub Actions 40039799888. No CJK/RTL equivalence or active keyboard attribution claimed."
                 },
                 {
                   "text": "Pause/focus/repeat rules",

@@ -4,7 +4,7 @@
 
 **Overall:** `████████░░ 76%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████████░░ 83%`
+## 🐣 M0 — Native typing MVP — `█████████░ 85%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -44,7 +44,7 @@
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
   - [ ] Native GUI goal import/export interaction and persistence
 
-### ⌨️ P2 — Tests and core scoring — `████████░░ 82%`
+### ⌨️ P2 — Tests and core scoring — `█████████░ 87%`
 
 - ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
   - [x] Input handlers implemented — src/app.rs
@@ -68,15 +68,15 @@
   - [x] Editable private custom passages — src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327
   - [x] Bounded local UTF-8 file import into custom passages — src/engine.rs and src/app.rs: explicit Load local file and drag/drop into in-memory custom passage, 64 KiB/4096 grapheme cap, rejects symlinks/devices/controls and invalid UTF-8; Unicode ZWJ cluster and file fixture QA in CI 40025534946, 141 Rust tests and graphical suite pass
   - [ ] Native GUI local-file import interaction and isolation
-- 🧮 **T205** Scoring taxonomy and fair comparisons — `█████░░░░░ 50%`
+- 🧮 **T205** Scoring taxonomy and fair comparisons — `████████░░ 75%`
   - [x] Raw vs corrected WPM — src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA
-  - [ ] Per-language speed definitions
+  - [x] Per-language speed definitions — docs/SCORING.md and src/engine.rs: both supported languages use five correctly matched extended grapheme clusters per standardized corrected WPM unit, with explicit comparability limits; test english_and_mexican_spanish_share_explicit_five_grapheme_wpm_units and native X11 QA green in GitHub Actions 40039799888. No CJK/RTL equivalence or active keyboard attribution claimed.
   - [ ] Pause/focus/repeat rules
   - [x] Anti-cheat tests — Real X11 Ctrl+V injection excluded from scored session; GitHub Actions 39872686067
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `████████░░ 82%`
+- ⌨️ Typing tests — `█████████░ 87%`
 - 🐦 Local identity — `█████████░ 92%`
 - 🌗 Appearance — `████████░░ 81%`
 

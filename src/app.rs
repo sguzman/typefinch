@@ -13,10 +13,14 @@ use crate::{
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
-use std::time::Duration;
+use std::{sync::mpsc::{self, Receiver, TryRecvError},time::{Duration, Instant}};
 use unicode_segmentation::UnicodeSegmentation;
 
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
+const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
+fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
+    hyprland && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
+}
 // Wayland normally combines physical keyboards into a seat-level event stream.
 // Only tag OS input with a detected layout when all reported keyboards agree;
 // selecting a device for inspection does NOT attribute its events to it.
@@ -93,6 +97,8 @@ pub struct Typefinch {
     keyboards: Vec<Keyboard>,
     device_index: usize,
     last_window_focused:bool,
+    device_poll_started:Instant,
+    pending_device_query:Option<Receiver<Result<Vec<Keyboard>,String>>>,
     device_error: Option<String>,
     new_profile: String,
     custom_text: String,
@@ -129,14 +135,56 @@ impl Typefinch {
         let earned_badges=achievements::earned(&all_history);
         Self { prefs, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
-               device_index: 0, last_window_focused:true, new_profile: String::new(), custom_text: String::new(), message: String::new() }
+               device_index: 0, last_window_focused:true,
+               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
-    fn refresh_keyboards(&mut self) {
+    fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
-        let (updated,error)=Self::query_devices();
+        let (updated,error)=match result {
+            Ok(found)=>(found,None),
+            Err(message)=>(Vec::new(),Some(message)),
+        };
         self.device_index=devices::preserve_selection(selected.as_deref(),&updated);
         self.keyboards=updated;
         self.device_error=error;
+    }
+    fn refresh_keyboards(&mut self) {
+        // A manual refresh supersedes any pending background answer.
+        self.pending_device_query=None;
+        self.device_poll_started=Instant::now();
+        self.apply_device_result(devices::inspect());
+    }
+    fn poll_keyboard_hotplug(&mut self,ctx:&egui::Context,focused:bool) {
+        if let Some(receiver)=self.pending_device_query.as_ref() {
+            match receiver.try_recv() {
+                Ok(result)=>{
+                    self.pending_device_query=None;
+                    self.apply_device_result(result);
+                },
+                Err(TryRecvError::Disconnected)=>{
+                    self.pending_device_query=None;
+                    self.device_error=Some("Keyboard inspection thread disconnected.".into());
+                },
+                Err(TryRecvError::Empty)=>{},
+            }
+        }
+        let hyprland=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
+        let focus_gained=focused && !self.last_window_focused;
+        if should_poll_devices(hyprland,focused,focus_gained,self.device_poll_started.elapsed())
+            && self.pending_device_query.is_none() {
+            self.device_poll_started=Instant::now();
+            let (send,receive)=mpsc::channel();
+            self.pending_device_query=Some(receive);
+            let repaint=ctx.clone();
+            std::thread::spawn(move || {
+                let result=devices::inspect();
+                let _=send.send(result);
+                repaint.request_repaint();
+            });
+        }
+        if focused && hyprland {
+            ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
+        }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
         match devices::inspect() {
@@ -699,7 +747,7 @@ impl Typefinch {
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
         ui.heading("Connected keyboards");
-        ui.small("Read-only Hyprland enumeration: updates when this window regains focus or you select Refresh. Event input remains seat-level.");
+        ui.small("Read-only Hyprland enumeration: refreshes on focus and every 20 seconds while active. Event input remains seat-level.");
         ui.vertical(|ui| {
             if ui.button("Refresh device list").clicked() {
                 self.refresh_keyboards();
@@ -1144,9 +1192,7 @@ impl Typefinch {
 impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let focused=ctx.input(|i|i.focused);
-        if focused && !self.last_window_focused {
-            self.refresh_keyboards();
-        }
+        self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
@@ -1276,6 +1322,13 @@ mod palette_tests {
     fn contrast(a:Color32,b:Color32)->f64 {
         let x=brightness(a);let y=brightness(b);
         (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn hyprland_hotplug_watch_is_bounded_focus_aware_and_opt_in_by_session() {
+        assert!(!should_poll_devices(false,true,true,Duration::from_secs(30)));
+        assert!(!should_poll_devices(true,false,true,Duration::from_secs(30)));
+        assert!(should_poll_devices(true,true,true,Duration::ZERO));
+        assert!(!should_poll_devices(true,true,false,Duration::from_secs(19)));
+        assert!(should_poll_devices(true,true,false,Duration::from_secs(20)));
     }
     #[test] fn keyboard_layout_attribution_never_uses_selected_inspection_device_as_input_source() {
         let xkb=vec![

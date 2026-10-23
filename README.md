@@ -109,3 +109,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Personal ANSI layouts:** Create and edit three ten-key rows (base and Shift) within Typefinch, using a validated v1 JSON schema. Custom keymaps are saved in local settings, selectable as software-emulated targets, and never modify the OS or capture global input. Explicit JSON import is limited to 16 KiB and refuses invalid mappings; export writes to the local `exports/` folder.
 
 **Personal ANSI layouts and private settings:** [79 passing Rust tests plus native physical-key, SVG/PNG and input QA](https://github.com/sguzman/typefinch/actions/runs/39953436230). The v1 custom mapping editor is in-app ANSI only; physical-device routing and live Hyprland acceptance remain pending.
+
+**Connected keyboard refresh:** A read-only, asynchronous Hyprland inventory check updates the available device list when Typefinch regains focus or about every 20 seconds while active. Selection is preserved by reported address where possible. It does not capture input from other applications or establish which keyboard delivered an event.

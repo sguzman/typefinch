@@ -39,7 +39,7 @@
               "id": "T002",
               "emoji": "🎨",
               "name": "Perceptual OKLCH project color",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Color specified",
@@ -53,7 +53,8 @@
                 },
                 {
                   "text": "Contrast and accessibility audit",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "tools/color_audit.lua and docs/COLOR.md: automated WCAG relative-luminance checks for the README swatch label and light/dark accent/selection text. CI 40039184099: five AA normal-text pairings (5.40, 6.27, 7.55, 6.27, 5.40:1), white-on-brand excluded (2.73:1), 153 Rust tests and native X11 suite green. This scoped brand audit does not accept keyboard-only navigation or Unicode-font QA."
                 }
               ]
             },

@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███████░░░ 74%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `████████░░ 76%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Current keyboard inspector acceptance:** [GitHub Actions 40037472601](https://github.com/sguzman/typefinch/actions/runs/40037472601) passed 151 Rust tests, synthetic Hyprland/Wayland checks, nested Weston virtual keyboard-capability tests, the read-only X11/Wayland/disconnected-session JSON inspector CLI, and full native X11 graphical QA. Real Hyprland hotplug, active generic XKB mapping, and physical per-device attribution remain unverified.
 

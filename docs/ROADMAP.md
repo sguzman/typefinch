@@ -2,22 +2,22 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 75%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 76%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████████░░ 80%`
+## 🐣 M0 — Native typing MVP — `████████░░ 83%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
-### 🧱 P0 — Foundation and visual identity — `███████░░░ 69%`
+### 🧱 P0 — Foundation and visual identity — `████████░░ 77%`
 
 - 🦀 **T001** Rust/egui application — `███████░░░ 67%`
   - [x] Native shell committed — Cargo.toml; src/main.rs
   - [x] CI native build passes — GitHub Actions run 39867817749: cargo check succeeded
   - [ ] Live Hyprland window screenshot
-- 🎨 **T002** Perceptual OKLCH project color — `███████░░░ 67%`
+- 🎨 **T002** Perceptual OKLCH project color — `██████████ 100%`
   - [x] Color specified — docs/COLOR.md
   - [x] README swatch authored — assets/typefinch-color.svg
-  - [ ] Contrast and accessibility audit
+  - [x] Contrast and accessibility audit — tools/color_audit.lua and docs/COLOR.md: automated WCAG relative-luminance checks for the README swatch label and light/dark accent/selection text. CI 40039184099: five AA normal-text pairings (5.40, 6.27, 7.55, 6.27, 5.40:1), white-on-brand excluded (2.73:1), 153 Rust tests and native X11 suite green. This scoped brand audit does not accept keyboard-only navigation or Unicode-font QA.
 - 🌗 **T003** System, Light and Dark modes — `████████░░ 75%`
   - [x] Three-way selector coded — src/app.rs
   - [x] Preference persistence coded — src/preferences.rs
@@ -78,7 +78,7 @@
 
 - ⌨️ Typing tests — `████████░░ 82%`
 - 🐦 Local identity — `█████████░ 92%`
-- 🌗 Appearance — `███████░░░ 70%`
+- 🌗 Appearance — `████████░░ 81%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 73%`
 

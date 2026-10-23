@@ -18,6 +18,17 @@ use eframe::egui::{self, Color32, RichText};
 use std::{sync::mpsc::{self, Receiver, TryRecvError},time::{Duration, Instant}};
 use unicode_segmentation::UnicodeSegmentation;
 
+#[derive(Clone,Copy,PartialEq,Eq)]
+enum PreviewLayer {Base,Shift,AltGr,ShiftAltGr}
+impl PreviewLayer {
+    const ALL:[Self;4]=[Self::Base,Self::Shift,Self::AltGr,Self::ShiftAltGr];
+    fn label(self)->&'static str {
+        match self {Self::Base=>"Base",Self::Shift=>"Shift",Self::AltGr=>"AltGr",
+            Self::ShiftAltGr=>"Shift+AltGr"}
+    }
+    fn shift(self)->bool {matches!(self,Self::Shift|Self::ShiftAltGr)}
+    fn alt_gr(self)->bool {matches!(self,Self::AltGr|Self::ShiftAltGr)}
+}
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
@@ -120,6 +131,7 @@ pub struct Typefinch {
     goal_import_path:String,
     backup_settings_path:String,
     backup_check_result:String,
+    preview_layer:PreviewLayer,
     message: String,
 }
 impl Typefinch {
@@ -168,7 +180,7 @@ impl Typefinch {
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
-            backup_check_result:String::new(), message: startup_warning }
+            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -974,7 +986,7 @@ impl Typefinch {
         if response.clicked() { response.request_focus(); }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
-    fn show_layout_preview(&self, ui: &mut egui::Ui) {
+    fn show_layout_preview(&mut self, ui: &mut egui::Ui) {
         // This is a map of the selected typing target, not a device-level OS
         // keyboard reading. An unknown key is shown explicitly, never guessed.
         const ROWS:[[egui::Key;10];3] = [
@@ -986,7 +998,18 @@ impl Typefinch {
              egui::Key::N,egui::Key::M,egui::Key::Comma,egui::Key::Period,egui::Key::Slash],
         ];
         ui.heading("Keyboard mapping preview");
-        ui.small(format!("Selected target: {} · ANSI base positions · {}",
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Modifier layer");
+            egui::ComboBox::from_id_salt("preview-modifier-layer")
+                .selected_text(self.preview_layer.label()).show_ui(ui,|ui| {
+                    for layer in PreviewLayer::ALL {
+                        ui.selectable_value(&mut self.preview_layer,layer,layer.label());
+                    }
+                });
+        });
+        let shift=self.preview_layer.shift();
+        let alt_gr=self.preview_layer.alt_gr();
+        ui.small(format!("Selected target: {} · ANSI physical positions · {}",
             self.prefs.layout,
             if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {"personal key positions"}
             else if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
@@ -995,11 +1018,16 @@ impl Typefinch {
             ui.horizontal(|ui| {
                 ui.add_space((row_index*12) as f32);
                 for key in keys {
-                    let value=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout)
-                        .and_then(|l|l.translate(*key,false))
-                        .or_else(||self.emulator.as_ref().and_then(|x|x.translate(*key,false)))
-                        .or_else(||layouts::emulate(*key,&self.prefs.layout,false).map(|c|c.to_string()))
-                        .unwrap_or_else(||"–".into());
+                    let custom=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout);
+                    let value=if let Some(personal)=custom {
+                        if alt_gr {None} else {personal.translate(*key,shift)}
+                    } else if let Some(emulator)=&self.emulator {
+                        emulator.translate_layer(*key,shift,alt_gr)
+                    } else if alt_gr {
+                        None
+                    } else {
+                        layouts::emulate(*key,&self.prefs.layout,shift).map(|c|c.to_string())
+                    }.unwrap_or_else(||"–".into());
                     let missed=if value.chars().count()==1 {
                         value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
                     } else {0};
@@ -1033,7 +1061,8 @@ impl Typefinch {
                 ui.label(format!("{} · {:.0} ms average between committed keys",ch,ms));
             }
         }
-        ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
+        ui.small("Modifier levels are inspected through XKB; AltGr for personal two-layer maps remains unavailable rather than guessed.");
+        ui.small("Preview only. Actual OS input may differ; reliable physical AltGr, ISO/JIS keys and dead-key composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
         ui.heading("Typing history");

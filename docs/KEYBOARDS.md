@@ -53,3 +53,7 @@ The built-in editor creates version-1 JSON keymaps with a UUID-based `custom/<uu
 ## Read-only hotplug refresh
 
 While Typefinch is open inside Hyprland, it refreshes the keyboard inventory on focus gain and approximately every 20 seconds while focused. Enumeration runs on a short-lived worker thread to avoid blocking typing. Keyboard selection survives reordering when the reported Hyprland address remains stable, but the selected device is only for inspection; no physical-device event interception or device attribution is implied. Outside Hyprland the application avoids background probing. Manual refresh remains available. The periodic timer does not run when the window is unfocused.
+
+## Modifier-layer inspector
+
+The preview exposes Base, Shift, AltGr and Shift+AltGr positions. XKB-backed layouts synthesize the right-Alt Level-3 modifier (evdev 100) for *read-only symbol inspection*, while the real input surface intentionally does not treat an undifferentiated left-Alt/right-Alt event as a trustworthy AltGr keystroke. Two-layer personal layouts have no inferred AltGr layer. Dead-key state and Compose sequences require a stateful input design before they may count toward the full-emulation acceptance gate.

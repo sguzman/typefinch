@@ -22,11 +22,19 @@ impl Emulator {
     /// Translate a physical key position. Does not capture the keyboard globally.
     /// Modifier state is constructed per key; dead-key/Compose sequences are future work.
     pub fn translate(&self, physical: Key, shift: bool) -> Option<String> {
-        let evdev = evdev_code(physical)?;
-        let mut state = xkb::State::new(&self.keymap);
-        if shift { state.update_key(xkb::Keycode::new(42 + 8), xkb::KeyDirection::Down); }
-        let result = state.key_get_utf8(xkb::Keycode::new(evdev + 8));
-        if result.is_empty() || result.chars().any(char::is_control) { None } else { Some(result) }
+        self.translate_layer(physical,shift,false)
+    }
+    /// Inspect XKB's selected modifier level. Right-Alt (evdev 100) is an
+    /// explicit Level-3 modifier in layouts that bind ISO_Level3_Shift.
+    /// This is a preview facility; egui does not reliably distinguish
+    /// physical left-Alt from AltGr input on every compositor.
+    pub fn translate_layer(&self,physical:Key,shift:bool,alt_gr:bool)->Option<String> {
+        let evdev=evdev_code(physical)?;
+        let mut state=xkb::State::new(&self.keymap);
+        if shift {state.update_key(xkb::Keycode::new(42+8),xkb::KeyDirection::Down);}
+        if alt_gr {state.update_key(xkb::Keycode::new(100+8),xkb::KeyDirection::Down);}
+        let result=state.key_get_utf8(xkb::Keycode::new(evdev+8));
+        if result.is_empty() || result.chars().any(char::is_control) {None} else {Some(result)}
     }
 }
 /// Common ANSI key positions; ISO/JIS extra key positions have separate roadmap gates.
@@ -63,6 +71,14 @@ mod tests {
         assert_eq!(de.translate(Key::Y,false).as_deref(),Some("z"));
         let colemak=Emulator::compile("us(colemak)").unwrap();
         assert_eq!(colemak.translate(Key::E,false).as_deref(),Some("f"));
+    }
+    #[test] fn xkb_level_three_is_distinct_from_shift_and_base() {
+        let de=Emulator::compile("de").unwrap();
+        assert_eq!(de.translate_layer(Key::E,false,false).as_deref(),Some("e"));
+        assert_eq!(de.translate_layer(Key::E,true,false).as_deref(),Some("E"));
+        assert_eq!(de.translate_layer(Key::E,false,true).as_deref(),Some("€"));
+        assert_eq!(de.translate_layer(Key::Q,false,true).as_deref(),Some("@"));
+        assert_eq!(de.translate_layer(Key::Num0,false,false),de.translate(Key::Num0,false));
     }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());

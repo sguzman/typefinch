@@ -99,3 +99,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Card layouts:** Classic (550×205) and Compact (550×145) are distinct native-preview/SVG/PNG templates; either can use Dusk, Daybreak, Fern, sans-serif or monospace. Classic remains the persisted default for existing installs.
 
 **Verified card templates:** [70 Rust tests and a native Compact+Daybreak+monospace SVG/PNG export](https://github.com/sguzman/typefinch/actions/runs/39949282753).
+
+**Device refresh:** The Hyprland keyboard inventory now refreshes when Typefinch regains window focus, preserving the selected inspection device by address where possible; manual Refresh remains available. This does not grant per-device input attribution or interception.

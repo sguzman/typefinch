@@ -70,6 +70,7 @@ pub struct Typefinch {
     completed_lessons: std::collections::HashSet<String>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
+    last_window_focused:bool,
     device_error: Option<String>,
     new_profile: String,
     custom_text: String,
@@ -105,7 +106,14 @@ impl Typefinch {
         let earned_badges=achievements::earned(&all_history);
         Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
-               device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
+               device_index: 0, last_window_focused:true, new_profile: String::new(), custom_text: String::new(), message: String::new() }
+    }
+    fn refresh_keyboards(&mut self) {
+        let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
+        let (updated,error)=Self::query_devices();
+        self.device_index=devices::preserve_selection(selected.as_deref(),&updated);
+        self.keyboards=updated;
+        self.device_error=error;
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
         match devices::inspect() {
@@ -528,11 +536,10 @@ impl Typefinch {
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
         ui.heading("Connected keyboards");
+        ui.small("Read-only Hyprland enumeration: updates when this window regains focus or you select Refresh. Event input remains seat-level.");
         ui.vertical(|ui| {
             if ui.button("Refresh device list").clicked() {
-                let previous = self.keyboards.get(self.device_index).map(|k|k.address.clone());
-                (self.keyboards, self.device_error) = Self::query_devices();
-                self.device_index = previous.and_then(|addr|self.keyboards.iter().position(|k|k.address==addr)).unwrap_or(0);
+                self.refresh_keyboards();
             }
             if !self.keyboards.is_empty() {
                 self.device_index = self.device_index.min(self.keyboards.len() - 1);
@@ -958,6 +965,11 @@ impl Typefinch {
 }
 impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let focused=ctx.input(|i|i.focused);
+        if focused && !self.last_window_focused {
+            self.refresh_keyboards();
+        }
+        self.last_window_focused=focused;
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
         }

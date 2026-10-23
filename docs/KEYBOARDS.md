@@ -41,3 +41,7 @@ At startup, Typefinch reads the local read-only xkeyboard-config rules inventory
 ## Session layout attribution
 
 Typefinch records the emulated target identity for software-emulated sessions. OS-input sessions use a clearly prefixed `detected/<id>` identity only if all currently reported Hyprland keyboards agree on the active keymap and it resolves uniquely to an installed XKB entry. Otherwise Typefinch records `os:unknown` and excludes that session from layout-comparable trend charts. This is seat-level *best-effort* metadata, not proof of which physical keyboard generated a keystroke; changes after the session begins are not presently monitored. The layout context is snapshotted when a session starts.
+
+## Refresh after hardware changes
+
+Typefinch re-enumerates the compositor's read-only keyboard inventory when its window regains focus. The selected inspection device is preserved by exact Hyprland address when still present; otherwise selection falls back to the first available device (or none). This does not subscribe to device events while the app is unfocused, and it does not tie scored keyboard events to a selected physical device. There is no privileged global key capture.

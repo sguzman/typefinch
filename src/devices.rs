@@ -10,6 +10,11 @@ pub struct Keyboard {
     pub layout: String,
     pub variant: String,
 }
+/// Preserve a user-selected physical keyboard by Hyprland address through
+/// enumeration changes. Selection is inspection-only, not event attribution.
+pub fn preserve_selection(previous:Option<&str>, devices:&[Keyboard])->usize {
+    previous.and_then(|address|devices.iter().position(|k|k.address==address)).unwrap_or(0)
+}
 pub fn inspect() -> Result<Vec<Keyboard>, String> {
     if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_none() {
         return Err("Hyprland session unavailable; native app input still works.".into());
@@ -30,6 +35,17 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn hotplug_refresh_preserves_selected_device_or_uses_safe_first() {
+        let original=vec![
+            Keyboard {address:"a".into(),name:"A".into(),..Default::default()},
+            Keyboard {address:"b".into(),name:"B".into(),..Default::default()},
+        ];
+        assert_eq!(preserve_selection(Some("b"),&original),1);
+        let swapped=vec![original[1].clone(),original[0].clone()];
+        assert_eq!(preserve_selection(Some("b"),&swapped),0);
+        assert_eq!(preserve_selection(Some("missing"),&swapped),0);
+        assert_eq!(preserve_selection(Some("b"),&[]),0);
+    }
     #[test] fn multiple_keyboards_preserve_each_active_keymap() {
         let input = br#"{"keyboards":[{"name":"Laptop","address":"0x1","active_keymap":"English (US)","layout":"us"},{"name":"USB","address":"0x2","active_keymap":"German","layout":"de"}]}"#;
         let found = parse_json(input).unwrap();

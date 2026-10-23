@@ -143,6 +143,21 @@ mod tests {
         assert_eq!(es.translate_composed(Key::Quote, false, &mut compose), None);
         assert_eq!(es.translate_composed(Key::B, false, &mut compose).as_deref(), Some("b"));
     }
+    #[test] fn composed_accent_is_one_scored_grapheme_not_two_keystrokes() {
+        use crate::engine::{Session, TestMode};
+        let es = Emulator::compile("es").unwrap();
+        let mut compose = es.compose_state().expect("CI needs an XKB Compose locale");
+        let mut session = Session::new_with_custom(30, TestMode::Custom, "é");
+        session.begin();
+        for key in [Key::Quote, Key::E] {
+            if let Some(text) = es.translate_composed(key, false, &mut compose) {
+                session.type_text(&text);
+            }
+        }
+        assert_eq!(session.typed, "é");
+        assert_eq!(session.attempts, 1);
+        assert_eq!(session.score().accuracy, 100.0);
+    }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());
     }

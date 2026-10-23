@@ -106,6 +106,24 @@ fn inspection_confirmed(inventory_fresh:bool,inspection_pending:bool)->bool {
     // or adopt a reported keymap until the refresh finishes successfully.
     inventory_fresh && !inspection_pending
 }
+// Inspectable rows may outlive focus and remain on screen for diagnosis.
+// Distinguish a fresh read-only report from historical, unverified metadata
+// without claiming that any row identifies the source of scored key events.
+fn inspected_row_summary(keyboard:&Keyboard,verified:bool)->String {
+    if keyboard.address.starts_with("wayland:seat:") {
+        if verified {"Wayland seat reports keyboard capability.".into()}
+        else {"Last observed Wayland seat (unverified): keyboard capability was reported.".into()}
+    } else if keyboard.address==X11_AGGREGATE_SEAT {
+        let prefix=if verified {"Configured X11 seat layout"}
+            else {"Last configured X11 seat layout (unverified)"};
+        format!("{prefix}: {} · variant: {}",
+            keyboard.layout,if keyboard.variant.is_empty(){"(none)"}else{&keyboard.variant})
+    } else {
+        let prefix=if verified {"Reported active map"} else {"Last reported active map (unverified)"};
+        format!("{prefix}: {} · configured: {} {}",
+            keyboard.active_keymap,keyboard.layout,keyboard.variant)
+    }
+}
 fn inspected_target_if_fresh<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout],
     inventory_fresh:bool)->Option<&'a InstalledLayout> {
     if inventory_fresh {inspected_target(keyboard,installed)} else {None}
@@ -1074,7 +1092,9 @@ impl Typefinch {
         ui.colored_label(accent_ink(ui.visuals().dark_mode),
             devices::CAPTURE_POLICY.explanation());
         ui.small("Read-only Hyprland device metadata, Wayland aggregate seat capabilities, or X11 configuration. Supported Wayland inspectors refresh on focus and every 20 seconds; no input capture.");
-        if !inspection_confirmed(self.device_inventory_fresh,self.pending_device_query.is_some()) {
+        let verified=inspection_confirmed(self.device_inventory_fresh,
+            self.pending_device_query.is_some());
+        if !verified {
             ui.small("Keyboard inventory not yet verified after startup, focus change, refresh, or failed inspection; new OS layout attribution stays unknown.");
         }
         ui.vertical(|ui| {
@@ -1098,22 +1118,16 @@ impl Typefinch {
                 let k = &self.keyboards[self.device_index];
                 let is_x11=k.address==X11_AGGREGATE_SEAT;
                 let is_wayland=k.address.starts_with("wayland:seat:");
+                ui.label(inspected_row_summary(k,verified));
                 if is_wayland {
-                    ui.label("Wayland seat reports keyboard capability.");
                     ui.small("Standard wl_seat gives no physical keyboard identity or active XKB layout. No key events are requested.");
                 } else if is_x11 {
-                    ui.label(format!("Configured X11 seat layout: {} · variant: {}",
-                        k.layout,if k.variant.is_empty(){"(none)"}else{&k.variant}));
                     ui.small("setxkbmap reports configured groups, not the active input group.");
                     ui.small("This is one aggregate seat, never a physical keyboard.");
-                } else {
-                    ui.label(format!("Reported active map: {} · configured: {} {}",
-                        k.active_keymap,k.layout,k.variant));
                 }
                 ui.small(format!("Inspection identifier: {}",k.address));
                 let matched=inspected_target_if_fresh(k,&self.installed_layouts,
-                    inspection_confirmed(self.device_inventory_fresh,
-                        self.pending_device_query.is_some())).map(|l|l.id.clone());
+                    verified).map(|l|l.id.clone());
                 if let Some(id)=matched {
                     let label=if is_x11 {
                         "Use configured X11 layout as target"
@@ -1129,8 +1143,7 @@ impl Typefinch {
                             "Emulation target updated from reported Hyprland metadata; system settings unchanged.".into()
                         };
                     }
-                } else if !inspection_confirmed(self.device_inventory_fresh,
-                    self.pending_device_query.is_some()) {
+                } else if !verified {
                     ui.small("Inspector metadata is unverified or refreshing; wait for a fresh result before adopting a layout target.");
                 } else if is_wayland {
                     ui.small("This aggregate Wayland seat cannot identify or select a physical keyboard's layout.");
@@ -1139,6 +1152,8 @@ impl Typefinch {
                 } else {
                     ui.small("No unique installed XKB match for this keyboard's active map.");
                 }
+            } else if pending {
+                ui.label("Inspecting keyboard seats; no previous inventory is available.");
             } else {
                 ui.label(self.device_error.as_deref().unwrap_or("No inspected keyboard seats available."));
             }
@@ -2022,6 +2037,30 @@ mod palette_tests {
             inspection_confirmed(true,false)),"detected/us");
         assert_eq!(layout_for_new_session(Mode::Emulated,"us",&keyboards,&installed,
             inspection_confirmed(false,true)),"us");
+    }
+    #[test] fn stale_inspector_rows_are_never_displayed_as_current_reports() {
+        let hyprland=Keyboard{
+            name:"USB keyboard".into(),address:"0x1".into(),
+            active_keymap:"English (US)".into(),layout:"us".into(),
+            ..Default::default()
+        };
+        assert!(inspected_row_summary(&hyprland,true).starts_with("Reported active map:"));
+        assert!(inspected_row_summary(&hyprland,false)
+            .starts_with("Last reported active map (unverified):"));
+        let x11=Keyboard{
+            address:X11_AGGREGATE_SEAT.into(),layout:"us".into(),
+            ..Default::default()
+        };
+        assert!(inspected_row_summary(&x11,true).starts_with("Configured X11 seat layout:"));
+        assert!(inspected_row_summary(&x11,false)
+            .starts_with("Last configured X11 seat layout (unverified):"));
+        let wayland=Keyboard{
+            address:"wayland:seat:42".into(),name:"seat0".into(),..Default::default()
+        };
+        assert!(inspected_row_summary(&wayland,true)
+            .starts_with("Wayland seat reports keyboard capability."));
+        assert!(inspected_row_summary(&wayland,false).contains("(unverified)"));
+        assert!(!inspected_row_summary(&wayland,true).contains("physical keyboard"));
     }
     #[test] fn layout_preview_matches_new_session_provenance_when_refresh_pending() {
         let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];

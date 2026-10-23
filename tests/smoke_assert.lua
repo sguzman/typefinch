@@ -170,6 +170,22 @@ elseif mode == "xkb-compose" then
     equals(x.attempts,12,"dead key must not create an extra attempt")
     equals(x.accuracy,100)
     print("Real X11 Spanish XKB dead-key Compose + Backspace cancellation PASS: 12 correct graphemes, 12 scored attempts")
+elseif mode == "geometry-cycled" then
+    local r=report(assert(arg[2]))
+    local initial=assert(arg[3])
+    local expected={
+        iso={name="JIS main block",slots=53,unattributed=5,visual_only=0,target="us"},
+        jis={name="Split main block",slots=49,unattributed=0,visual_only=1,target="jp"},
+        split={name="ANSI main block",slots=48,unattributed=0,visual_only=0,target="us"},
+    }
+    local v=assert(expected[initial],"unknown source shape")
+    assert(r.synthetic and r.state=="geometry-preview")
+    equals(r.shape,v.name)
+    equals(r.target,v.target)
+    equals(r.slots,v.slots)
+    equals(r.unattributed,v.unattributed)
+    equals(r.visual_only,v.visual_only)
+    print("Native F4 geometry switch PASS: "..initial.." -> "..r.shape)
 elseif mode == "geometry-preview" then
     local r=report(assert(arg[2]))
     local shape=assert(arg[3])

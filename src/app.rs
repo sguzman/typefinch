@@ -1127,7 +1127,7 @@ impl Typefinch {
                         ui.selectable_value(&mut self.preview_layer,layer,layer.label());
                     }
                 });
-            ui.label("Illustrative geometry");
+            ui.label("Geometry (F4 cycles)");
             egui::ComboBox::from_id_salt("preview-keyboard-shape")
                 .selected_text(self.preview_shape.label()).show_ui(ui,|ui|{
                     for shape in Shape::ALL {
@@ -1499,6 +1499,17 @@ impl eframe::App for Typefinch {
         if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
             self.preview_layer=self.preview_layer.next();
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::F4)) {
+            // Presentation-only navigation: never alters the OS layout or
+            // the scoring/emulation target.
+            self.preview_shape=self.preview_shape.next();
+            if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+                && std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some() {
+                let _=crate::qa::write_geometry_report(
+                    self.preview_shape.label(),&self.prefs.layout,
+                    &geometry::slots(self.preview_shape));
+            }
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
         }
@@ -1608,7 +1619,7 @@ impl eframe::App for Typefinch {
                         ui.group(|ui| {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
-                            ui.label("F1: toggle guide · F2: focus typing · F3: cycle keyboard preview · F5: start/restart · Escape: cancel.");
+                            ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");

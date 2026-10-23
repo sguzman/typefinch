@@ -561,6 +561,9 @@ for shape in iso jis split; do
     echo "Missing $shape native preview screenshot" >&2; exit 1;
   }
   identify -format "$shape geometry screenshot: %wx%h pixels\n" "$tmp/typefinch-geometry-$shape.png"
+  xdotool key --clearmodifiers F4
+  sleep 0.3
+  lua5.4 tests/smoke_assert.lua geometry-cycled "$tmp/geometry-$shape.json" "$shape"
   kill "$app_pid" 2>/dev/null || true
   wait "$app_pid" 2>/dev/null || true
   app_pid=""

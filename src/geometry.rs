@@ -19,6 +19,14 @@ impl Shape {
             Self::Split => "Split main block",
         }
     }
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Ansi=>Self::Iso,
+            Self::Iso=>Self::Jis,
+            Self::Jis=>Self::Split,
+            Self::Split=>Self::Ansi,
+        }
+    }
     pub const fn note(self) -> &'static str {
         match self {
             Self::Ansi => "Common ANSI positions (not a full numeric keypad)",
@@ -109,6 +117,13 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn geometry_shortcut_cycle_never_changes_input_keymap() {
+        let mut shape=Shape::Ansi;
+        for expected in [Shape::Iso,Shape::Jis,Shape::Split,Shape::Ansi] {
+            shape=shape.next();
+            assert_eq!(shape,expected);
+        }
+    }
     #[test] fn main_block_preview_row_fits_native_qa_center_pane() {
         // This is a model bound, not a replacement for a rendered screenshot.
         for shape in Shape::ALL {

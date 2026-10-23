@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███░░░░░░░ 33%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████░░░░░░ 40%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `██████░░░░ 61%`
+## 🐣 M0 — Native typing MVP — `███████░░░ 67%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -28,7 +28,7 @@
   - [ ] Keyboard navigation audit
   - [ ] HiDPI/small-window screenshots
 
-### 🐦 P1 — Profiles and persistence — `█████░░░░░ 45%`
+### 🐦 P1 — Profiles and persistence — `███████░░░ 67%`
 
 - 👤 **T101** Multiple local profiles — `███████░░░ 67%`
   - [x] Create/select profile UI coded — src/app.rs
@@ -38,9 +38,9 @@
   - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
   - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
   - [ ] Retention and backup tests
-- 🎯 **T103** Per-profile goals and settings — `░░░░░░░░░░ 0%`
-  - [ ] Settings and goals UI
-  - [ ] Per-profile setting persistence
+- 🎯 **T103** Per-profile goals and settings — `███████░░░ 67%`
+  - [x] Settings and goals UI — src/app.rs: independent editable WPM/accuracy goals and progress bars; Actions 39888678045
+  - [x] Per-profile setting persistence — src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045
   - [ ] Export/import
 
 ### ⌨️ P2 — Tests and core scoring — `███████░░░ 72%`
@@ -75,7 +75,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - ⌨️ Typing tests — `███████░░░ 72%`
-- 🐦 Local identity — `█████░░░░░ 45%`
+- 🐦 Local identity — `███████░░░ 67%`
 - 🌗 Appearance — `██████░░░░ 58%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `████░░░░░░ 35%`
@@ -131,16 +131,16 @@
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
-## 🎓 M2 — Typing academy — `░░░░░░░░░░ 0%`
+## 🎓 M2 — Typing academy — `███░░░░░░░ 33%`
 
 **Acceptance gate:** Adaptive lessons, weak-key drills, and course progression.
 
-### 🧠 P5 — Practice and learning — `░░░░░░░░░░ 0%`
+### 🧠 P5 — Practice and learning — `███░░░░░░░ 33%`
 
-- 📚 **T501** Courses and lessons — `░░░░░░░░░░ 0%`
-  - [ ] Lesson content schema
-  - [ ] Progression UI
-  - [ ] Course completion tests
+- 📚 **T501** Courses and lessons — `██████████ 100%`
+  - [x] Lesson content schema — src/lesson.rs: five original licensed-by-author lesson definitions; Actions 39888678045
+  - [x] Progression UI — src/app.rs: lesson picker, completion labels and course progress; Actions 39888678045
+  - [x] Course completion tests — src/history.rs: full-accuracy mastery rules and profile isolation; GitHub Actions 39888678045, 46 Rust tests and native untimed lesson
 - 🎯 **T502** Character and n-gram drills — `░░░░░░░░░░ 0%`
   - [ ] Per-key timing metrics
   - [ ] Adaptive drill generation
@@ -149,30 +149,30 @@
   - [ ] Finger models
   - [ ] Heatmaps
   - [ ] Accessibility tests
-- 🌱 **T504** Daily targets and accuracy-first practice — `░░░░░░░░░░ 0%`
-  - [ ] Goal engine
+- 🌱 **T504** Daily targets and accuracy-first practice — `███░░░░░░░ 33%`
+  - [x] Goal engine — src/preferences.rs and src/app.rs: user-configured benchmark targets and progress calculations; Actions 39888678045
   - [ ] Challenge UI
   - [ ] Performance summaries
 
 **Feature inventory** (computed from associated task progress):
 
-- 🎓 Structured curriculum — `░░░░░░░░░░ 0%`
+- 🎓 Structured curriculum — `███████░░░ 67%`
 - 🧠 Adaptive exercises — `░░░░░░░░░░ 0%`
 
-## 📊 M3 — Statistics and achievements — `██░░░░░░░░ 17%`
+## 📊 M3 — Statistics and achievements — `███░░░░░░░ 34%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `██░░░░░░░░ 17%`
+### 📈 P6 — Analytics and progression — `███░░░░░░░ 34%`
 
-- 🏅 **T601** Records by layout and test mode — `███░░░░░░░ 33%`
+- 🏅 **T601** Records by layout and test mode — `███████░░░ 67%`
   - [x] Basic profile bests tracked — src/app.rs
-  - [ ] Segmented history
+  - [x] Segmented history — src/history.rs: context-specific comparisons and per-profile recent history; Actions 39888678045
   - [ ] Versioned scoring policies
-- 📉 **T602** Progress charts and consistency — `███░░░░░░░ 33%`
+- 📉 **T602** Progress charts and consistency — `███████░░░ 67%`
   - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
   - [ ] Graphs and filters
-  - [ ] Consistency formulas
+  - [x] Consistency formulas — src/history.rs: mean, best and population standard deviation with unit test; Actions 39888678045
 - 🔥 **T603** Key timing and error heatmaps — `░░░░░░░░░░ 0%`
   - [ ] Event recording
   - [ ] Aggregations
@@ -184,14 +184,14 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `██░░░░░░░░ 22%`
+- 📊 Statistics — `█████░░░░░ 45%`
 - 🏆 Achievements — `░░░░░░░░░░ 0%`
 
-## 🎨 M4 — Profile card studio — `███░░░░░░░ 27%`
+## 🎨 M4 — Profile card studio — `████░░░░░░ 36%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `███░░░░░░░ 27%`
+### 🐤 P7 — Widgets and publishing — `████░░░░░░ 36%`
 
 - 🪄 **T701** GitHub-safe SVG card — `████████░░ 75%`
   - [x] SVG generator coded — src/export.rs
@@ -202,10 +202,10 @@
   - [ ] Template system
   - [ ] Color and type controls
   - [ ] Live preview
-- 📝 **T703** Markdown, PNG, JSON exports — `███░░░░░░░ 33%`
+- 📝 **T703** Markdown, PNG, JSON exports — `███████░░░ 67%`
   - [x] README Markdown — src/export.rs produces paired local Markdown/SVG and validates the embed; GitHub Actions 39872686067
   - [ ] PNG renderer
-  - [ ] Privacy-aware data exports
+  - [x] Privacy-aware data exports — src/export.rs, src/history.rs: entire profile's versioned JSON aggregate export; Actions 39888678045 native F7 export QA
 - 🔄 **T704** Optional GitHub profile updates — `░░░░░░░░░░ 0%`
   - [ ] Explicit opt-in
   - [ ] Safe credentials
@@ -213,7 +213,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `████░░░░░░ 36%`
+- 🐤 GitHub widget — `█████░░░░░ 47%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `░░░░░░░░░░ 0%`

@@ -160,15 +160,17 @@
               "id": "T103",
               "emoji": "🎯",
               "name": "Per-profile goals and settings",
-              "progress": 0,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Settings and goals UI",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs: independent editable WPM/accuracy goals and progress bars; Actions 39888678045"
                 },
                 {
                   "text": "Per-profile setting persistence",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045"
                 },
                 {
                   "text": "Export/import",
@@ -617,19 +619,22 @@
               "id": "T501",
               "emoji": "📚",
               "name": "Courses and lessons",
-              "progress": 0,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Lesson content schema",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/lesson.rs: five original licensed-by-author lesson definitions; Actions 39888678045"
                 },
                 {
                   "text": "Progression UI",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs: lesson picker, completion labels and course progress; Actions 39888678045"
                 },
                 {
                   "text": "Course completion tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: full-accuracy mastery rules and profile isolation; GitHub Actions 39888678045, 46 Rust tests and native untimed lesson"
                 }
               ]
             },
@@ -677,11 +682,12 @@
               "id": "T504",
               "emoji": "🌱",
               "name": "Daily targets and accuracy-first practice",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Goal engine",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/preferences.rs and src/app.rs: user-configured benchmark targets and progress calculations; Actions 39888678045"
                 },
                 {
                   "text": "Challenge UI",
@@ -730,7 +736,7 @@
               "id": "T601",
               "emoji": "🏅",
               "name": "Records by layout and test mode",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Basic profile bests tracked",
@@ -739,7 +745,8 @@
                 },
                 {
                   "text": "Segmented history",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: context-specific comparisons and per-profile recent history; Actions 39888678045"
                 },
                 {
                   "text": "Versioned scoring policies",
@@ -751,7 +758,7 @@
               "id": "T602",
               "emoji": "📉",
               "name": "Progress charts and consistency",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Timeseries store",
@@ -764,7 +771,8 @@
                 },
                 {
                   "text": "Consistency formulas",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: mean, best and population standard deviation with unit test; Actions 39888678045"
                 }
               ]
             },
@@ -892,7 +900,7 @@
               "id": "T703",
               "emoji": "📝",
               "name": "Markdown, PNG, JSON exports",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "README Markdown",
@@ -905,7 +913,8 @@
                 },
                 {
                   "text": "Privacy-aware data exports",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/export.rs, src/history.rs: entire profile's versioned JSON aggregate export; Actions 39888678045 native F7 export QA"
                 }
               ]
             },

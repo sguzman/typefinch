@@ -39,3 +39,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Settings corruption guard:** When a settings file exists but is invalid or unreadable, the original remains untouched. New default values are temporary and never written over it; scored sessions and profile-mutation persistence are disabled to protect the existing identity/history association. The UI visibly warns about recovery.
 
 - **Backup verification:** The optional in-app checker accepts an explicit private settings-backup path only in memory, derives the matching SQLite filename and validates both as read-only inputs. It neither opens the live profile directory for writing nor stores the path with preferences or history.
+
+- **Per-device capture security:** The explicit [permission and threat model](DEVICE_INPUT_SECURITY.md) applies to any proposed future input backend. Today per-device typing is unsupported, the inspector remains metadata-only, and there is no root/global key capture.

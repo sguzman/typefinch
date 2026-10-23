@@ -943,16 +943,21 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
                 ui.label("Custom passage (in memory only)");
-                ui.small("Import a private UTF-8 text file by path or drag-and-drop (64 KiB limit, 4096 graphemes).");
+                ui.small("Ctrl+O focuses the local path field; Enter imports. Drag-and-drop also works (64 KiB limit, 4096 graphemes).");
                 let mut load_requested=false;
                 ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
                     ui.horizontal_wrapped(|ui| {
                         let response=ui.add(
                             egui::TextEdit::singleline(&mut self.custom_import_path)
+                                .id(egui::Id::new("custom_import_path"))
                                 .hint_text("Path to local .txt or .md file")
                                 .desired_width(ui.available_width().min(230.0))
                         );
-                        if response.lost_focus() && ui.input(|i|i.key_pressed(egui::Key::Enter)) {
+                        if response.has_focus() {
+                            ui.scroll_to_rect(response.rect,Some(egui::Align::Center));
+                        }
+                        if (response.has_focus() || response.lost_focus())
+                            && ui.input(|i|i.key_pressed(egui::Key::Enter)) {
                             load_requested=true;
                         }
                         if ui.button("Load local file").clicked() {load_requested=true;}
@@ -1734,6 +1739,18 @@ impl eframe::App for Typefinch {
         }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
+        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O))
+            && self.session.state!=State::Running && !self.settings_read_only {
+            // Keyboard navigation to the ordinary editor, not a QA bypass.
+            if self.prefs.test_mode!=TestMode::Custom {
+                self.prefs.test_mode=TestMode::Custom;
+                self.rebuild_session();
+                self.save();
+            }
+            ctx.memory_mut(|memory|
+                memory.request_focus(egui::Id::new("custom_import_path")));
+            self.message="Enter a local UTF-8 file path and press Enter to import. The passage remains in memory only.".into();
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.show_keyboard_help=!self.show_keyboard_help;
         }
@@ -1886,6 +1903,7 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
+                            ui.label("Ctrl+O: open custom passage import field; type a path and press Enter.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");

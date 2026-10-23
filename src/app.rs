@@ -148,6 +148,16 @@ fn layout_for_new_session(mode:Mode,target:&str,keyboards:&[Keyboard],
     if mode==Mode::System && !inventory_fresh {"os:unknown".into()}
     else {recorded_layout(mode,target,keyboards,installed)}
 }
+// A session can finish while a periodic or manually requested inspection is
+// still in flight. A stale detected/* label is never persisted as if the
+// compositor had revalidated it. Keep the score; downgrade only provenance.
+fn layout_at_completion(current:&str,mode:Mode,inventory_fresh:bool,
+    inspection_pending:bool)->String {
+    if mode==Mode::System && current.starts_with("detected/")
+        && !inspection_confirmed(inventory_fresh,inspection_pending) {
+        "os:unknown".into()
+    } else {current.to_owned()}
+}
 fn layout_after_focus_change(current:&str,mode:Mode,
     previously_focused:bool,focused:bool)->String {
     if previously_focused && !focused && mode==Mode::System
@@ -421,6 +431,10 @@ impl Typefinch {
             self.message = "Empty session not recorded. Start another test when ready.".into();
             return;
         }
+        // The UI may have finished scoring before an outstanding compositor
+        // refresh was consumed. Never persist speculative detected/* identity.
+        self.session_layout=layout_at_completion(&self.session_layout,self.mode,
+            self.device_inventory_fresh,self.pending_device_query.is_some());
         let identity = self.prefs.profiles[self.prefs.active_profile].id.clone();
         let mut record = Record::completed(&identity, &self.session_layout, &self.session_input_mode, &self.session);
         if self.session.mode==TestMode::Lesson {
@@ -2000,6 +2014,18 @@ mod palette_tests {
             inspection_confirmed(true,false)),"detected/us");
         assert_eq!(layout_for_new_session(Mode::Emulated,"us",&keyboards,&installed,
             inspection_confirmed(false,true)),"us");
+    }
+    #[test] fn completing_a_session_during_refresh_cannot_persist_stale_layout() {
+        assert_eq!(layout_at_completion("detected/us",Mode::System,true,false),
+            "detected/us");
+        assert_eq!(layout_at_completion("detected/us",Mode::System,true,true),
+            "os:unknown","pending refresh may contradict active input layout");
+        assert_eq!(layout_at_completion("detected/us",Mode::System,false,false),
+            "os:unknown");
+        assert_eq!(layout_at_completion("os:unknown",Mode::System,true,false),
+            "os:unknown","an unknown label cannot be upgraded after finish");
+        assert_eq!(layout_at_completion("us",Mode::Emulated,false,true),
+            "us","explicit software emulation is not derived from inspection");
     }
     #[test] fn stale_inspector_inventory_cannot_supply_emulation_target() {
         let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];

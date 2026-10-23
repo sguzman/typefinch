@@ -29,6 +29,9 @@ assert(meta:close())
 local archive=output.."/"..stem..".tar.gz"
 run("tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "..
     q(stage).." -cf - "..q(stem).." | gzip -n > "..q(archive))
-run("sha256sum "..q(archive).." > "..q(archive..".sha256"))
+-- Checksum names only the archive filename so two downloaded artifacts
+-- verify correctly when placed side by side outside the CI dist directory.
+run("(cd "..q(output).." && sha256sum "..q(stem..".tar.gz")..
+    " > "..q(stem..".tar.gz.sha256")..")")
 run("rm -rf "..q(stage))
 print("Packaged "..archive.." from an explicit, user-data-free allowlist")

@@ -3,7 +3,7 @@ set -euo pipefail
 version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
 archive="dist/typefinch-${version}-linux-x86_64.tar.gz"
 [[ -s "$archive" ]] || exit 1
-sha256sum --check "$archive.sha256"
+(cd dist && sha256sum --check "$(basename "$archive").sha256")
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 tar -tzf "$archive" >"$tmp/members"

@@ -21,10 +21,10 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 
 ## Multiple keyboards
 
-- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland devices and active keymaps. On genuine X11 sessions, `setxkbmap -query` instead reports one **aggregate seat**, not individual devices. The selector inspects only returned metadata.
+- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland inspection rows and reported active keymaps. Other Wayland compositors expose **aggregate `wl_seat` capability metadata**, without active keymaps; genuine X11 sessions use `setxkbmap -query` for a single **configured aggregate seat**. None of these APIs attributes Typefinch typing events to physical keyboards.
 - **Not implemented:** selecting a keyboard as an exclusive input source. Ordinary Wayland `wl_keyboard` is seat-level and can aggregate multiple physical keyboards.
 - **Future:** per-device event attribution only where a compositor-specific protocol or authorized opt-in evdev/libinput capture allows it. Never secretly capture keys or modify OS keyboard configuration.
-- If neither Hyprland nor a genuine X11 seat query is available, regular native typing remains available and the detection limitation is displayed.
+- If none of these inspectors is available, regular native typing remains available and the detection limitation is displayed.
 
 Acceptance: hotplug two keyboards; map both with differing layouts; verify focus, shift/AltGr, symbols, dead keys, IMEs, ANSI/ISO/JIS and no double-count of physical + committed events.
 
@@ -40,7 +40,7 @@ At startup, Typefinch reads the local read-only xkeyboard-config rules inventory
 
 ## Session layout attribution
 
-Typefinch records the emulated target identity for software-emulated sessions. OS-input sessions use a clearly prefixed `detected/<id>` identity only if all currently reported Hyprland keyboards agree on the active keymap and it resolves uniquely to an installed XKB entry. Otherwise Typefinch records `os:unknown` and excludes that session from layout-comparable trend charts. This is seat-level *best-effort* metadata, not proof of which physical keyboard generated a keystroke; changes after the session begins are not presently monitored. The layout context is snapshotted when a session starts.
+Typefinch records the emulated target identity for software-emulated sessions. OS-input sessions use a clearly prefixed `detected/<id>` identity only if a **complete, uniquely addressed** Hyprland keyboard inventory agrees on the active keymap and it resolves uniquely to an installed XKB entry. Otherwise Typefinch records `os:unknown` and excludes that session from layout-comparable trend charts. This is seat-level *best-effort* metadata, not proof of which physical keyboard generated a keystroke; changes after the session begins are not presently monitored. The layout context is snapshotted when a session starts.
 
 ## Refresh after hardware changes
 
@@ -52,7 +52,7 @@ The built-in editor creates version-1 JSON keymaps with a UUID-based `custom/<uu
 
 ## Read-only hotplug refresh
 
-While Typefinch is open inside Hyprland, it refreshes the keyboard inventory on focus gain and approximately every 20 seconds while focused. Enumeration runs on a short-lived worker thread to avoid blocking typing. Keyboard selection survives reordering when the reported Hyprland address remains stable, but the selected device is only for inspection; no physical-device event interception or device attribution is implied. Outside Hyprland the application avoids background probing. Manual refresh remains available. The periodic timer does not run when the window is unfocused.
+While Typefinch is open inside Hyprland or another supported Wayland session, it refreshes read-only metadata on focus gain and approximately every 20 seconds while focused. Enumeration runs on a worker thread to avoid blocking typing. Selection survives reordering when the compositor's inspection identity remains stable, but it does not grant physical-device event attribution. Genuine X11 configured-seat inspection is on-demand. Manual refresh remains available; polling stops when the window is unfocused.
 
 ## Modifier-layer inspector
 
@@ -102,7 +102,7 @@ The JIS main-block illustration uses `KEY_ZENKAKUHANKAKU=85` in the top-left loc
 
 ## Read-only X11 aggregate seat fallback
 
-When Hyprland is absent **and** the process declares a genuine `XDG_SESSION_TYPE=x11` with `DISPLAY`, Typefinch uses `setxkbmap -query` to inspect one X11 keyboard seat. This is intentionally reported as **"X11 aggregate seat (not a physical keyboard)"** with a stable synthetic inspection identity. The result preserves the reported layout and variant strings without pretending an X11 seat can attribute individual hardware events. There is no write to `setxkbmap`, no privilege escalation, no global keyboard capture, and no fallback through XWayland while a Wayland session is declared. Hyprland inspection still takes priority.
+When the process declares a genuine `XDG_SESSION_TYPE=x11` with `DISPLAY`, Typefinch uses `setxkbmap -query` to inspect one X11 keyboard seat, even if a stale Hyprland signature remains inherited. This is intentionally reported as **"X11 aggregate seat (not a physical keyboard)"** with a stable synthetic inspection identity. The result preserves the reported layout and variant strings without pretending an X11 seat can attribute individual hardware events. There is no write to `setxkbmap`, no privilege escalation, no global keyboard capture, and no fallback through XWayland while a Wayland session is declared. Native Hyprland sessions still use their dedicated inspector. An explicit X11 session cannot be overridden by an inherited Hyprland variable.
 
 [CI 40008974131](https://github.com/sguzman/typefinch/actions/runs/40008974131) passed 122 Rust tests, malicious/missing-layout parser cases, a separate live `Xvfb` + `setxkbmap -query` probe, and the full native graphical suite. This accepts the X11 fallback only. Generic Wayland-compositor XKB seat discovery and verified per-device attribution remain future work; if `setxkbmap` is missing or the X11 query fails, ordinary native typing remains available and the inspector reports the limitation.
 
@@ -112,9 +112,11 @@ The current input capability is explicitly `CapturePolicy::InspectionOnly`, rega
 
 ## Bounded inspection and session provenance
 
-Typefinch opens its GUI before awaiting any compositor metadata. Startup, manual refresh, and focused Hyprland polling share a **single asynchronous inspection worker**, so repeated clicks cannot accumulate concurrent `hyprctl` processes. Both read-only helper commands have a **three-second runtime limit**, bounded stdout (256 KiB Hyprland JSON; 16 KiB X11 query), and no shell interpolation, global keystroke hook or writable system command. A timeout, oversized response or disconnected worker clears the trusted inventory rather than leaving its previous contents marked current.
+Typefinch opens its GUI before awaiting any compositor metadata. Startup, manual refresh, and focused Hyprland polling share a **single asynchronous inspection worker**, so repeated clicks cannot accumulate concurrent `hyprctl` processes. All inspection subprocesses have a **three-second runtime limit**, bounded stdout (256 KiB Hyprland JSON; 16 KiB X11 and Wayland seat metadata), and no shell interpolation, global keystroke hook or writable system command. A timeout, oversized response or disconnected worker clears the trusted inventory rather than leaving its previous contents marked current.
 
 Keyboard inventory becomes **unverified** on focus loss. A worker launched before that focus transition cannot restore confidence in the reported keymap; after focus returns, Hyprland must supply a fresh inspection result. A running OS-input session with an earlier `detected/<id>` label downgrades to `os:unknown` when focus is lost or the inventory contradicts the old label. Likewise, a new OS-input session started before refreshed inventory arrives is recorded as `os:unknown`, not a guessed layout. Explicit software emulation retains its chosen target, and the app never upgrades an existing unknown session retroactively.
+
+Hyprland reports with any unaddressed, malformed, or duplicate keyboard identity are now rejected as incomplete. Silently dropping such a row could hide a different active layout and falsely label a scored OS-input session. Rejection clears the trusted inventory and preserves the safer `os:unknown` history label; it does not prevent ordinary native typing. The stricter parser and stale-environment routing have new regression tests, but their complete CI acceptance is not yet recorded here.
 
 [Native CI 40020631995](https://github.com/sguzman/typefinch/actions/runs/40020631995) passed 132 Rust tests, the real Xvfb aggregate-seat probe and all existing X11 graphical checks. It covers subprocess timeout, output limits, focus invalidation, fresh-vs-stale layout attribution and nonblocking keyboard inspection. **No live Hyprland hotplug or physical-device event routing is claimed by these tests.**
 

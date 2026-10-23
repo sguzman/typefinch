@@ -37,20 +37,24 @@ pub fn preserve_selection(previous:Option<&str>, devices:&[Keyboard])->usize {
     previous.and_then(|address|devices.iter().position(|k|k.address==address)).unwrap_or(0)
 }
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
-enum InspectorBackend {Hyprland, X11Aggregate, Unavailable}
-fn backend_for_session(hyprland:bool,session_type:Option<&str>,has_display:bool)
-    ->InspectorBackend {
+enum InspectorBackend {Hyprland, X11Aggregate, WaylandAggregate, Unavailable}
+fn backend_for_session(hyprland:bool,session_type:Option<&str>,
+    has_x11_display:bool,has_wayland_socket:bool)->InspectorBackend {
     if hyprland {InspectorBackend::Hyprland}
-    else if session_type==Some("x11") && has_display {InspectorBackend::X11Aggregate}
+    else if session_type==Some("x11") && has_x11_display {InspectorBackend::X11Aggregate}
+    else if session_type==Some("wayland") && has_wayland_socket {InspectorBackend::WaylandAggregate}
     else {InspectorBackend::Unavailable}
 }
 pub fn inspect() -> Result<Vec<Keyboard>, String> {
     match backend_for_session(
         std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some(),
         std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
-        std::env::var_os("DISPLAY").is_some()) {
+        std::env::var_os("DISPLAY").is_some(),
+        std::env::var_os("WAYLAND_DISPLAY").is_some()
+            || std::env::var_os("WAYLAND_SOCKET").is_some()) {
         InspectorBackend::Hyprland=>inspect_hyprland(),
         InspectorBackend::X11Aggregate=>inspect_x11_seat(),
+        InspectorBackend::WaylandAggregate=>inspect_wayland_seats(),
         InspectorBackend::Unavailable=>Err(
             "No supported compositor keyboard inspector; native app input still works.".into()),
     }
@@ -113,6 +117,45 @@ fn inspect_x11_seat()->Result<Vec<Keyboard>,String> {
     let raw=bounded_query("setxkbmap",&["-query"],
         X11_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
     parse_x11_query(&raw)
+}
+fn inspect_wayland_seats()->Result<Vec<Keyboard>,String> {
+    // Query standard wl_registry/wl_seat only, in a bounded, short-lived
+    // copy of this executable. A stalled compositor cannot strand the
+    // only inspector worker, and wl_keyboard is never requested.
+    let path=std::env::current_exe()
+        .map_err(|e|format!("Cannot locate Wayland seat inspector: {e}"))?;
+    let exe=path.to_str().ok_or("Wayland inspector executable path is not UTF-8.")?;
+    let raw=bounded_query(exe,&["--_probe_wayland_seats"],
+        X11_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
+    parse_wayland_seats(&raw)
+}
+fn parse_wayland_seats(raw:&[u8])->Result<Vec<Keyboard>,String>{
+    if raw.len()>X11_QUERY_MAX_BYTES {
+        return Err("Wayland seat response exceeds inspection size limit.".into());
+    }
+    let seats:Vec<crate::wayland_seat::Seat>=serde_json::from_slice(raw)
+        .map_err(|e|format!("Invalid Wayland seat metadata: {e}"))?;
+    if seats.len()>MAX_INSPECTED_KEYBOARDS {
+        return Err("Wayland returned too many seat entries.".into());
+    }
+    let mut identities=HashSet::new();
+    let mut found=Vec::new();
+    for seat in seats {
+        if !seat.keyboard {continue;}
+        // wl_seat groups input devices, never physical keyboards. Neither
+        // wl_seat names nor capabilities reveal the active XKB keymap.
+        if !usable_metadata(&seat.name,128) || !identities.insert(seat.name.clone()) {
+            return Err("Wayland returned an invalid or duplicate seat name.".into());
+        }
+        found.push(Keyboard {
+            name:format!("Wayland seat {} (not a physical keyboard)",seat.name),
+            address:format!("wayland:seat:{}",seat.name),
+            active_keymap:String::new(),
+            layout:String::new(),
+            variant:String::new(),
+        });
+    }
+    Ok(found)
 }
 /// An X11 core seat is NOT a physical device. Never return multiple
 /// invented keyboards, silently infer a hardware shape, or claim key events
@@ -226,13 +269,34 @@ mod tests {
     }
     #[test] fn xwayland_display_is_never_used_as_native_x11_seat_evidence() {
         use InspectorBackend::*;
-        assert_eq!(backend_for_session(false,Some("wayland"),true),Unavailable);
-        assert_eq!(backend_for_session(false,Some("wayland"),false),Unavailable);
-        assert_eq!(backend_for_session(false,None,true),Unavailable);
-        assert_eq!(backend_for_session(false,Some("x11"),false),Unavailable);
-        assert_eq!(backend_for_session(false,Some("x11"),true),X11Aggregate);
-        assert_eq!(backend_for_session(true,Some("wayland"),true),Hyprland);
-        assert_eq!(backend_for_session(true,Some("x11"),true),Hyprland);
+        assert_eq!(backend_for_session(false,Some("wayland"),true,false),Unavailable);
+        assert_eq!(backend_for_session(false,Some("wayland"),true,true),WaylandAggregate);
+        assert_eq!(backend_for_session(false,Some("wayland"),false,true),WaylandAggregate);
+        assert_eq!(backend_for_session(false,None,true,true),Unavailable);
+        assert_eq!(backend_for_session(false,Some("x11"),false,true),Unavailable);
+        assert_eq!(backend_for_session(false,Some("x11"),true,true),X11Aggregate);
+        assert_eq!(backend_for_session(true,Some("wayland"),true,true),Hyprland);
+        assert_eq!(backend_for_session(true,Some("x11"),true,true),Hyprland);
+    }
+    #[test] fn wayland_seat_protocol_metadata_never_invents_input_layouts() {
+        let payload=serde_json::to_vec(&vec![
+            crate::wayland_seat::Seat{id:10,name:"seat0".into(),keyboard:true},
+            crate::wayland_seat::Seat{id:11,name:"pointer".into(),keyboard:false},
+        ]).unwrap();
+        let devices=parse_wayland_seats(&payload).unwrap();
+        assert_eq!(devices.len(),1);
+        assert_eq!(devices[0].address,"wayland:seat:seat0");
+        assert!(devices[0].name.contains("not a physical keyboard"));
+        assert!(devices[0].active_keymap.is_empty());
+        assert!(devices[0].layout.is_empty());
+        assert!(devices[0].variant.is_empty());
+        assert!(parse_wayland_seats(b"not json").is_err());
+        assert!(parse_wayland_seats(&vec![b'a';X11_QUERY_MAX_BYTES+1]).is_err());
+        let duplicate=serde_json::to_vec(&vec![
+            crate::wayland_seat::Seat{id:1,name:"seat0".into(),keyboard:true},
+            crate::wayland_seat::Seat{id:2,name:"seat0".into(),keyboard:true},
+        ]).unwrap();
+        assert!(parse_wayland_seats(&duplicate).is_err());
     }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";

@@ -37,6 +37,21 @@ impl Shape {
     }
 }
 
+/// Which physical-key *reference* region is illustrated. Non-main
+/// sections have no scoring or compositor event attribution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Section { Typing, Navigation, Keypad }
+impl Section {
+    pub const ALL:[Self;3]=[Self::Typing,Self::Navigation,Self::Keypad];
+    pub const fn label(self)->&'static str {
+        match self {Self::Typing=>"Typing block",Self::Navigation=>"Function / navigation",
+                    Self::Keypad=>"Numeric keypad"}
+    }
+    pub const fn next(self)->Self {
+        match self {Self::Typing=>Self::Navigation,Self::Navigation=>Self::Keypad,
+                    Self::Keypad=>Self::Typing}
+    }
+}
 /// Units are tenths of one ordinary key width. No slot claims ownership of
 /// real hardware events; `egui_key=None` must not be synthesized from another key.
 /// Presentation semantics, never inferred from XKB modifier symbols.
@@ -153,9 +168,107 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
     result.sort_by_key(|slot|(slot.row,slot.x));
     result
 }
+/// Standard Linux evdev reference positions; these keys are never
+/// attributed to a connected keyboard, synthesized, or scored. Main typing
+/// geometry is deliberately unchanged for the existing QA corpus.
+pub fn section_slots(shape:Shape,section:Section)->Vec<Slot> {
+    if section==Section::Typing {return slots(shape);}
+    let mut out=Vec::with_capacity(30);
+    match section {
+        Section::Typing=>unreachable!(),
+        Section::Navigation=>{
+            out.push(special("Escape","Esc",1,0,0,12,false));
+            for (index,evdev) in [59,60,61,62,63,64,65,66,67,68,87,88].into_iter().enumerate() {
+                let x=20+index as u16*11+if index>=8 {12} else if index>=4 {6} else {0};
+                let name=match index {
+                    0=>"F1",1=>"F2",2=>"F3",3=>"F4",4=>"F5",5=>"F6",
+                    6=>"F7",7=>"F8",8=>"F9",9=>"F10",10=>"F11",_=>"F12",
+                };
+                out.push(special(name,name,evdev,0,x,10,false));
+            }
+            for (name,caption,evdev,row,x) in [
+                ("Print Screen","Prt",99,1,0),
+                ("Scroll Lock","ScrLk",70,1,14),
+                ("Pause","Pause",119,1,28),
+                ("Insert","Ins",110,1,70),
+                ("Home","Home",102,1,82),
+                ("Page Up","PgUp",104,1,94),
+                ("Delete","Del",111,2,70),
+                ("End","End",107,2,82),
+                ("Page Down","PgDn",109,2,94),
+                ("Up arrow","Up",103,3,82),
+                ("Left arrow","Left",105,4,70),
+                ("Down arrow","Down",108,4,82),
+                ("Right arrow","Right",106,4,94),
+            ] {out.push(special(name,caption,evdev,row,x,11,false));}
+        },
+        Section::Keypad=>{
+            for (name,caption,evdev,row,x,width) in [
+                ("Num Lock","Num",69,0,0,12),
+                ("Keypad divide","/",98,0,13,12),
+                ("Keypad multiply","*",55,0,26,12),
+                ("Keypad minus","-",74,0,39,12),
+                ("Keypad 7","7",71,1,0,12),
+                ("Keypad 8","8",72,1,13,12),
+                ("Keypad 9","9",73,1,26,12),
+                ("Keypad plus","+",78,1,39,12),
+                ("Keypad 4","4",75,2,0,12),
+                ("Keypad 5","5",76,2,13,12),
+                ("Keypad 6","6",77,2,26,12),
+                ("Keypad 1","1",79,3,0,12),
+                ("Keypad 2","2",80,3,13,12),
+                ("Keypad 3","3",81,3,26,12),
+                ("Keypad Enter","Enter",96,3,39,12),
+                ("Keypad 0","0",82,4,0,25),
+                ("Keypad decimal",".",83,4,26,12),
+            ] {out.push(special(name,caption,evdev,row,x,width,false));}
+        }
+    }
+    out.sort_by_key(|slot|(slot.row,slot.x));
+    out
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn reference_sections_have_real_codes_but_never_claim_event_capture() {
+        use std::collections::HashSet;
+        assert_eq!(Section::Typing.next(),Section::Navigation);
+        assert_eq!(Section::Navigation.next(),Section::Keypad);
+        assert_eq!(Section::Keypad.next(),Section::Typing);
+        for shape in Shape::ALL {
+            for (section,expected_count) in [(Section::Navigation,26),(Section::Keypad,17)] {
+                let slots=section_slots(shape,section);
+                assert_eq!(slots.len(),expected_count);
+                let mut seen=HashSet::new();
+                for slot in &slots {
+                    assert_eq!(slot.kind,SlotKind::Control);
+                    assert!(slot.egui_key.is_none());
+                    assert!(seen.insert(slot.evdev),"duplicate key {} in {section:?}",slot.name);
+                    assert!(!slot.caption.is_empty());
+                }
+                for row in 0..=4 {
+                    let keys:Vec<_>=slots.iter().filter(|s|s.row==row).collect();
+                    for pair in keys.windows(2) {
+                        assert!(pair[0].x+u16::from(pair[0].width)<=pair[1].x,
+                            "{section:?}: {} overlaps {}",pair[0].name,pair[1].name);
+                    }
+                }
+            }
+        }
+        assert_eq!(section_slots(Shape::Iso,Section::Typing),slots(Shape::Iso));
+    }
+    #[test] fn extension_has_stable_linux_evdev_codes() {
+        let nav=section_slots(Shape::Ansi,Section::Navigation);
+        for (name,code) in [("Escape",1),("F1",59),("F10",68),("F11",87),
+                            ("F12",88),("Up arrow",103),("Delete",111)] {
+            assert_eq!(nav.iter().find(|s|s.name==name).unwrap().evdev,code);
+        }
+        let keypad=section_slots(Shape::Ansi,Section::Keypad);
+        for (name,code) in [("Num Lock",69),("Keypad 0",82),("Keypad decimal",83),
+                            ("Keypad Enter",96),("Keypad divide",98)] {
+            assert_eq!(keypad.iter().find(|s|s.name==name).unwrap().evdev,code);
+        }
+    }
     #[test] fn geometry_shortcut_cycle_never_changes_input_keymap() {
         let mut shape=Shape::Ansi;
         for expected in [Shape::Iso,Shape::Jis,Shape::Split,Shape::Ansi] {

@@ -99,6 +99,21 @@ impl Session {
     pub fn seconds_left(&self) -> f64 { self.duration.saturating_sub(self.elapsed).as_secs_f64() }
 }
 
+
+/// A stable, bounded typing viewport. Advancing in 80-character steps prevents
+/// long tests from silently continuing beyond the visible reference passage.
+pub fn viewport(total: usize, cursor: usize, width: usize) -> (usize, usize) {
+    if width == 0 || total == 0 { return (0,0); }
+    let width = width.min(total);
+    let cursor = cursor.min(total);
+    let anchor = width / 3;
+    let step = (width / 3).max(1);
+    let start = if cursor <= anchor { 0 } else {
+        ((cursor - anchor) / step) * step
+    }.min(total.saturating_sub(width));
+    (start, (start + width).min(total))
+}
+
 /// Gross errors include uncorrected mismatches, including mistyped Unicode scalars.
 /// WPM = correctly positioned characters / 5 / elapsed minutes.
 /// Each session defines its metric version; corrected-error accounting is separate.
@@ -130,6 +145,18 @@ mod tests {
         assert!(session.target.chars().count()<=4096);
         assert!(!session.target.contains('\n'));
         assert!(Session::new_with_mode(60,TestMode::Custom).target.is_empty());
+    }
+    #[test] fn viewport_follows_cursor_and_stays_in_range() {
+        assert_eq!(viewport(0,0,230), (0,0));
+        assert_eq!(viewport(50,50,230), (0,50));
+        assert_eq!(viewport(1000,0,230), (0,230));
+        assert_eq!(viewport(1000,450,230), (304,534));
+        let (start,end)=viewport(1000,999,230);
+        assert!(start<=999 && end==1000);
+        for cursor in 0..=1000 {
+            let (s,e)=viewport(1000,cursor,230);
+            assert!(s<=cursor && cursor<=e && e-s<=230);
+        }
     }
     #[test] fn scoring_is_position_based() {
         let a = score("cat", "cut", Duration::from_secs(60));

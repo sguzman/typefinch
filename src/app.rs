@@ -364,14 +364,18 @@ impl Typefinch {
             }
         ).show_percentage());
         ui.add_space(8.0);
-        let expected: Vec<char> = self.session.target.chars().take(230).collect();
-        let actual: Vec<char> = self.session.typed.chars().collect();
+        let entered = self.session.typed.chars().count();
+        let total = self.session.target.chars().count();
+        let (first, last) = crate::engine::viewport(total, entered, 230);
+        let expected: Vec<char> = self.session.target.chars().skip(first).take(last-first).collect();
+        let actual: Vec<char> = self.session.typed.chars().skip(first).collect();
         let mut job = egui::text::LayoutJob::default();
         for (i, ch) in expected.iter().enumerate() {
+            let position = first + i;
             let color = match actual.get(i) {
                 Some(c) if c == ch => Color32::from_rgb(91, 184, 137),
                 Some(_) => Color32::from_rgb(239, 102, 112),
-                None if i == actual.len() && self.session.state == State::Running => PERIWINKLE,
+                None if position == entered && self.session.state == State::Running => PERIWINKLE,
                 None => ui.visuals().text_color().gamma_multiply(0.75),
             };
             job.append(&ch.to_string(), 0.0, egui::TextFormat {
@@ -385,7 +389,7 @@ impl Typefinch {
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
                 ui.label(job);
-                ui.small("Click here to refocus typing, or press F5 to start/restart.");
+                ui.small(format!("Reference characters {}–{} of {} · Click here to refocus or press F5 to restart.", first.saturating_add(1), last, total));
             });
         let response = ui.interact(
             typing_area.response.rect,

@@ -15,17 +15,24 @@ pub struct Keyboard {
 pub fn preserve_selection(previous:Option<&str>, devices:&[Keyboard])->usize {
     previous.and_then(|address|devices.iter().position(|k|k.address==address)).unwrap_or(0)
 }
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+enum InspectorBackend {Hyprland, X11Aggregate, Unavailable}
+fn backend_for_session(hyprland:bool,session_type:Option<&str>,has_display:bool)
+    ->InspectorBackend {
+    if hyprland {InspectorBackend::Hyprland}
+    else if session_type==Some("x11") && has_display {InspectorBackend::X11Aggregate}
+    else {InspectorBackend::Unavailable}
+}
 pub fn inspect() -> Result<Vec<Keyboard>, String> {
-    if std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
-        // Never override trusted Hyprland read-only enumeration with an
-        // XWayland query that may describe a different keyboard mapping.
-        return inspect_hyprland();
+    match backend_for_session(
+        std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some(),
+        std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+        std::env::var_os("DISPLAY").is_some()) {
+        InspectorBackend::Hyprland=>inspect_hyprland(),
+        InspectorBackend::X11Aggregate=>inspect_x11_seat(),
+        InspectorBackend::Unavailable=>Err(
+            "No supported compositor keyboard inspector; native app input still works.".into()),
     }
-    if std::env::var("XDG_SESSION_TYPE").as_deref()==Ok("x11")
-        && std::env::var_os("DISPLAY").is_some() {
-        return inspect_x11_seat();
-    }
-    Err("No supported compositor keyboard inspector; native app input still works.".into())
 }
 fn inspect_hyprland() -> Result<Vec<Keyboard>, String> {
     let out=Command::new("hyprctl").args(["-j","devices"]).output()
@@ -83,6 +90,16 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn xwayland_display_is_never_used_as_native_x11_seat_evidence() {
+        use InspectorBackend::*;
+        assert_eq!(backend_for_session(false,Some("wayland"),true),Unavailable);
+        assert_eq!(backend_for_session(false,Some("wayland"),false),Unavailable);
+        assert_eq!(backend_for_session(false,None,true),Unavailable);
+        assert_eq!(backend_for_session(false,Some("x11"),false),Unavailable);
+        assert_eq!(backend_for_session(false,Some("x11"),true),X11Aggregate);
+        assert_eq!(backend_for_session(true,Some("wayland"),true),Hyprland);
+        assert_eq!(backend_for_session(true,Some("x11"),true),Hyprland);
+    }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";
         let found=parse_x11_query(raw).unwrap();

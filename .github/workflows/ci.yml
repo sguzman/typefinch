@@ -63,6 +63,7 @@ jobs:
             typefinch-narrow.png
             typefinch-hidpi.png
             typefinch-geometry-*.png
+            typefinch-reference-*.png
             typefinch-recovery.png
             typefinch-gui-smoke.log
             typefinch-window-manager.log

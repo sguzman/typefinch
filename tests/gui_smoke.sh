@@ -19,7 +19,7 @@ cleanup() {
     for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png typefinch-recovery.png; do
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
-    for img in "$tmp"/typefinch-geometry-*.png; do
+    for img in "$tmp"/typefinch-geometry-*.png "$tmp"/typefinch-reference-*.png; do
       if [[ -s "$img" ]]; then cp "$img" "$GITHUB_WORKSPACE/"; fi
     done
   fi

@@ -82,6 +82,8 @@ pub struct Typefinch {
     emulator: Option<Emulator>,
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
+    layout_draft:Option<CustomLayout>,
+    layout_import_path:String,
     history: Vec<Record>,
     earned_badges: Vec<achievements::Achievement>,
     all_history:Vec<Record>,
@@ -119,12 +121,13 @@ impl Typefinch {
         let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
         let session = Session::new_with_settings(duration, prefs.test_mode, input, prefs.language, prefs.word_difficulty);
         let emulator = Emulator::compile(&prefs.layout).ok();
+        let initial_mode=if prefs.custom_layouts.iter().any(|l|l.id==prefs.layout && l.validate().is_ok()) {Mode::Emulated} else {Mode::System};
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let all_history=history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let earned_badges=achievements::earned(&all_history);
-        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }

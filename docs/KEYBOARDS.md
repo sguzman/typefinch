@@ -144,7 +144,7 @@ When no supported compositor or X11 session is available, the command emits an e
 
 ## Keyboard-operated custom passage import
 
-Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. Native X11 QA drives this actual UI control, verifies a completed custom session, and tests a rejected symlink in an independent disposable profile. It does not establish Hyprland keyboard-only accessibility.
+F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. Native X11 QA drives this actual UI control, verifies a completed custom session, and tests a rejected symlink in an independent disposable profile. It does not establish Hyprland keyboard-only accessibility.
 
 ## Private passage and goal transfer checks
 

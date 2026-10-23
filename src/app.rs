@@ -943,7 +943,7 @@ impl Typefinch {
             if self.prefs.test_mode == TestMode::Custom {
                 ui.add_space(6.0);
                 ui.label("Custom passage (in memory only)");
-                ui.small("Ctrl+O focuses the local path field; Enter imports. Drag-and-drop also works (64 KiB limit, 4096 graphemes).");
+                ui.small("F11 or Ctrl+O focuses the local path field; Enter imports. Drag-and-drop also works (64 KiB limit, 4096 graphemes).");
                 let mut load_requested=false;
                 ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
                     ui.horizontal_wrapped(|ui| {
@@ -1739,7 +1739,8 @@ impl eframe::App for Typefinch {
         }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
-        if ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O))
+        if (ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O))
+            || ctx.input(|i| i.key_pressed(egui::Key::F11)))
             && self.session.state!=State::Running && !self.settings_read_only {
             // Keyboard navigation to the ordinary editor, not a QA bypass.
             if self.prefs.test_mode!=TestMode::Custom {
@@ -1903,7 +1904,7 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
-                            ui.label("Ctrl+O: open custom passage import field; type a path and press Enter.");
+                            ui.label("F11 / Ctrl+O: open custom passage import field; type a path and press Enter.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");

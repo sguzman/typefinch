@@ -44,8 +44,13 @@ stop_app() {
 }
 keyboard_import() {
   local path="$1"
-  xdotool key --clearmodifiers ctrl+o
+  xdotool key --clearmodifiers F11
   sleep 0.6
+  # Establish that the real app changed modes before sending a path or
+  # scoring any text: otherwise Words-mode QA would produce false confidence.
+  grep -q '"test_mode": "custom"' "$XDG_CONFIG_HOME/typefinch/settings.json" || {
+    echo "F11 did not select Custom passage mode" >&2; exit 1;
+  }
   xdotool type --clearmodifiers --delay 20 "$path"
   xdotool key --clearmodifiers Return
   sleep 0.5

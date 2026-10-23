@@ -588,19 +588,27 @@ impl Typefinch {
                     let value = self.emulator.as_ref().and_then(|x|x.translate(*key,false))
                         .or_else(||layouts::emulate(*key,&self.prefs.layout,false).map(|c|c.to_string()))
                         .unwrap_or_else(||"–".into());
-                    egui::Frame::group(ui.style())
+                    let missed=if value.chars().count()==1 {
+                        value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
+                    } else {0};
+                    let ink=if missed>0 {error_ink(ui.visuals().dark_mode)} else {ui.visuals().text_color()};
+                    let cell=egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(7,7))
                         .show(ui,|ui| {
                             let finger=layouts::finger_hint(*key).unwrap_or("–");
                             ui.add_sized([34.0,43.0], egui::Label::new(
-                                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0)
+                                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
                             ).selectable(false));
                         });
+                    if missed>0 {
+                        cell.response.on_hover_text(format!("{missed} missed attempt(s) for this character in the current session"));
+                    }
                 }
             });
             ui.add_space(2.0);
         }
         ui.small("Finger hints: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Standard ANSI guidance only.");
+        ui.small("Red symbols had mistakes in the current session. Hover for the in-memory count.");
         ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {

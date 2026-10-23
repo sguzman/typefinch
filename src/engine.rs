@@ -120,6 +120,9 @@ impl Session {
     }
     /// Create a temporary drill targeting commonly mistyped reference characters.
     /// Does not persist target text, error positions, or the generated drill.
+    pub fn missed_character_count(&self,key:char)->u32 {
+        self.weak_keys.get(&key).copied().unwrap_or(0)
+    }
     pub fn weak_character_drill(&self)->Option<String> {
         let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
         candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
@@ -271,11 +274,15 @@ mod tests {
         s.type_text("c");
         s.type_text("a");
         s.type_text("x");
+        assert_eq!(s.missed_character_count('c'),1);
+        assert_eq!(s.missed_character_count('t'),1);
+        assert_eq!(s.missed_character_count('a'),0);
         let drill=s.weak_character_drill().unwrap();
         assert_eq!(drill.split_whitespace().collect::<Vec<_>>(),
             vec!["c","c","c","c","c","c","c","c","t","t","t","t","t","t","t","t"]);
         s.begin();
         assert!(s.weak_character_drill().is_none());
+        assert_eq!(s.missed_character_count('c'),0);
     }
     #[test] fn raw_metrics_preserve_corrected_mistakes() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");

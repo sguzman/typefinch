@@ -113,6 +113,7 @@ pub struct Typefinch {
     session_layout: String,
     session_input_mode: String,
     emulator: Option<Emulator>,
+    composition: Option<xkbcommon::xkb::compose::State>,
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     layout_draft:Option<CustomLayout>,
@@ -180,7 +181,7 @@ impl Typefinch {
              history::all_for_profile(id).unwrap_or_default())
         };
         let earned_badges=achievements::earned(&all_history);
-        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
@@ -313,6 +314,9 @@ impl Typefinch {
         self.session_layout = recorded_layout(self.mode,&self.prefs.layout,
             &self.keyboards,&self.installed_layouts);
         self.session_input_mode = if self.mode == Mode::System { "OS".into() } else { "Emulated".into() };
+        self.composition = if self.mode == Mode::Emulated {
+            self.emulator.as_ref().and_then(Emulator::compose_state)
+        } else { None };
         self.session.begin();
         ctx.memory_mut(|m| m.request_focus(egui::Id::new("typing_surface")));
     }
@@ -321,6 +325,7 @@ impl Typefinch {
         if !ctx.input(|i| i.focused) {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
+            if let Some(compose) = self.composition.as_mut() { compose.reset(); }
             let _=crate::qa::write_focus_lost_report();
             self.message = "Session canceled on window focus loss. No result saved.".into();
             return;
@@ -334,9 +339,17 @@ impl Typefinch {
             match event {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                     self.session.state = State::Ready;
+                    if let Some(compose) = self.composition.as_mut() { compose.reset(); }
                 }
-                egui::Event::Key { key: egui::Key::Backspace, pressed: true, repeat: false, .. } =>
-                    self.session.backspace(),
+                egui::Event::Key { key: egui::Key::Backspace, pressed: true, repeat: false, .. } => {
+                    if let Some(compose) = self.composition.as_mut().filter(|compose|
+                        compose.status() == xkbcommon::xkb::compose::Status::Composing) {
+                        // The pending accent has not entered scoring: cancel it first.
+                        compose.reset();
+                    } else {
+                        self.session.backspace();
+                    }
+                },
                 egui::Event::Key { key, physical_key, pressed: true, repeat: false, modifiers, .. }
                     if self.mode == Mode::Emulated && !modifiers.command && !modifiers.ctrl && !modifiers.alt =>
                 {
@@ -347,7 +360,11 @@ impl Typefinch {
                             .find(|l|l.id==self.prefs.layout) {
                             personal.translate(physical,modifiers.shift)
                         } else if let Some(emulator) = &self.emulator {
-                            emulator.translate(physical, modifiers.shift)
+                            if let Some(compose) = self.composition.as_mut() {
+                                emulator.translate_composed(physical, modifiers.shift, compose)
+                            } else {
+                                emulator.translate(physical, modifiers.shift)
+                            }
                         } else {
                             layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
                         };
@@ -861,7 +878,7 @@ impl Typefinch {
             ui.small(if self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout) {
                 "Personal ANSI mapping uses physical-key events. It cannot change your system layout; Compose/AltGr/IME are not supported."
             } else if self.emulator.is_some() {
-                "Compiled using installed XKB symbols; initial physical ANSI keys supported. Compose, AltGr, IME pending."
+                "Installed XKB ANSI keys: Base/Shift and session-local dead-key Compose where locale data exists. Physical AltGr, IME and extra keys remain pending."
             } else {
                 "Using starter ANSI table; physical-key events required. Compose, AltGr, IME pending."
             });

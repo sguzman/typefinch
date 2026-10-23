@@ -21,7 +21,7 @@ case "${TYPEFINCH_QA_WAYLAND_CASE:-}" in
     printf '%s\n' '[{"id":10,"name":"first","keyboard":true},{"id":10,"name":"second","keyboard":true}]'
     ;;
   malformed) printf 'not json\n' ;;
-  oversized) head -c 20000 /dev/zero | tr '\\000' a ;;
+  oversized) head -c 20000 /dev/zero | tr '\000' a ;;
   command_failed) exit 17 ;;
   hung) exec sleep 9 ;;
   *) exit 2 ;;

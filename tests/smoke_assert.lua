@@ -188,6 +188,17 @@ elseif mode == "geometry-cycled" then
     equals(r.controls,v.controls)
     equals(r.modifiers,v.modifiers)
     print("Native F4 geometry switch PASS: "..initial.." -> "..r.shape)
+elseif mode == "spanish-geometry" then
+    local r=report(assert(arg[2]))
+    assert(r.synthetic and r.state=="geometry-preview")
+    equals(r.shape,"ISO main block")
+    equals(r.target,"es")
+    equals(r.slots,61)
+    equals(r.unattributed,1)
+    equals(r.controls,3)
+    equals(r.modifiers,9)
+    equals(r.visual_only,0)
+    print("Native Spanish-XKB geometry PASS: installed Spanish target and typed dead-key preview")
 elseif mode == "geometry-preview" then
     local r=report(assert(arg[2]))
     local shape=assert(arg[3])

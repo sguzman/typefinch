@@ -573,3 +573,39 @@ for shape in iso jis split; do
   wait "$app_pid" 2>/dev/null || true
   app_pid=""
 done
+
+# A separate disposable Spanish-XKB preview verifies that real dead-accent
+# positions are displayed distinctly from unmapped positions. Normal users
+# never receive the synthetic QA layout override.
+spanish_root="$tmp/geometry-spanish"
+mkdir -p "$spanish_root"
+XDG_CONFIG_HOME="$spanish_root" \
+TYPEFINCH_QA_REPORT="$tmp/geometry-spanish.json" \
+TYPEFINCH_QA_PREVIEW_SHAPE="iso" \
+TYPEFINCH_QA_PREVIEW_LAYOUT="es" \
+  ./target/debug/typefinch >"$tmp/app-geometry-spanish.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-geometry-spanish.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No Spanish-XKB geometry preview" >&2; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+xdotool windowsize "$window" 1100 850
+sleep 0.7
+xdotool mousemove --window "$window" 825 590
+xdotool click --repeat 3 --delay 70 5
+sleep 0.6
+lua5.4 tests/smoke_assert.lua spanish-geometry "$tmp/geometry-spanish.json"
+import -window "$window" "$tmp/typefinch-geometry-spanish.png"
+[[ -s "$tmp/typefinch-geometry-spanish.png" ]] || {
+  echo "Missing Spanish XKB screenshot" >&2; exit 1;
+}
+echo "Native Spanish XKB preview screenshot PASS"
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""

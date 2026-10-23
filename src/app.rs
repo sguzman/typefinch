@@ -145,11 +145,18 @@ impl Typefinch {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let loaded=Preferences::load_guarded();
         let mut prefs=loaded.prefs;
-        // Only synthetic native graphical QA swaps the XKB target so the JIS
-        // snapshot exercises installed Japanese symbols. Never persist this.
+        // Synthetic graphical QA may inspect installed Japanese or Spanish
+        // XKB symbols without mutating an actual saved preference. Both
+        // environment guards are necessary; the override is not persistent.
         if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
-            && std::env::var("TYPEFINCH_QA_PREVIEW_SHAPE").as_deref()==Ok("jis") {
-            prefs.layout="jp".to_owned();
+            && std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some() {
+            match std::env::var("TYPEFINCH_QA_PREVIEW_LAYOUT").as_deref() {
+                Ok("es")=>prefs.layout="es".to_owned(),
+                Ok("jp")=>prefs.layout="jp".to_owned(),
+                _ if std::env::var("TYPEFINCH_QA_PREVIEW_SHAPE").as_deref()==Ok("jis")=>
+                    prefs.layout="jp".to_owned(),
+                _=>{},
+            }
         }
         let settings_read_only=loaded.read_only;
         let startup_warning=loaded.warning.unwrap_or_default();
@@ -1059,7 +1066,7 @@ impl Typefinch {
         let dead=if mapped.is_none() && custom.is_none() {
             self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(key,shift,alt_gr))
         } else {None};
-        let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
+        let value=mapped.unwrap_or_else(||if dead.is_some() {"dk".into()} else {"–".into()});
         let value=if key==egui::Key::Space && value==" " {"Space".to_string()} else {value};
         let missed=if value.chars().count()==1 {
             value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
@@ -1103,7 +1110,7 @@ impl Typefinch {
         let symbol=match slot.kind {
             SlotKind::Control|SlotKind::Modifier=>slot.caption.to_string(),
             SlotKind::Decoration=>"Space".to_string(),
-            SlotKind::Extra=>mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()}),
+            SlotKind::Extra=>mapped.unwrap_or_else(||if dead.is_some() {"dk".into()} else {"–".into()}),
             SlotKind::Character=>unreachable!("normal keys use show_preview_key"),
         };
         let frame=egui::Frame::group(ui.style()).inner_margin(egui::Margin::symmetric(7,7));
@@ -1179,7 +1186,7 @@ impl Typefinch {
             }
         });
         ui.small("Control and modifier positions are illustrations, not separately captured physical events. ISO/JIS extras are unattributed. Split geometry never duplicates scored Space.");
-        ui.small("Dead accents (◌) and unknown mappings (–) have distinct labels. Space and modifier captions are always readable text. AltGr inspection is not physical AltGr attribution.");
+        ui.small("dk = XKB dead key (hover for accent name); – = unknown/unmapped. Space and modifier captions are readable text. AltGr inspection is not physical AltGr attribution.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty(){
             ui.small("Slower single-key intervals (current session only; ≥2 samples each):");

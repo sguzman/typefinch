@@ -12,6 +12,9 @@ impl TestMode {
     pub fn label(self) -> &'static str {
         match self { Self::Words=>"Words", Self::Quotes=>"Quotes", Self::Numbers=>"Numbers", Self::Punctuation=>"Punctuation", Self::Paragraphs=>"Paragraphs", Self::Custom=>"Custom text", Self::Lesson=>"Practice lesson" }
     }
+    pub fn counts_for_benchmark(self) -> bool {
+        !matches!(self, Self::Custom | Self::Lesson)
+    }
     pub fn key(self) -> &'static str {
         match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation", Self::Paragraphs=>"paragraphs", Self::Custom=>"custom", Self::Lesson=>"lesson" }
     }
@@ -159,6 +162,11 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn custom_and_lesson_scores_never_inflate_standard_records() {
+        for mode in TestMode::ALL {
+            assert_eq!(mode.counts_for_benchmark(), !matches!(mode,TestMode::Custom|TestMode::Lesson));
+        }
+    }
     #[test] fn distinct_content_modes_build_different_targets() {
         let targets:Vec<_> = TestMode::ALL.iter()
             .filter(|mode|!matches!(mode,TestMode::Custom | TestMode::Lesson))

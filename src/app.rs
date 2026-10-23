@@ -118,8 +118,10 @@ impl Typefinch {
         }
         let profile = &mut self.prefs.profiles[self.prefs.active_profile];
         profile.tests = profile.tests.saturating_add(1);
-        profile.best_wpm = profile.best_wpm.max(result.wpm);
-        profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
+        if self.session.mode.counts_for_benchmark() {
+            profile.best_wpm = profile.best_wpm.max(result.wpm);
+            profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
+        }
         let completed_tests = profile.tests;
         self.save();
         if let Err(err) = crate::qa::write_smoke_report(&self.session, completed_tests) {
@@ -219,7 +221,7 @@ impl Typefinch {
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
-        ui.label(format!("{} completed tests  ·  best {:.1} WPM  ·  best accuracy {:.1}%",
+        ui.label(format!("{} sessions  ·  benchmark best {:.1} WPM  ·  best accuracy {:.1}%",
             p.tests, p.best_wpm, p.best_accuracy));
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {

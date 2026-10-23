@@ -22,11 +22,11 @@ pub fn card(profile: &Profile, layout: &str) -> String {
 <text x="28" y="76" fill="#F1F2FF" font-size="19" font-family="sans-serif">{name}</text>
 <text x="29" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">BEST WPM</text>
 <text x="29" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{:.0}</text>
-<text x="200" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">TESTS</text>
+<text x="200" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">SESSIONS</text>
 <text x="200" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{}</text>
 <text x="370" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">BEST ACCURACY</text>
 <text x="370" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{:.1}%</text>
-<text x="29" y="184" fill="#BEC7F3" font-family="sans-serif" font-size="13">Layout: {layout} · Benchmark records only</text>
+<text x="29" y="184" fill="#BEC7F3" font-family="sans-serif" font-size="13">Layout: {layout} · Timed-test bests, all sessions counted</text>
 </svg>"##, profile.best_wpm, profile.tests, profile.best_accuracy)
 }
 pub fn markdown_embed() -> &'static str {

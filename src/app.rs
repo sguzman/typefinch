@@ -591,13 +591,10 @@ impl Typefinch {
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(7,7))
                         .show(ui,|ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add_sized([27.0,22.0],egui::Label::new(
-                                    RichText::new(value).monospace().size(15.0)
-                                ).selectable(false));
-                                ui.label(RichText::new(layouts::finger_hint(*key).unwrap_or("–"))
-                                    .size(10.0).weak());
-                            });
+                            let finger=layouts::finger_hint(*key).unwrap_or("–");
+                            ui.add_sized([34.0,43.0], egui::Label::new(
+                                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0)
+                            ).selectable(false));
                         });
                 }
             });

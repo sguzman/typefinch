@@ -11,6 +11,7 @@ use crate::{
 };
 use eframe::egui::{self, Color32, RichText};
 use std::time::Duration;
+use unicode_segmentation::UnicodeSegmentation;
 
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 // Wayland normally combines physical keyboards into a seat-level event stream.
@@ -572,21 +573,21 @@ impl Typefinch {
             }
         ).show_percentage());
         ui.add_space(8.0);
-        let entered = self.session.typed.chars().count();
-        let total = self.session.target.chars().count();
+        let entered = self.session.typed.graphemes(true).count();
+        let total = self.session.target.graphemes(true).count();
         let (first, last) = crate::engine::viewport(total, entered, 230);
-        let expected: Vec<char> = self.session.target.chars().skip(first).take(last-first).collect();
-        let actual: Vec<char> = self.session.typed.chars().skip(first).collect();
+        let expected:Vec<&str> = self.session.target.graphemes(true).skip(first).take(last-first).collect();
+        let actual:Vec<&str> = self.session.typed.graphemes(true).skip(first).collect();
         let mut job = egui::text::LayoutJob::default();
         for (i, ch) in expected.iter().enumerate() {
             let position = first + i;
             let color = match actual.get(i) {
-                Some(c) if c == ch => correct_ink(ui.visuals().dark_mode),
+                Some(c) if crate::engine::canonically_equal(c,ch) => correct_ink(ui.visuals().dark_mode),
                 Some(_) => error_ink(ui.visuals().dark_mode),
                 None if position == entered && self.session.state == State::Running => accent_ink(ui.visuals().dark_mode),
                 None => ui.visuals().text_color().gamma_multiply(0.75),
             };
-            job.append(&ch.to_string(), 0.0, egui::TextFormat {
+            job.append(ch, 0.0, egui::TextFormat {
                 font_id: egui::FontId::monospace(21.0),
                 color,
                 ..Default::default()
@@ -597,7 +598,7 @@ impl Typefinch {
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
                 ui.label(job);
-                ui.small(format!("Reference characters {}–{} of {} · Click here to refocus or press F5 to restart.", first.saturating_add(1), last, total));
+                ui.small(format!("Reference graphemes {}–{} of {} · Click here to refocus or press F5 to restart.", first.saturating_add(1), last, total));
             });
         let response = ui.interact(
             typing_area.response.rect,

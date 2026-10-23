@@ -1,6 +1,17 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
 use std::{collections::BTreeMap, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
+use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
+use unicode_segmentation::UnicodeSegmentation;
+
+/// Compare extended grapheme clusters after Unicode canonical normalization.
+pub fn canonically_equal(a:&str,b:&str)->bool {a.nfc().eq(b.nfc())}
+fn canonical_prefix(expected:&str,entered:&str)->bool {
+    let normalized=expected.nfd().collect::<String>();
+    let prefix=entered.nfd().collect::<String>();
+    normalized.starts_with(&prefix)
+}
+fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
 
 /// Parse a local custom passage in bounded memory; the bytes are never logged.
 pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
@@ -9,7 +20,7 @@ pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
     if text.chars().any(|c|c.is_control() && !matches!(c,'\n'|'\r'|'\t')) {
         return Err("File contains unsupported control characters".into());
     }
-    let result=text.chars().take(4096).collect::<String>();
+    let result=text.graphemes(true).take(4096).collect::<String>();
     if result.split_whitespace().next().is_none() {
         return Err("Text file is empty or whitespace-only".into());
     }
@@ -120,6 +131,7 @@ pub struct Session {
     pub attempts: u32,
     pub mistakes: u32,
     weak_keys: BTreeMap<char,u32>,
+    pending_completion: Option<Instant>,
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Score {
@@ -154,11 +166,11 @@ impl Session {
         } else {
             corpus(mode,language,difficulty)
         };
-        let target = source.chars().take(4096).collect::<String>()
+        let target = source.graphemes(true).take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
-            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new() }
+            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),pending_completion:None }
     }
     pub fn history_mode(&self)->String {
         if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
@@ -180,29 +192,43 @@ impl Session {
         self.attempts = 0;
         self.mistakes = 0;
         self.weak_keys.clear();
+        self.pending_completion=None;
         self.elapsed = Duration::ZERO;
         self.started = Some(Instant::now());
         self.state = State::Running;
     }
     pub fn type_text(&mut self, text: &str) {
         if self.state != State::Running { return; }
-        let total = self.target.chars().count();
-        let mut cursor = self.typed.chars().count();
-        for ch in text.chars().filter(|c| !c.is_control()) {
-            if cursor >= total { break; }
-            self.attempts = self.attempts.saturating_add(1);
-            let expected=self.target.chars().nth(cursor);
-            if expected != Some(ch) {
-                self.mistakes = self.mistakes.saturating_add(1);
-                if let Some(key)=expected.filter(|c|!c.is_control() && !c.is_whitespace()) {
+        let total=grapheme_count(&self.target);
+        for ch in text.chars().filter(|c|!c.is_control()) {
+            let cursor=grapheme_count(&self.typed);
+            // Allow a combining mark to extend the final grapheme, including
+            // when its base character arrived in a separate Text event.
+            let combining=canonical_combining_class(ch)>0;
+            if cursor>=total && !combining {break;}
+            let position=if combining && cursor>0 {cursor-1} else {cursor};
+            let expected=self.target.graphemes(true).nth(position).unwrap_or("");
+            self.typed.push(ch);
+            self.attempts=self.attempts.saturating_add(1);
+            let actual=self.typed.graphemes(true).nth(position).unwrap_or("");
+            if !canonical_prefix(expected,actual) {
+                self.mistakes=self.mistakes.saturating_add(1);
+                if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
                     let errors=self.weak_keys.entry(key).or_default();
                     *errors=errors.saturating_add(1);
                 }
             }
-            self.typed.push(ch);
-            cursor += 1;
         }
-        if self.typed.chars().count() >= self.target.chars().count() { self.finish(); }
+        if grapheme_count(&self.typed)>=total {
+            let expected=self.target.graphemes(true).last().unwrap_or("");
+            let actual=self.typed.graphemes(true).last().unwrap_or("");
+            if canonically_equal(expected,actual) || !canonical_prefix(expected,actual) {
+                self.finish();
+            } else {
+                // Delay only the final *incomplete combining sequence*.
+                self.pending_completion.get_or_insert_with(Instant::now);
+            }
+        }
     }
     /// Create a temporary drill targeting commonly mistyped reference characters.
     /// Does not persist target text, error positions, or the generated drill.
@@ -219,11 +245,20 @@ impl Session {
         if syllables.is_empty() {None} else {Some(syllables.join(" "))}
     }
     pub fn backspace(&mut self) {
-        if self.state == State::Running && self.typed.pop().is_some() { self.corrections += 1; }
+        if self.state!=State::Running {return;}
+        if let Some((start,_))=self.typed.grapheme_indices(true).last() {
+            self.typed.truncate(start);
+            self.pending_completion=None;
+            self.corrections=self.corrections.saturating_add(1);
+        }
     }
     pub fn tick(&mut self) -> bool {
         if self.state != State::Running { return false; }
         self.elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
+        if self.pending_completion.is_some_and(|at|at.elapsed()>=Duration::from_millis(250)) {
+            self.finish();
+            return true;
+        }
         if self.duration.is_zero() { return false; }
         if self.elapsed >= self.duration {
             self.elapsed = self.duration;
@@ -233,6 +268,7 @@ impl Session {
         false
     }
     fn finish(&mut self) {
+        self.pending_completion=None;
         let elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
         self.elapsed = if self.duration.is_zero() { elapsed } else { elapsed.min(self.duration) };
         self.state = State::Finished;
@@ -266,13 +302,13 @@ pub fn viewport(total: usize, cursor: usize, width: usize) -> (usize, usize) {
     (start, (start + width).min(total))
 }
 
-/// Gross errors include uncorrected mismatches, including mistyped Unicode scalars.
-/// WPM = correctly positioned characters / 5 / elapsed minutes.
-/// Each session defines its metric version; corrected-error accounting is separate.
+/// Final WPM and accuracy operate on canonically normalized extended
+/// grapheme clusters. Raw input attempts are still scalar input events;
+/// their denominator is deliberately separate from final grapheme accuracy.
 pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
-    let expected: Vec<char> = target.chars().collect();
-    let entered: Vec<char> = typed.chars().collect();
-    let correct = entered.iter().zip(expected.iter()).filter(|(a,b)| a==b).count();
+    let expected: Vec<&str> = target.graphemes(true).collect();
+    let entered: Vec<&str> = typed.graphemes(true).collect();
+    let correct = entered.iter().zip(expected.iter()).filter(|(a,b)|canonically_equal(a,b)).count();
     let accuracy = if entered.is_empty() { 0.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
     let minutes = elapsed.as_secs_f64() / 60.0;
     let wpm=if minutes>0.0 {correct as f64 / 5.0 / minutes} else {0.0};
@@ -284,6 +320,34 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn nfc_equivalent_graphemes_score_identically() {
+        let scores=score("café mañana", "cafe\u{301} man\u{303}ana",Duration::from_secs(60));
+        assert_eq!(scores.entered,11);
+        assert_eq!(scores.correct,11);
+        assert_eq!(scores.accuracy,100.0);
+        assert!(canonically_equal("é","e\u{301}"));
+        assert!(!canonically_equal("é","e"));
+    }
+    #[test] fn accent_composition_can_arrive_in_separate_input_events() {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"é");
+        session.begin();
+        session.type_text("e");
+        assert_eq!(session.state,State::Running);
+        session.type_text("\u{301}");
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().entered,1);
+        assert_eq!(session.score().correct,1);
+        assert_eq!(session.mistakes,0);
+    }
+    #[test] fn a_backspace_erases_one_whole_grapheme() {
+        let mut session=Session::new_with_custom(30,TestMode::Custom,"é a");
+        session.begin();
+        session.type_text("e\u{301}");
+        assert_eq!(session.typed,"e\u{301}");
+        session.backspace();
+        assert!(session.typed.is_empty());
+        assert_eq!(session.corrections,1);
+    }
     #[test] fn private_text_file_import_is_utf8_and_bounded() {
         assert_eq!(import_custom_passage(b"hello\nworld").unwrap(),"hello\nworld");
         assert!(import_custom_passage(&vec![b'a';65_537]).is_err());

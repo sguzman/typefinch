@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::{collections::HashSet, fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
 
-pub const SCORING_VERSION: i64 = 1;
+pub const SCORING_VERSION: i64 = 2;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Record {
@@ -223,7 +223,7 @@ mod tests {
             layout:"us(colemak)".into(), input_mode:"Emulated".into(), test_mode:"words".into(),
             duration_ms:30000, elapsed_ms:30000, entered:120,
             correct:114, wpm:45.6, accuracy:95.0, raw_wpm:51.2,
-            raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:1
+            raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:SCORING_VERSION
         }
     }
     #[test] fn spanish_and_english_history_stays_separate() {

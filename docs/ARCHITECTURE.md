@@ -20,7 +20,7 @@ Typefinch is a **single standalone Rust application**, not a monorepo, with a na
 
 A session starts on F5 or Start and accepts input while the app window and typing surface own focus. Escape cancels. Window focus loss cancels without saving. Completed timed sessions with no entered characters are excluded from records. Ordinary input consumes compositor-committed text; software emulation uses physical-key positions, never modifies the global keyboard layout, and does not claim to identify which physical keyboard generated an ordinary Wayland event.
 
-The current scoring version is `1`: correct-position Unicode *scalar values* divided by five per elapsed minute for WPM, and correctly positioned characters divided by entered characters for accuracy. Empty entry is 0% accurate. This is not yet grapheme-aware or IME-certified. Raw WPM, corrected-entry policy and per-language denominators are roadmap features.
+The current scoring version is `1`: correct-position Unicode extended grapheme clusters (canonical NFC equivalents) divided by five per elapsed minute for WPM, and correctly positioned characters divided by entered characters for accuracy. Empty entry is 0% accurate. This is not yet grapheme-aware or IME-certified. Raw WPM, corrected-entry policy and per-language denominators are roadmap features.
 
 ## Persistence
 

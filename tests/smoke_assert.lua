@@ -41,7 +41,7 @@ if mode == "first" then
     assert(r.elapsed_ms >= 1500 and r.elapsed_ms <= 2500)
     local rows = dbquery("SELECT entered,correct,scoring_version,test_mode FROM sessions")
     equals(#rows,1)
-    assert(rows[1].entered>=8 and rows[1].scoring_version==1 and rows[1].test_mode=="words")
+    assert(rows[1].entered>=8 and rows[1].scoring_version==2 and rows[1].test_mode=="words")
     print(string.format("X11 GUI smoke PASS: %d entered, %d correct, %.1f WPM",r.entered,r.correct,r.wpm))
 elseif mode == "paste" then
     local r = report(assert(arg[2]))

@@ -23,3 +23,7 @@ Store future corpora as independently versioned, attributed, redistributable dat
 ## Starter word difficulty
 
 Each language has an Easy, Standard and Challenge original word list. Tiers are manually curated from common/short words toward longer vocabulary and accents; they have not been calibrated using user performance data. The selection is persisted locally. The default Standard level preserves historical English `words` and Mexican Spanish `words/es-MX` identifiers; other levels append `/easy` or `/challenge`. This extra context prevents misleading cross-difficulty WPM comparisons. Tiers currently apply only to Words, not quotes or lessons.
+
+## Canonical-equivalent scoring (version 2)
+
+Final WPM and accuracy now compare Unicode extended grapheme clusters after canonical normalization, so `é` and `e` followed by a combining acute accent receive the same score. Backspace deletes one entire grapheme. The final incomplete combining sequence may remain open briefly to accept the accent event. Raw input attempts still count individual committed Unicode scalars, a different denominator from grapheme-based final speed. The SQLite scoring-version marker increments from 1 to 2 and legacy records remain unchanged; trend charts do not merge scoring versions. Full CJK composition, bidirectional shaping and locale-specific speed standards still require dedicated QA.

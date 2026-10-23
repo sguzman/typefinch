@@ -112,6 +112,7 @@ elseif mode == "prepare-card-theme" then
     local config=assert(json.decode(read(path)))
     config.card_theme="daybreak"
     config.card_font="mono"
+    config.card_template="compact"
     save(path,json.encode(config))
 elseif mode == "png" then
     local data=read(assert(arg[2]))
@@ -121,15 +122,16 @@ elseif mode == "png" then
         return a*16777216+b*65536+c*256+d
     end
     equals(big32(17),550)
-    equals(big32(21),205)
+    equals(big32(21),145)
     assert(#data>512)
-    print("Native PNG card export PASS: valid 550x205 raster with selected palette")
+    print("Native PNG card export PASS: valid compact 550x145 raster with selected palette")
 elseif mode == "card-theme" then
     local data=read(assert(arg[2]))
     assert(data:find('fill="#F5F6FF"',1,true),"Daybreak background missing")
     assert(data:find('font-family="monospace"',1,true),"Monospaced typography missing")
+    assert(data:find('height="145"',1,true),"Compact layout size missing")
     assert(not data:find("<script",1,true),"Unsafe SVG script")
-    print("Profile card studio PASS: native Daybreak and mono settings reflected in SVG")
+    print("Profile card studio PASS: Daybreak + mono + compact template reflected in native SVG")
 elseif mode == "set-theme" then
     local path, theme=assert(arg[2]),assert(arg[3])
     assert(theme=="light" or theme=="dark")

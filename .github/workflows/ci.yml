@@ -33,6 +33,8 @@ jobs:
             typefinch-window.png
             typefinch-light.png
             typefinch-dark.png
+            typefinch-narrow.png
+            typefinch-hidpi.png
             typefinch-gui-smoke.log
             typefinch-window-manager.log
             typefinch-profile.svg

@@ -59,3 +59,5 @@ Five starter lessons (home row, top row, bottom row, common pairs, symbols) run 
 **Private custom text import:** While Custom text is selected, drag a local UTF-8 text/Markdown file onto the window. Imports are bounded at 64 KiB, retain at most 4,096 characters in memory and are discarded on exit. Importing never logs or persists the passage.
 
 **Adaptive practice preview:** After a session with mistakes, choose **Practice missed keys** to start a generated custom drill concentrating on frequently missed reference characters. The drill is deterministic for that session, remains in memory, and does not affect benchmark records. Historical per-key statistics and adaptive efficacy evaluation remain future work.
+
+**Finger-position guide:** The layout preview now includes conventional ANSI left/right finger labels by physical key position, independent of its selected XKB symbol map. These are hints, not personalized ergonomic guidance or a replacement for future per-key heatmaps.

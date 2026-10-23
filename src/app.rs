@@ -591,14 +591,19 @@ impl Typefinch {
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(7,7))
                         .show(ui,|ui| {
-                            ui.add_sized([27.0,27.0],egui::Label::new(
-                                RichText::new(value).monospace().size(15.0)
-                            ).selectable(false));
+                            ui.vertical_centered(|ui| {
+                                ui.add_sized([27.0,22.0],egui::Label::new(
+                                    RichText::new(value).monospace().size(15.0)
+                                ).selectable(false));
+                                ui.label(RichText::new(layouts::finger_hint(*key).unwrap_or("–"))
+                                    .size(10.0).weak());
+                            });
                         });
                 }
             });
             ui.add_space(2.0);
         }
+        ui.small("Finger hints: L/R = hand, 2 = index, 3 = middle, 4 = ring, 5 = pinky. Standard ANSI guidance only.");
         ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {

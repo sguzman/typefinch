@@ -85,6 +85,13 @@ pub fn physical_index(key: egui::Key) -> Option<(usize, usize)> {
     };
     [TOP, HOME, BOTTOM].iter().enumerate().find_map(|(row, keys)| keys.chars().position(|k| k == ch).map(|col| (row, col)))
 }
+/// Conventional ANSI touch-typing finger assignments (5 = pinky, 2 = index).
+/// A positional guide; does not imply a particular hand geometry or custom layout.
+pub fn finger_hint(key:egui::Key)->Option<&'static str> {
+    const FINGERS:[&str;10]=["L5","L4","L3","L2","L2","R2","R2","R3","R4","R5"];
+    let (_,col)=physical_index(key)?;
+    FINGERS.get(col).copied()
+}
 pub fn emulate(key: egui::Key, id: &str, shift: bool) -> Option<char> {
     if key == egui::Key::Space { return Some(' '); }
     let (row, col) = physical_index(key)?;
@@ -101,6 +108,13 @@ fn shifted(ch: char) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn ansi_finger_assignments_are_position_based() {
+        assert_eq!(finger_hint(egui::Key::A),Some("L5"));
+        assert_eq!(finger_hint(egui::Key::F),Some("L2"));
+        assert_eq!(finger_hint(egui::Key::J),Some("R2"));
+        assert_eq!(finger_hint(egui::Key::Semicolon),Some("R5"));
+        assert_eq!(finger_hint(egui::Key::Space),None);
+    }
     #[test] fn catalog_has_unique_ids() {
         let mut ids = std::collections::HashSet::new();
         for layout in CATALOG { assert!(ids.insert(layout.id)); }

@@ -131,6 +131,30 @@ pub fn save_backup(prefs:&Preferences)->Result<(PathBuf,PathBuf),String> {
     }
     Ok((settings,database))
 }
+/// Render only Typefinch-generated, script-free SVG using Rust libraries.
+/// Text outlines are resolved locally with the system font database.
+pub fn rasterize_card(svg:&str)->Result<Vec<u8>,String> {
+    let mut opts=resvg::usvg::Options::default();
+    opts.fontdb_mut().load_system_fonts();
+    let tree=resvg::usvg::Tree::from_str(svg,&opts).map_err(|e|e.to_string())?;
+    let size=tree.size().to_int_size();
+    if size.width()>4096 || size.height()>4096 {return Err("Card dimensions exceed 4096 px".into());}
+    let mut pixmap=resvg::tiny_skia::Pixmap::new(size.width(),size.height())
+        .ok_or("Could not allocate card pixmap")?;
+    resvg::render(&tree,resvg::tiny_skia::Transform::default(),&mut pixmap.as_mut());
+    pixmap.encode_png().map_err(|e|e.to_string())
+}
+pub fn save_card_png(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
+    ->Result<PathBuf,String> {
+    let folder=base_dir().join("exports");
+    fs::create_dir_all(&folder).map_err(|e|e.to_string())?;
+    let output=folder.join("typefinch-profile.png");
+    let png=rasterize_card(&card_with_style(profile,layout,theme,font))?;
+    let temp=output.with_extension("png.tmp");
+    fs::write(&temp,png).map_err(|e|e.to_string())?;
+    fs::rename(&temp,&output).map_err(|e|e.to_string())?;
+    Ok(output)
+}
 pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
     save_card_with_style(profile,layout,CardTheme::Dusk,CardFont::Sans)
 }
@@ -172,6 +196,15 @@ mod tests {
             }
         }
         assert_ne!(palette(CardTheme::Dusk).bg,palette(CardTheme::Daybreak).bg);
+    }
+    #[test] fn raster_export_is_a_real_png_with_expected_dimensions() {
+        let p=Profile::default();
+        let png=rasterize_card(&card_with_style(&p,"us",CardTheme::Fern,CardFont::Sans)).unwrap();
+        assert!(png.starts_with(&[137,80,78,71,13,10,26,10]));
+        let width=u32::from_be_bytes(png[16..20].try_into().unwrap());
+        let height=u32::from_be_bytes(png[20..24].try_into().unwrap());
+        assert_eq!((width,height),(550,205));
+        assert!(png.len()>512);
     }
     #[test] fn markdown_link_uses_local_svg_without_remote_fetch() {
         assert_eq!(markdown_embed(),"![Typefinch typing profile](./typefinch-profile.svg)\n");

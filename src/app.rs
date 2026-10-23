@@ -808,6 +808,16 @@ impl Typefinch {
             Err(e) => format!("Export failed: {e}"),
         };
     }
+    fn export_png(&mut self) {
+        let p=&self.prefs.profiles[self.prefs.active_profile];
+        let display=self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
+            .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
+            .unwrap_or("Custom XKB");
+        self.message=match export::save_card_png(p,display,self.prefs.card_theme,self.prefs.card_font) {
+            Ok(path)=>format!("PNG saved: {}",path.display()),
+            Err(e)=>format!("PNG export failed: {e}"),
+        };
+    }
     fn export_statistics(&mut self) {
         let profile=&self.prefs.profiles[self.prefs.active_profile];
         self.message=match export::save_stats_json(profile) {
@@ -903,6 +913,7 @@ impl Typefinch {
         ui.small("Live native preview of theme and statistics; exported SVG renders using GitHub-safe system font families.");
         ui.horizontal_wrapped(|ui| {
             if ui.button("Export SVG + Markdown").clicked() { self.export_widget(); }
+            if ui.button("Export PNG").clicked() {self.export_png();}
             if ui.button("Export session history JSON").clicked() {self.export_statistics();}
             if ui.button("Backup settings + SQLite").clicked() {self.export_full_backup();}
             if ui.button("Copy GitHub Markdown").clicked() {
@@ -925,6 +936,9 @@ impl eframe::App for Typefinch {
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F8)) {
             self.export_full_backup();
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F9)) {
+            self.export_png();
         }
         self.accept_custom_file(ctx);
         let before = self.session.state;

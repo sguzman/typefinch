@@ -91,3 +91,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Latest acceptance:** [66 Rust tests + native X11 session QA with daily targets, opt-in streak and local achievements](https://github.com/sguzman/typefinch/actions/runs/39947014970). Real Hyprland hardware acceptance remains pending.
 
 **Card studio palettes:** Profile exports now support Dusk, Daybreak and Fern themes and sans-serif/monospace typography. Controls persist locally, and the preview updates immediately; SVG generation remains static and escapes user-controlled profile/layout text. No hosted fonts or network dependency.
+
+**PNG card export:** F9 or the Export PNG button rasterizes the current styled SVG locally via the pure-Rust resvg renderer and writes `typefinch-profile.png` beside the SVG. No external converter, shell script, or network service is needed.

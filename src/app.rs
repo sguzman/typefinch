@@ -361,6 +361,54 @@ impl Typefinch {
         }
         ui.small("Goals and progress belong to the selected local profile.");
     }
+    fn import_personal_keymap(&mut self) {
+        let filename=self.layout_import_path.trim();
+        let result=(|| -> Result<CustomLayout,String> {
+            if filename.is_empty() {return Err("Enter a local JSON file path".into());}
+            let metadata=std::fs::metadata(filename).map_err(|e|e.to_string())?;
+            if metadata.len()>16_384 {return Err("Layout file exceeds 16 KiB".into());}
+            let bytes=std::fs::read(filename).map_err(|e|e.to_string())?;
+            CustomLayout::from_json(&bytes)
+        })();
+        match result {
+            Err(e)=>self.message=format!("Layout import rejected: {e}"),
+            Ok(mut layout)=>{
+                if self.prefs.custom_layouts.len()>=32 {
+                    self.message="Maximum of 32 personal keymaps reached.".into();
+                    return;
+                }
+                if self.prefs.custom_layouts.iter().any(|k|k.id==layout.id) {
+                    layout.new_identity();
+                }
+                self.prefs.layout=layout.id.clone();
+                self.prefs.custom_layouts.push(layout);
+                self.layout_import_path.clear();
+                self.emulator=None;
+                self.mode=Mode::Emulated;
+                self.save();
+                self.message="Personal ANSI keymap imported and activated.".into();
+            }
+        }
+    }
+    fn export_personal_keymap(&mut self) {
+        let result=(|| -> Result<std::path::PathBuf,String> {
+            let layout=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout)
+                .ok_or("Select a personal keymap before exporting")?;
+            let bytes=layout.as_json()?;
+            let folder=crate::preferences::base_dir().join("exports");
+            std::fs::create_dir_all(&folder).map_err(|e|e.to_string())?;
+            let id=layout.id.strip_prefix("custom/").ok_or("Invalid keymap ID")?;
+            let path=folder.join(format!("typefinch-keymap-{id}.json"));
+            let tmp=path.with_extension("json.tmp");
+            std::fs::write(&tmp,bytes).map_err(|e|e.to_string())?;
+            std::fs::rename(&tmp,&path).map_err(|e|e.to_string())?;
+            Ok(path)
+        })();
+        self.message=match result {
+            Ok(path)=>format!("Personal keymap exported: {}",path.display()),
+            Err(e)=>format!("Keymap export failed: {e}"),
+        };
+    }
     fn show_custom_layout_editor(&mut self,ui:&mut egui::Ui) {
         egui::CollapsingHeader::new("🛠 Personal ANSI keymaps")
             .default_open(false).show(ui,|ui| {
@@ -374,6 +422,9 @@ impl Typefinch {
                         .find(|l|l.id==self.prefs.layout).cloned();
                     if ui.add_enabled(enabled && current.is_some(),egui::Button::new("Edit selected")).clicked() {
                         self.layout_draft=current;
+                    }
+                    if ui.add_enabled(enabled && self.prefs.custom_layouts.iter().any(|l|l.id==self.prefs.layout),egui::Button::new("Export selected JSON")).clicked() {
+                        self.export_personal_keymap();
                     }
                 });
                 let mut save=false;
@@ -396,6 +447,16 @@ impl Typefinch {
                         if ui.button("Cancel editing").clicked() {cancel=true;}
                     });
                 }
+                ui.separator();
+                ui.label("Import versioned ANSI mapping JSON (16 KiB maximum)");
+                ui.add_enabled_ui(enabled,|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.layout_import_path)
+                        .hint_text("Absolute path to local JSON").desired_width(270.0));
+                    if ui.button("Import JSON as a new keymap").clicked() {
+                        self.import_personal_keymap();
+                    }
+                });
+                ui.small("Duplicate IDs receive a new UUID; existing layouts are never overwritten by import.");
                 if cancel {self.layout_draft=None;}
                 if save {
                     if let Some(draft)=self.layout_draft.clone() {

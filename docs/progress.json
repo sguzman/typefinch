@@ -163,7 +163,7 @@
               "id": "T103",
               "emoji": "🎯",
               "name": "Per-profile goals and settings",
-              "progress": 67,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Settings and goals UI",
@@ -176,7 +176,12 @@
                   "evidence": "src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045"
                 },
                 {
-                  "text": "Export/import",
+                  "text": "Safe per-profile goal JSON export/import logic",
+                  "passed": true,
+                  "evidence": "src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass"
+                },
+                {
+                  "text": "Native GUI goal import/export interaction and persistence",
                   "passed": false
                 }
               ]
@@ -269,7 +274,7 @@
               "id": "T204",
               "emoji": "📚",
               "name": "Word, quote, punctuation and custom tests",
-              "progress": 83,
+              "progress": 86,
               "checks": [
                 {
                   "text": "Starter English corpus",
@@ -297,7 +302,12 @@
                   "evidence": "src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327"
                 },
                 {
-                  "text": "Import local text files into custom passages",
+                  "text": "Bounded local UTF-8 file import into custom passages",
+                  "passed": true,
+                  "evidence": "src/engine.rs and src/app.rs: explicit Load local file and drag/drop into in-memory custom passage, 64 KiB/4096 grapheme cap, rejects symlinks/devices/controls and invalid UTF-8; Unicode ZWJ cluster and file fixture QA in CI 40025534946, 141 Rust tests and graphical suite pass"
+                },
+                {
+                  "text": "Native GUI local-file import interaction and isolation",
                   "passed": false
                 }
               ]

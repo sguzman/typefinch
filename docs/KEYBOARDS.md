@@ -127,3 +127,7 @@ A read-only compositor query is triggered on startup, manual refresh, and focus-
 [CI 40023774467](https://github.com/sguzman/typefinch/actions/runs/40023774467) passed 136 Rust tests, six synthetic Hyprland lifecycle cases, a native headless Weston `wl_seat` protocol query, X11 seat acceptance and the full graphical suite. **Weston advertised zero seats:** that proves real protocol connectivity and safe empty-seat handling, not live keyboard-equipped seat detection. The parser independently tests capability filtering and no active-layout attribution. True generic XKB active keymap detection, physical device routing and live Hyprland hardware acceptance remain open.
 
 Protocol: [Wayland core wl_seat](https://wayland.app/protocols/wayland) and [Wayland specification](https://wayland.freedesktop.org/docs/html/apa.html).
+
+## Private passage and goal transfer checks
+
+Although not keyboard hardware functions, personal goals and imported private text must not accidentally become input telemetry. [CI 40025534946](https://github.com/sguzman/typefinch/actions/runs/40025534946) validates 141 Rust tests including goals-only format isolation across two local profiles, atomic file export, negative symbolic-link imports and complete extended-grapheme preservation for large emoji passages. Existing egui UI controls are implemented, but specific native GUI clicking/typing acceptance remains open rather than being credited as complete.

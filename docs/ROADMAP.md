@@ -4,7 +4,7 @@
 
 **Overall:** `███████░░░ 74%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████████░░ 77%`
+## 🐣 M0 — Native typing MVP — `████████░░ 78%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -28,7 +28,7 @@
   - [ ] Keyboard navigation audit
   - [x] HiDPI/small-window screenshots — CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface
 
-### 🐦 P1 — Profiles and persistence — `█████████░ 89%`
+### 🐦 P1 — Profiles and persistence — `█████████░ 92%`
 
 - 👤 **T101** Multiple local profiles — `██████████ 100%`
   - [x] Create/select profile UI coded — src/app.rs
@@ -38,10 +38,11 @@
   - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
   - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
   - [x] Retention and backup tests — src/history.rs: >100-session retention query, VACUUM INTO snapshot test and native F8 backup QA, CI 39895462191
-- 🎯 **T103** Per-profile goals and settings — `███████░░░ 67%`
+- 🎯 **T103** Per-profile goals and settings — `████████░░ 75%`
   - [x] Settings and goals UI — src/app.rs: independent editable WPM/accuracy goals and progress bars; Actions 39888678045
   - [x] Per-profile setting persistence — src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045
-  - [ ] Export/import
+  - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
+  - [ ] Native GUI goal import/export interaction and persistence
 
 ### ⌨️ P2 — Tests and core scoring — `████████░░ 77%`
 
@@ -59,13 +60,14 @@
   - [x] Monotonic timer coded — src/engine.rs
   - [ ] Live timing edge-case QA
   - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
-- 📚 **T204** Word, quote, punctuation and custom tests — `████████░░ 83%`
+- 📚 **T204** Word, quote, punctuation and custom tests — `█████████░ 86%`
   - [x] Starter English corpus — src/engine.rs
   - [x] Quote passages — src/engine.rs quotes corpus; GitHub Actions 39872686067
   - [x] Dedicated paragraph test content — src/engine.rs: paragraph content; GitHub Actions 39880764327: 39 tests passed
   - [x] Punctuation and numbers — src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067
   - [x] Editable private custom passages — src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327
-  - [ ] Import local text files into custom passages
+  - [x] Bounded local UTF-8 file import into custom passages — src/engine.rs and src/app.rs: explicit Load local file and drag/drop into in-memory custom passage, 64 KiB/4096 grapheme cap, rejects symlinks/devices/controls and invalid UTF-8; Unicode ZWJ cluster and file fixture QA in CI 40025534946, 141 Rust tests and graphical suite pass
+  - [ ] Native GUI local-file import interaction and isolation
 - 🧮 **T205** Scoring taxonomy and fair comparisons — `█████░░░░░ 50%`
   - [x] Raw vs corrected WPM — src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA
   - [ ] Per-language speed definitions
@@ -75,7 +77,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - ⌨️ Typing tests — `████████░░ 77%`
-- 🐦 Local identity — `█████████░ 89%`
+- 🐦 Local identity — `█████████░ 92%`
 - 🌗 Appearance — `███████░░░ 70%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 73%`

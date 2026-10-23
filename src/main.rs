@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod achievements;
 mod app;
 mod devices;
 mod engine;

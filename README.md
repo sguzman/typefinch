@@ -81,3 +81,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Latest Unicode acceptance:** [59 passing Rust tests, NFC grapheme scoring and full Lua-backed X11 QA](https://github.com/sguzman/typefinch/actions/runs/39896389227). Complex IME and Hyprland hardware QA remain pending.
 
 **History explorer:** Filter the recent-session table to the currently comparable test configuration and switch the trend between corrected/raw WPM and final/raw accuracy. Older results without recorded raw attempts display a dash, not a fabricated zero. Charts exclude incompatible scoring versions, layouts, durations and content/language tiers.
+
+**Offline achievements:** Six initial badges are derived from saved per-profile history (first benchmark, sustained practice, precision, speed, two languages and academy completion). Legitimate thresholds prevent tiny/custom sessions from earning benchmark skill badges. Awards are recalculated locally and never uploaded; optional streaks remain a future feature.

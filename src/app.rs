@@ -1,4 +1,5 @@
 use crate::{
+    achievements,
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
@@ -61,6 +62,7 @@ pub struct Typefinch {
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     history: Vec<Record>,
+    earned_badges: Vec<achievements::Achievement>,
     history_only_matching: bool,
     history_metric: history::HistoryMetric,
     completed_lessons: std::collections::HashSet<String>,
@@ -97,8 +99,10 @@ impl Typefinch {
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
+        let earned_badges=achievements::earned(
+            &history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default());
         Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
-            completed_lessons, keyboards, device_error,
+            earned_badges, completed_lessons, keyboards, device_error,
                device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -146,6 +150,13 @@ impl Typefinch {
             profile.best_accuracy = profile.best_accuracy.max(result.accuracy);
         }
         let completed_tests = profile.tests;
+        let prior=self.earned_badges.clone();
+        if let Ok(records)=history::all_for_profile(&identity) {
+            self.earned_badges=achievements::earned(&records);
+            if let Some(new_badge)=self.earned_badges.iter().find(|a|!prior.contains(a)) {
+                self.message=format!("{} New achievement: {}! {}",new_badge.emoji,new_badge.title,new_badge.reason);
+            }
+        }
         self.save();
         if let Err(err) = crate::qa::write_smoke_report(&self.session, completed_tests) {
             self.message = format!("QA report failed: {err}");
@@ -269,6 +280,7 @@ impl Typefinch {
             let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
             self.history = history::recent(&id).unwrap_or_default();
             self.completed_lessons = history::completed_lessons(&id).unwrap_or_default();
+            self.earned_badges=achievements::earned(&history::all_for_profile(&id).unwrap_or_default());
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
@@ -749,6 +761,21 @@ impl Typefinch {
             });
         });
     }
+    fn show_achievements(&self,ui:&mut egui::Ui) {
+        egui::CollapsingHeader::new(format!("🏅 Achievements · {}/{}",self.earned_badges.len(),achievements::ALL.len()))
+            .default_open(false)
+            .show(ui,|ui| {
+                ui.small("Earned from this local profile's saved aggregate history. No uploads or raw key records.");
+                for badge in achievements::ALL {
+                    let earned=self.earned_badges.contains(&badge);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(if earned {badge.emoji} else {"🔒"});
+                        ui.label(RichText::new(badge.title).strong());
+                        ui.small(badge.reason);
+                    });
+                }
+            });
+    }
     fn export_widget(&mut self) {
         let p = &self.prefs.profiles[self.prefs.active_profile];
         let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
@@ -890,6 +917,8 @@ impl eframe::App for Typefinch {
                     ui.separator();
                     ui.add_space(16.0);
                     self.show_history(ui);
+                    ui.add_space(16.0);
+                    self.show_achievements(ui);
                     ui.add_space(24.0);
                     ui.separator();
                     ui.add_space(16.0);

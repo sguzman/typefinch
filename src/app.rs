@@ -301,6 +301,7 @@ impl Typefinch {
                 .text("Accuracy target")).changed();
             changed |= ui.add(egui::Slider::new(&mut goals.daily_sessions,1..=10)
                 .text("Daily benchmark goal")).changed();
+            changed |= ui.checkbox(&mut goals.show_streak,"Show practice streak (optional)").changed();
         });
         if changed { self.save(); }
         let current=&self.prefs.profiles[self.prefs.active_profile];
@@ -319,6 +320,11 @@ impl Typefinch {
         ui.small(format!("{} typed graphemes · {:.1}% weighted accuracy · Local calendar date",
             today.graphemes,today.weighted_accuracy));
         ui.small("Only timed benchmarks of at least 15 s and 20 graphemes count. Practice and custom text are excluded.");
+        if goals.show_streak {
+            let days=daily::streak(&self.all_history,now.date_naive(),&chrono::Local);
+            ui.label(format!("🪶 Local practice streak: {days} day{}",if days==1 {""} else {"s"}));
+            ui.small("Includes yesterday while today is still unfinished. Turn off above to hide this display.");
+        }
         ui.small("Goals and progress belong to the selected local profile.");
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {

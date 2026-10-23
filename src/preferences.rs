@@ -13,10 +13,12 @@ pub struct Goals {
     pub target_accuracy: f64,
     #[serde(default = "default_daily_target")]
     pub daily_sessions:u32,
+    #[serde(default)]
+    pub show_streak:bool,
 }
 fn default_daily_target()->u32 {3}
 impl Default for Goals {
-    fn default() -> Self { Self { target_wpm:60.0, target_accuracy:95.0, daily_sessions:default_daily_target() } }
+    fn default() -> Self { Self { target_wpm:60.0, target_accuracy:95.0, daily_sessions:default_daily_target(), show_streak:false } }
 }
 impl Goals {
     pub fn wpm_progress(&self, best:f64)->f32 {
@@ -147,6 +149,7 @@ mod tests {
         assert_eq!(loaded.profiles[1].goals.target_wpm,110.0);
         assert_eq!(loaded.profiles[1].goals.target_accuracy,95.0);
         assert_eq!(loaded.profiles[1].goals.daily_sessions,3);
+        assert!(!loaded.profiles[1].goals.show_streak);
         assert_eq!(loaded.profiles[0].goals.wpm_progress(30.0),0.5);
         assert_eq!(loaded.profiles[1].goals.wpm_progress(120.0),1.0);
     }
@@ -166,6 +169,7 @@ mod tests {
         let old=r#"{"target_wpm":70,"target_accuracy":96}"#;
         let goals:Goals=serde_json::from_str(old).unwrap();
         assert_eq!(goals.daily_sessions,3);
+        assert!(!goals.show_streak);
     }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {

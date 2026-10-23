@@ -85,3 +85,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Offline achievements:** Six initial badges are derived from saved per-profile history (first benchmark, sustained practice, precision, speed, two languages and academy completion). Legitimate thresholds prevent tiny/custom sessions from earning benchmark skill badges. Awards are recalculated locally and never uploaded; optional streaks remain a future feature.
 
 **Daily practice goal:** Each local profile can configure a target number of qualifying timed benchmark sessions per calendar day. The progress bar derives counts and weighted accuracy from saved aggregate history using the computer's local timezone, excluding private passages and short practice runs. No calendar service, reminders, or background tracking is involved.
+
+**Optional streak:** An opt-in checkbox shows consecutive days with substantive benchmark sessions, calculated from local dates. It is off by default and offers a one-day grace window for a day still in progress. No notifications, network service, or penalties are attached.

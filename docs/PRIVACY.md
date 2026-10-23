@@ -25,3 +25,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Achievements:** The badge panel computes earned status entirely from locally stored aggregate session records, with no online accounts, tracking, additional per-key storage, or publication. Badges are recalculated from history rather than written into a new identity database.
 
 - **Daily target:** Uses the device's local date and existing stored aggregate session timestamps. It does not create a separate activity log, communicate with a calendar service, or require any account. Today's totals are recomputed from the active profile's history.
+
+- **Optional streak display:** Disabled by default; when enabled, derives qualifying consecutive calendar days from the same local aggregate session timestamps. No additional log is created and it can be hidden instantly.

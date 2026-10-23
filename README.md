@@ -10,7 +10,7 @@
 
 ## Currently implemented in source
 
-- ⌨️ English word, quote, number, punctuation, paragraph and private custom-passage tests: 15, 30, 60 and 120 seconds; WPM, accuracy and corrections.
+- ⌨️ English and Mexican Spanish word, quote, punctuation and paragraph tests (plus locale-neutral numbers and private custom passages): 15, 30, 60 and 120 seconds; WPM, accuracy and corrections.
 - 🐦 Multiple local profiles, versioned SQLite session history, and saved high-water statistics without online accounts.
 - 🌗 System/Light/Dark egui appearance and persisted preference.
 - 🗺️ Curated keyboard-layout catalog plus installed XKB layout and variant discovery with four initial ANSI fallback emulation tables: QWERTY, Dvorak, Colemak and Colemak-DH. Installed XKB layout/variant identities can also be compiled for provisional in-app ANSI-position emulation; unavailable identities remain recognition-only. AltGr/dead-key/IME and non-ANSI behavior still need QA.
@@ -67,3 +67,5 @@ The ANSI keycap preview now highlights mistakes from the current session in red 
 ## 🌎 Language foundation
 
 Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. This does not yet mean fully localized quotes, lesson curricula, Unicode grapheme normalization, AltGr/Compose, or IME certification. The OS-input mode is recommended for accented Spanish characters.
+
+**Language safety:** English benchmark IDs remain unchanged for existing histories; Mexican Spanish benchmark modes use distinct `/es-MX` identifiers. Spanish word, quote, punctuation and paragraph passages are original project text. Numbers are shared across languages but tracked under separate test contexts. English-only starter lessons and user-provided custom text are not translated automatically. Unicode grapheme normalization and complex input methods remain unverified.

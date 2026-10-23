@@ -55,10 +55,27 @@ impl TestMode {
 fn corpus(mode: TestMode, language:Language) -> String {
     let (text, repeats) = match mode {
         TestMode::Words => (if language==Language::MexicanSpanish {WORDS_ES_MX} else {WORDS}, 8),
-        TestMode::Quotes => ("A small improvement, repeated carefully, becomes a remarkable skill. Every key is another opportunity to learn.", 14),
+        TestMode::Quotes => (
+            if language==Language::MexicanSpanish {
+                "Con práctica constante, cada palabra encuentra su ritmo. Una mejora pequeña también cuenta."
+            } else {
+                "A small improvement, repeated carefully, becomes a remarkable skill. Every key is another opportunity to learn."
+            },14),
+        // Digits are locale-neutral in this starter corpus, but sessions remain
+        // separate by the chosen language context for honest comparisons.
         TestMode::Numbers => ("17 42 63 85 91 24 56 78 30 49 12 75 64 83 29 50 04 68", 28),
-        TestMode::Punctuation => ("Wait, is that correct? Yes! Write clearly: commas, colons; parentheses (like these), and a final period.", 13),
-        TestMode::Paragraphs => ("A bird learns to fly through careful repetition, just as a typist learns rhythm from patient practice. Every attempt records a small improvement.\n\nThe best progress is steady and deliberate: watch each symbol, keep the hands comfortable, and let consistency grow.", 10),
+        TestMode::Punctuation => (
+            if language==Language::MexicanSpanish {
+                "¡Hola, qué tal! ¿Todo bien? Sí: escribe comas, puntos; paréntesis (así), y preguntas."
+            } else {
+                "Wait, is that correct? Yes! Write clearly: commas, colons; parentheses (like these), and a final period."
+            },13),
+        TestMode::Paragraphs => (
+            if language==Language::MexicanSpanish {
+                "El ritmo al escribir se construye con paciencia. Cada intento ofrece una oportunidad para conocer mejor el teclado.\n\nLas palabras tienen acentos, signos y sonidos propios. Practicar sin prisa ayuda a reconocerlos con claridad."
+            } else {
+                "A bird learns to fly through careful repetition, just as a typist learns rhythm from patient practice. Every attempt records a small improvement.\n\nThe best progress is steady and deliberate: watch each symbol, keep the hands comfortable, and let consistency grow."
+            },10),
         TestMode::Custom | TestMode::Lesson => ("",0),
     };
     std::iter::repeat_n(text, repeats).collect::<Vec<_>>().join(" ")
@@ -112,9 +129,10 @@ impl Session {
             corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new() }
     }
     pub fn history_mode(&self)->String {
-        if self.mode==TestMode::Words && self.language!=Language::English {
-            format!("words/{}",self.language.code())
+        if self.mode.counts_for_benchmark() && self.language!=Language::English {
+            format!("{}/{}",self.mode.key(),self.language.code())
         } else {
+            // Keep legacy English identifiers stable in existing SQLite files.
             self.mode.key().to_owned()
         }
     }
@@ -249,6 +267,23 @@ mod tests {
         assert_eq!(en.history_mode(),"words");
         assert_eq!(es.history_mode(),"words/es-MX");
         assert_eq!(serde_json::to_string(&Language::MexicanSpanish).unwrap(),"\"es-MX\"");
+    }
+    #[test] fn benchmark_languages_are_not_merged_in_history() {
+        for mode in [TestMode::Words,TestMode::Quotes,TestMode::Punctuation,TestMode::Paragraphs,TestMode::Numbers] {
+            let en=Session::new_with_language(30,mode,"",Language::English);
+            let es=Session::new_with_language(30,mode,"",Language::MexicanSpanish);
+            assert_eq!(en.history_mode(),mode.key());
+            assert_eq!(es.history_mode(),format!("{}/es-MX",mode.key()));
+            if mode!=TestMode::Numbers {
+                assert_ne!(en.target,es.target,"missing Spanish corpus for {}",mode.key());
+            }
+        }
+        let punctuation=Session::new_with_language(30,TestMode::Punctuation,"",Language::MexicanSpanish);
+        assert!(punctuation.target.contains('¿') && punctuation.target.contains('¡'));
+        let custom=Session::new_with_language(30,TestMode::Custom,"texto",Language::MexicanSpanish);
+        assert_eq!(custom.history_mode(),"custom");
+        let lesson=Session::new_with_language(0,TestMode::Lesson,"lesson",Language::MexicanSpanish);
+        assert_eq!(lesson.history_mode(),"lesson");
     }
     #[test] fn distinct_content_modes_build_different_targets() {
         let targets:Vec<_> = TestMode::ALL.iter()

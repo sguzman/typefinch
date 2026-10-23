@@ -202,6 +202,17 @@ mod tests {
             raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:1
         }
     }
+    #[test] fn spanish_and_english_history_stays_separate() {
+        let mut english=item("p");
+        english.layout="detected/us".into();
+        english.input_mode="OS".into();
+        english.test_mode="punctuation".into();
+        let mut mexican_spanish=english.clone();
+        mexican_spanish.test_mode="punctuation/es-MX".into();
+        let rows=vec![english,mexican_spanish];
+        assert_eq!(comparable(&rows,"detected/us","punctuation",30000,"OS").len(),1);
+        assert_eq!(comparable(&rows,"detected/us","punctuation/es-MX",30000,"OS").len(),1);
+    }
     #[test] fn context_filter_never_compares_different_modes_layouts_or_versions() {
         let mut a=item("p");
         a.wpm=50.0;a.finished_at_ms=10;

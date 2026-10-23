@@ -262,7 +262,7 @@ impl Typefinch {
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
-        ui.label(format!("{} sessions · benchmark best {:.1} WPM · {:.1}% accuracy",
+        ui.label(format!("{} sessions · overall benchmark best {:.1} WPM · {:.1}% accuracy",
             p.tests, p.best_wpm, p.best_accuracy));
         ui.add_space(9.0);
         ui.label(RichText::new("Personal goals").strong());
@@ -323,7 +323,7 @@ impl Typefinch {
                 }
             }
             ui.add_space(6.0);
-            ui.label("Language (word tests)");
+            ui.label("Typing language");
             let previous_language=self.prefs.language;
             ui.add_enabled_ui(self.session.state != State::Running, |ui| {
                 egui::ComboBox::from_id_salt("language")
@@ -338,8 +338,12 @@ impl Typefinch {
                 self.rebuild_session();
                 self.save();
             }
-            if self.prefs.test_mode!=TestMode::Words {
-                ui.small("Language packs currently change only the Words corpus; other test modes retain their original passages.");
+            if matches!(self.prefs.test_mode,TestMode::Custom|TestMode::Lesson) {
+                ui.small("Custom passages use your text; starter lessons are English-only. The language preference is not applied to these modes.");
+            } else if self.prefs.test_mode==TestMode::Numbers {
+                ui.small("Number passages are language-neutral, but their results remain separated by selected language.");
+            } else {
+                ui.small("Each supported language has its own original starter passage.");
             }
             if self.prefs.test_mode == TestMode::Lesson {
                 ui.add_space(6.0);

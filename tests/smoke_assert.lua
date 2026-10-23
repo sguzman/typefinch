@@ -107,6 +107,31 @@ elseif mode == "backup" then
     assert(p:close())
     equals(versions[1].user_version,3)
     print("Private backup PASS: paired JSON settings and complete consistent SQLite snapshot")
+elseif mode == "prepare-personal-keymap" then
+    local path=assert(arg[2])
+    local config=assert(json.decode(read(path)))
+    local id="custom/00000000-0000-4000-8000-000000000001"
+    config.test_mode="words"
+    config.language="en"
+    config.word_difficulty="easy"
+    config.layout=id
+    config.custom_layouts={{
+        version=1,id=id,name="X11 synthetic ANSI",
+        base={"qwertyuiop","asdfghjkl;","zxcvbnm,./"},
+        shifted={"QWERTYUIOP","ASDFGHJKL:","ZXCVBNM<>?"}
+    }}
+    save(path,json.encode(config))
+elseif mode == "personal-keymap" then
+    local r=report(assert(arg[2]))
+    assert(r.state=="finished" and r.tests==6,r)
+    assert(r.correct>0 and r.entered>=10,r)
+    local rows=dbquery("SELECT layout,input_mode,test_mode,entered,correct FROM sessions ORDER BY id DESC LIMIT 1")
+    equals(#rows,1)
+    equals(rows[1].layout,"custom/00000000-0000-4000-8000-000000000001")
+    equals(rows[1].input_mode,"Emulated")
+    equals(rows[1].test_mode,"words/easy")
+    assert(rows[1].correct>=10,rows[1].correct)
+    print("Personal ANSI native QA PASS: physical events scored through a persisted custom keymap")
 elseif mode == "prepare-card-theme" then
     local path=assert(arg[2])
     local config=assert(json.decode(read(path)))

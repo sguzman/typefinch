@@ -146,6 +146,10 @@ When no supported compositor or X11 session is available, the command emits an e
 
 F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022) passed 155 Rust tests and native X11 QA: F11 focused the real import path editor, Enter loaded a synthetic 16-grapheme passage, and scoring saved 16/16 correctly as Custom without persisting the passage/path. A separate symlink import produced no scored session. It does not establish Hyprland keyboard-only accessibility.
 
+## Keyboard-operated profile goals transfer
+
+F12 focuses the normal per-profile local goals JSON path field; Enter invokes the regular validated import and persists only the selected profile's goals. Shift+F12 explicitly exports the current goals. Neither action runs during an active typing test, and protected settings cannot be overwritten. The same buttons remain usable by mouse. The dedicated native X11 QA exercises these real shortcuts and checks JSON persistence, exported data and identity/score isolation. These controls do not inspect physical keyboard hardware or establish live Hyprland acceptance.
+
 ## Private passage and goal transfer checks
 
 Although not keyboard hardware functions, personal goals and imported private text must not accidentally become input telemetry. [CI 40025534946](https://github.com/sguzman/typefinch/actions/runs/40025534946) validates 141 Rust tests including goals-only format isolation across two local profiles, atomic file export, negative symbolic-link imports and complete extended-grapheme preservation for large emoji passages. Existing egui UI controls are implemented, but specific native GUI clicking/typing acceptance remains open rather than being credited as complete.

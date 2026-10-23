@@ -682,18 +682,18 @@ impl Typefinch {
                 if ui.button("Export goals JSON").clicked() {export_requested=true;}
                 if ui.button("Import goals JSON").clicked() {import_requested=true;}
             });
-            ui.add(egui::TextEdit::singleline(&mut self.goal_import_path)
+            let response=ui.add(egui::TextEdit::singleline(&mut self.goal_import_path)
+                .id(egui::Id::new("goals_import_path"))
                 .hint_text("Local path to goals JSON").desired_width(ui.available_width()));
+            if response.has_focus() {
+                ui.scroll_to_rect(response.rect,Some(egui::Align::Center));
+            }
+            if (response.has_focus() || response.lost_focus())
+                && ui.input(|i|i.key_pressed(egui::Key::Enter)) {
+                import_requested=true;
+            }
         });
-        if export_requested && self.settings_read_only {
-            self.message="Goal export disabled: fallback profile targets do not represent recovered settings.".into();
-        } else if export_requested {
-            let goals=&self.prefs.profiles[self.prefs.active_profile].goals;
-            self.message=match goal_transfer::export(goals) {
-                Ok(path)=>format!("Local goals exported: {}",path.display()),
-                Err(e)=>format!("Goals export failed: {e}"),
-            };
-        }
+        if export_requested {self.export_profile_goals();}
         if import_requested && self.settings_read_only {
             self.message="Goals cannot be imported while existing settings are protected from writes.".into();
         } else if import_requested {
@@ -712,6 +712,18 @@ impl Typefinch {
                 Err(e)=>self.message=format!("Goals import failed: {e}"),
             }
         }
+    }
+    fn export_profile_goals(&mut self) {
+        if self.session.state==State::Running {return;}
+        if self.settings_read_only {
+            self.message="Goal export disabled: fallback profile targets do not represent recovered settings.".into();
+            return;
+        }
+        let goals=&self.prefs.profiles[self.prefs.active_profile].goals;
+        self.message=match goal_transfer::export(goals) {
+            Ok(path)=>format!("Local goals exported: {}",path.display()),
+            Err(e)=>format!("Goals export failed: {e}"),
+        };
     }
     fn import_personal_keymap(&mut self) {
         let filename=self.layout_import_path.trim();
@@ -1739,6 +1751,15 @@ impl eframe::App for Typefinch {
         }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
+        if ctx.input(|i|i.key_pressed(egui::Key::F12)) && self.session.state!=State::Running {
+            if ctx.input(|i|i.modifiers.shift) {
+                self.export_profile_goals();
+            } else if !self.settings_read_only {
+                ctx.memory_mut(|memory|
+                    memory.request_focus(egui::Id::new("goals_import_path")));
+                self.message="Enter a local goals JSON path, then press Enter to import into the selected profile.".into();
+            }
+        }
         if (ctx.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::O))
             || ctx.input(|i| i.key_pressed(egui::Key::F11)))
             && self.session.state!=State::Running && !self.settings_read_only {
@@ -1904,7 +1925,7 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
-                            ui.label("F11 / Ctrl+O: open custom passage import field; type a path and press Enter.");
+                            ui.label("F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");

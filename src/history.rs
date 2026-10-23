@@ -127,9 +127,36 @@ pub fn insert(record: &Record) -> Result<i64, String> {
     let db=connect()?;
     insert_with(&db, record).map_err(|e| e.to_string())
 }
+/// Only compare exactly identical typing contexts and scoring versions.
+/// Custom passages have different targets and are excluded from comparability.
+pub fn comparable<'a>(records: &'a [Record], layout: &str, content: &str,
+    duration_ms: i64, input_mode: &str) -> Vec<&'a Record> {
+    if content == "custom" { return Vec::new(); }
+    let mut entries: Vec<_> = records.iter().filter(|r|
+        r.layout == layout && r.test_mode == content && r.duration_ms == duration_ms &&
+        r.input_mode == input_mode && r.scoring_version == SCORING_VERSION
+    ).collect();
+    entries.sort_by_key(|r| (r.finished_at_ms, r.id));
+    entries
+}
+#[derive(Debug, Clone, Copy)]
+pub struct Trend {
+    pub mean_wpm: f64,
+    pub best_wpm: f64,
+    /// Population standard deviation in WPM, not a confidence interval.
+    pub deviation_wpm: f64,
+}
+pub fn trend(records: &[&Record]) -> Option<Trend> {
+    if records.is_empty() { return None; }
+    let n=records.len() as f64;
+    let mean=records.iter().map(|r|r.wpm).sum::<f64>()/n;
+    let spread=(records.iter().map(|r|(r.wpm-mean).powi(2)).sum::<f64>()/n).sqrt();
+    let best=records.iter().map(|r|r.wpm).fold(0.0_f64, f64::max);
+    Some(Trend {mean_wpm:mean,best_wpm:best,deviation_wpm:spread})
+}
 pub fn recent(profile_id: &str) -> Result<Vec<Record>, String> {
     let db=connect()?;
-    recent_with(&db, profile_id, 8).map_err(|e| e.to_string())
+    recent_with(&db, profile_id, 80).map_err(|e| e.to_string())
 }
 #[cfg(test)]
 mod tests {
@@ -142,6 +169,24 @@ mod tests {
             correct:114, wpm:45.6, accuracy:95.0, raw_wpm:51.2,
             raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:1
         }
+    }
+    #[test] fn context_filter_never_compares_different_modes_layouts_or_versions() {
+        let mut a=item("p");
+        a.wpm=50.0;a.finished_at_ms=10;
+        let mut b=a.clone();b.wpm=70.0;b.finished_at_ms=20;b.id=1;
+        let mut layout=b.clone();layout.layout="de".into();
+        let mut content=b.clone();content.test_mode="numbers".into();
+        let mut old=b.clone();old.scoring_version=999;
+        let items=vec![old,content,layout,b,a];
+        let comparable=comparable(&items,"us(colemak)","words",30000,"Emulated");
+        assert_eq!(comparable.len(),2);
+        assert_eq!(comparable[0].wpm,50.0);
+        assert_eq!(comparable[1].wpm,70.0);
+        let stats=trend(&comparable).unwrap();
+        assert!((stats.mean_wpm-60.0).abs()<0.001);
+        assert!((stats.deviation_wpm-10.0).abs()<0.001);
+        assert_eq!(stats.best_wpm,70.0);
+        assert!(comparable(&items,"us(colemak)","custom",30000,"Emulated").is_empty());
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
         let db=Connection::open_in_memory().unwrap();

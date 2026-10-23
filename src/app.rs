@@ -407,6 +407,46 @@ impl Typefinch {
             ui.label("No completed scored tests yet. Results stay on this device.");
             return;
         }
+        let mode=if self.mode==Mode::System { "OS" } else { "Emulated" };
+        let comparable=history::comparable(&self.history, &self.prefs.layout,
+            self.prefs.test_mode.key(), self.prefs.duration_seconds as i64*1000, mode);
+        if comparable.len()>=2 {
+            if let Some(stats)=history::trend(&comparable) {
+                ui.label(format!("Comparable sessions: {} · Avg {:.1} WPM · Best {:.1} WPM · Std. dev. {:.1} WPM",
+                    comparable.len(), stats.mean_wpm, stats.best_wpm, stats.deviation_wpm));
+            }
+            let h=146.0_f32;
+            let (rect,_) = ui.allocate_exact_size(egui::vec2(ui.available_width().max(160.0),h),egui::Sense::hover());
+            let painter=ui.painter_at(rect);
+            let area=rect.shrink2(egui::vec2(14.0,14.0));
+            let low=comparable.iter().map(|r|r.wpm).fold(f64::MAX,f64::min).max(0.0);
+            let high=comparable.iter().map(|r|r.wpm).fold(0.0_f64,f64::max);
+            let bottom=(low-4.0).max(0.0);
+            let top=high+4.0;
+            painter.line_segment(
+                [area.left_bottom(),area.right_bottom()],
+                egui::Stroke::new(1.0,ui.visuals().weak_text_color())
+            );
+            let mut previous:Option<egui::Pos2>=None;
+            for (index,result) in comparable.iter().enumerate() {
+                let x=area.left()+area.width()*index as f32/(comparable.len()-1) as f32;
+                let y=area.bottom()-area.height()*((result.wpm-bottom)/(top-bottom)) as f32;
+                let point=egui::pos2(x,y);
+                if let Some(last)=previous {
+                    painter.line_segment([last,point],egui::Stroke::new(2.0,PERIWINKLE));
+                }
+                painter.circle_filled(point,3.0,PERIWINKLE);
+                previous=Some(point);
+            }
+            ui.small("Trend: comparable layout, content, input mode, duration and scoring version only.");
+        } else if self.prefs.test_mode==TestMode::Custom {
+            ui.small("Custom passages are intentionally not ranked against different custom texts.");
+        } else {
+            ui.small("Complete two tests with the same layout, content, input mode and duration to see your trend.");
+        }
+        ui.add_space(10.0);
+        ui.label("Latest sessions");
+        egui::ScrollArea::horizontal().id_salt("recent-history-horizontal").show(ui, |ui| {
         egui::Grid::new("recent-tests").striped(true).min_col_width(75.0).show(ui, |ui| {
             ui.strong("WPM");
             ui.strong("Raw WPM");
@@ -416,9 +456,9 @@ impl Typefinch {
             ui.strong("Layout");
             ui.strong("Input");
             ui.end_row();
-            for r in &self.history {
+            for r in self.history.iter().take(8) {
                 ui.label(format!("{:.1}", r.wpm));
-                ui.label(format!("{:.1}", r.raw_wpm));
+                ui.label(if r.attempts>0 {format!("{:.1}",r.raw_wpm)} else {"—".to_owned()});
                 ui.label(&r.test_mode);
                 ui.label(format!("{:.1}%", r.accuracy));
                 ui.label(format!("{}s", r.duration_ms / 1000));
@@ -426,6 +466,7 @@ impl Typefinch {
                 ui.label(&r.input_mode);
                 ui.end_row();
             }
+        });
         });
     }
     fn export_widget(&mut self) {

@@ -137,3 +137,5 @@ The guarded startup path also avoids opening or migrating the saved SQLite datab
 **Orphaned-history safeguard:** If `settings.json` disappears but `sessions.sqlite3` still exists, startup now enters guarded recovery mode instead of assigning a new profile UUID. Original session data remains untouched while a matching settings backup is recovered.
 
 **In-app backup inspection:** The profile studio and guarded recovery screen now accept an explicit F8 settings-backup path, infer its companion SQLite file, and report a read-only validity check. Paths and validation feedback are transient UI state; Typefinch never restores or overwrites anything from this inspection.
+
+**Non-overwriting restore staging:** `typefinch --restore-backup-to-new-dir SETTINGS.json SESSIONS.sqlite3 NEW_DIRECTORY` validates a paired backup then copies it into a brand-new directory, with owner-only permissions on Unix. It refuses preexisting destinations and does not touch or activate the current profile. In-app recovery verification remains a separate read-only control.

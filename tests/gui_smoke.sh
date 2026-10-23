@@ -248,6 +248,16 @@ if ./target/debug/typefinch --verify-backup "$tmp/bad-backup-settings.json" "$ba
   exit 1
 fi
 echo "Read-only backup verification PASS"
+mkdir -p "$tmp/restore-staging"
+restored="$tmp/restore-staging/typefinch"
+./target/debug/typefinch --restore-backup-to-new-dir "$backup_settings" "$backup_db" "$restored"
+cmp "$backup_settings" "$restored/settings.json"
+cmp "$backup_db" "$restored/sessions.sqlite3"
+if ./target/debug/typefinch --restore-backup-to-new-dir "$backup_settings" "$backup_db" "$restored"; then
+  echo "Restore staging unexpectedly overwrote existing destination"
+  exit 1
+fi
+echo "Safe restore-to-new-directory PASS"
 
 # Native SVG profile designer: verify selected palette and font are honored.
 kill "$app_pid" 2>/dev/null || true

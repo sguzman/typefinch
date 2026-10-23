@@ -32,6 +32,17 @@ The command never opens the live profile or replaces either file. It rejects
 corrupt settings and mismatched backup pairs. A successful validation does
 **not** perform a restore; preserve the original files while planning recovery.
 
+For a non-destructive recovery copy, run
+`typefinch --restore-backup-to-new-dir SETTINGS.json SESSIONS.sqlite3 NEW_DIRECTORY`.
+This first validates both source files, then creates a **new directory only**
+and copies the pair to `settings.json` and `sessions.sqlite3` within it.
+If the destination already exists, including if it is the live Typefinch
+directory, the operation fails without overwriting anything. The copied
+directory is not automatically activated. On any I/O error, a partial newly
+created destination is left for inspection, rather than deleting user files.
+Review it before choosing a new XDG configuration location for that copy.
+Never merge or overwrite a live Typefinch directory while the app is running.
+
 An existing unmanaged `bin/typefinch` is never overwritten. App settings
 and the SQLite database are **not** rolled back with the binary: use the in-app
 F8 full backup before experimenting with newer builds.

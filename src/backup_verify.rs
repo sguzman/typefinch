@@ -23,6 +23,48 @@ fn require_file(path:&Path,label:&str)->Result<(),String>{
     }
     Ok(())
 }
+/// Copy a verified backup into a *new*, isolated directory. Existing paths
+/// are never modified. The staged directory is not automatically activated.
+/// If I/O fails, leave the partial new directory for explicit inspection
+/// instead of recursively removing files that another process might add.
+fn copy_private(src:&Path,dst:&Path)->Result<(),String>{
+    use std::io::Write;
+    let mut input=fs::File::open(src).map_err(|e|e.to_string())?;
+    let mut options=fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut output=options.open(dst).map_err(|e|e.to_string())?;
+    std::io::copy(&mut input,&mut output).map_err(|e|e.to_string())?;
+    output.flush().map_err(|e|e.to_string())?;
+    output.sync_all().map_err(|e|e.to_string())?;
+    Ok(())
+}
+pub fn stage_to_new_directory(settings:&Path,database:&Path,destination:&Path)
+    ->Result<BackupSummary,String> {
+    // Verification comes before creating a new directory.
+    let summary=verify(settings,database)?;
+    let mut builder=fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(destination).map_err(|e|format!(
+        "Destination must be a new, nonexistent directory: {e}"
+    ))?;
+    copy_private(settings,&destination.join("settings.json"))
+        .map_err(|e|format!("Copying backup settings: {e}; staged directory may be partial"))?;
+    copy_private(database,&destination.join("sessions.sqlite3"))
+        .map_err(|e|format!("Copying backup sessions: {e}; staged directory may be partial"))?;
+    verify(&destination.join("settings.json"),&destination.join("sessions.sqlite3"))
+        .map_err(|e|format!("Staged copy failed validation: {e}"))?;
+    Ok(summary)
+}
+
 pub fn verify(settings:&Path,database:&Path)->Result<BackupSummary,String>{
     require_file(settings,"Settings backup")?;
     require_file(database,"SQLite backup")?;
@@ -101,6 +143,34 @@ mod tests {
         assert_eq!((summary.profiles,summary.sessions,summary.schema),(1,1,3));
         assert_eq!(fs::read(settings).unwrap(),original_json);
         assert_eq!(fs::read(database).unwrap(),original_db);
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn staging_a_valid_backup_never_replaces_existing_data(){
+        let (dir,settings,database,_)=fixture();
+        let dest=dir.join("new-profile");
+        let settings_bytes=fs::read(&settings).unwrap();
+        let database_bytes=fs::read(&database).unwrap();
+        let staged=stage_to_new_directory(&settings,&database,&dest).unwrap();
+        assert_eq!((staged.profiles,staged.sessions),(1,1));
+        assert_eq!(fs::read(dest.join("settings.json")).unwrap(),settings_bytes);
+        assert_eq!(fs::read(dest.join("sessions.sqlite3")).unwrap(),database_bytes);
+        assert!(stage_to_new_directory(&settings,&database,&dest).is_err());
+        // The original backup is never mutated or consumed.
+        assert_eq!(fs::read(&settings).unwrap(),settings_bytes);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(fs::metadata(&dest).unwrap().permissions().mode() & 0o777,0o700);
+            assert_eq!(fs::metadata(dest.join("settings.json")).unwrap().permissions().mode() & 0o777,0o600);
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+    #[test] fn rejected_backup_does_not_create_restore_destination(){
+        let (dir,settings,database,_)=fixture();
+        fs::write(&settings,b"bad").unwrap();
+        let dest=dir.join("must-not-appear");
+        assert!(stage_to_new_directory(&settings,&database,&dest).is_err());
+        assert!(!dest.exists());
         fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn reject_corruption_or_orphaned_profile_without_writing(){

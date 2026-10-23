@@ -47,3 +47,7 @@ A finished untimed lesson is recorded as an attempt. Only records with nonzero e
 ## Language-scoped tests
 
 The initial locale catalog contains `en` and `es-MX`. Both have original word, quote, punctuation and paragraph passages, while numbers share a language-neutral corpus. Word tests have Easy, Standard and Challenge heuristic tiers. Historical English Standard identifiers remain stable; Spanish modes are suffixed `/es-MX` and nonstandard word tiers append `/easy` or `/challenge`. Comparisons are segmented by this content identity, layout, input method, duration and scoring version. Academy lessons remain English-only, and custom text is not translated. See [LANGUAGES.md](LANGUAGES.md).
+
+## Settings recovery safety
+
+A missing settings.json creates a normal writable first-run profile. An existing invalid/unreadable settings file instead produces a visible read-only recovery state: the original bytes are not changed, and the app blocks preferences saves, goal imports, full backups of fallback defaults and insertion of new scored sessions. Migration-generated profile IDs must successfully persist before history is recorded. Recovery must preserve both settings and the corresponding SQLite database; automatic destructive restore is deliberately not implemented.

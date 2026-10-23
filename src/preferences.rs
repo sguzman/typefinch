@@ -105,6 +105,12 @@ pub fn base_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
         .join("typefinch")
 }
+pub struct SettingsLoad {
+    pub prefs:Preferences,
+    /// True means the existing source must not be overwritten by a default.
+    pub read_only:bool,
+    pub warning:Option<String>,
+}
 impl Preferences {
     fn parse_and_migrate(bytes: &[u8]) -> Option<(Self,bool)> {
         let data: serde_json::Value = serde_json::from_slice(bytes).ok()?;
@@ -123,21 +129,35 @@ impl Preferences {
         }
         Some((p, changed))
     }
-    pub fn load() -> Self {
-        let path=base_dir().join("settings.json");
-        let parsed=fs::read(&path).ok().and_then(|bytes| Self::parse_and_migrate(&bytes));
-        match parsed {
-            Some((settings, needs_write)) => {
-                // UUID migrations must be persisted *before* creating history,
-                // or a legacy profile gets a new UUID each launch.
-                if needs_write {
-                    if let Err(err)=settings.save() {
-                        eprintln!("Typefinch profile ID migration not saved: {err}");
+    pub fn load_guarded()->SettingsLoad {
+        Self::load_at(&base_dir().join("settings.json"))
+    }
+    fn load_at(path:&std::path::Path)->SettingsLoad {
+        let unsafe_to_write=|warning:&str|SettingsLoad{
+            prefs:Self::default(),read_only:true,warning:Some(warning.to_owned())
+        };
+        match fs::read(path) {
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound =>
+                SettingsLoad{prefs:Self::default(),read_only:false,warning:None},
+            Err(_)=>unsafe_to_write(
+                "Existing settings could not be read. The original is unchanged; settings and session recording are disabled to protect it."),
+            Ok(bytes)=>match Self::parse_and_migrate(&bytes) {
+                None=>unsafe_to_write(
+                    "Existing settings could not be decoded or validated. The original file is untouched; settings and session recording are disabled until it is repaired or restored from backup."),
+                Some((settings,needs_write))=>{
+                    // Persist new identifiers BEFORE any sessions use those IDs.
+                    if needs_write {
+                        let dir=path.parent().unwrap_or(std::path::Path::new("."));
+                        if settings.save_to_dir(dir).is_err() {
+                            return SettingsLoad {
+                                prefs:settings,read_only:true,
+                                warning:Some("Profile identifier migration could not be saved. Existing settings are preserved; settings and session recording are disabled.".into()),
+                            };
+                        }
                     }
+                    SettingsLoad{prefs:settings,read_only:false,warning:None}
                 }
-                settings
-            },
-            None => Self::default(),
+            }
         }
     }
     pub fn save(&self) -> Result<(), String> {
@@ -183,6 +203,31 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn corrupt_existing_settings_never_get_silently_replaced() {
+        let dir=std::env::temp_dir().join(format!("typefinch-corrupt-settings-{}",uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let settings=dir.join("settings.json");
+        let corrupt=b"{broken json \xff and truncated";
+        fs::write(&settings,corrupt).unwrap();
+        let result=Preferences::load_at(&settings);
+        assert!(result.read_only);
+        assert!(result.warning.as_ref().is_some_and(|m|m.contains("unchanged")||m.contains("untouched")));
+        assert_eq!(fs::read(&settings).unwrap(),corrupt);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(),1);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+    #[test] fn first_run_is_writable_but_empty_existing_profiles_are_guarded() {
+        let dir=std::env::temp_dir().join(format!("typefinch-guard-{}",uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let settings=dir.join("settings.json");
+        let first=Preferences::load_at(&settings);
+        assert!(!first.read_only && first.warning.is_none());
+        fs::write(&settings,br#"{"profiles":[]}"#).unwrap();
+        let bad=Preferences::load_at(&settings);
+        assert!(bad.read_only);
+        assert_eq!(fs::read(&settings).unwrap(),br#"{"profiles":[]}"#);
+        fs::remove_dir_all(&dir).unwrap();
+    }
     #[test] fn atomic_settings_save_is_private_and_leaves_no_temp_files() {
         let dir=std::env::temp_dir().join(format!("typefinch-prefs-{}",uuid::Uuid::new_v4()));
         let mut prefs=Preferences::default();

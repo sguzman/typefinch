@@ -83,6 +83,7 @@ fn motion_seconds(reduced:bool,normal:f32)->f32 {
 }
 pub struct Typefinch {
     prefs: Preferences,
+    settings_read_only:bool,
     normal_animation_time:f32,
     show_keyboard_help:bool,
     session: Session,
@@ -114,7 +115,10 @@ pub struct Typefinch {
 }
 impl Typefinch {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut prefs = Preferences::load();
+        let loaded=Preferences::load_guarded();
+        let mut prefs=loaded.prefs;
+        let settings_read_only=loaded.read_only;
+        let startup_warning=loaded.warning.unwrap_or_default();
         if std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
             // Opt-in synthetic GUI test process only, never persisted to a real profile.
             prefs.duration_seconds = 2;
@@ -143,10 +147,10 @@ impl Typefinch {
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let all_history=history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let earned_badges=achievements::earned(&all_history);
-        Self { prefs, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), message: String::new() }
+               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -203,9 +207,17 @@ impl Typefinch {
         }
     }
     fn save(&mut self) {
+        if self.settings_read_only {
+            self.message="Settings remain read-only because the existing settings file needs recovery. Original data is preserved.".into();
+            return;
+        }
         if let Err(e) = self.prefs.save() { self.message = format!("Could not save settings: {e}"); }
     }
     fn finish(&mut self) {
+        if self.settings_read_only {
+            self.message="Session not recorded: existing settings need recovery, and the original file has been preserved.".into();
+            return;
+        }
         let result = self.session.score();
         if result.entered == 0 {
             self.message = "Empty session not recorded. Start another test when ready.".into();
@@ -430,7 +442,9 @@ impl Typefinch {
                 Err(e)=>format!("Goals export failed: {e}"),
             };
         }
-        if import_requested {
+        if import_requested && self.settings_read_only {
+            self.message="Goals cannot be imported while existing settings are protected from writes.".into();
+        } else if import_requested {
             match goal_transfer::import(std::path::Path::new(self.goal_import_path.trim())) {
                 Ok(goals)=>{
                     let index=self.prefs.active_profile;
@@ -1127,6 +1141,10 @@ impl Typefinch {
         };
     }
     fn export_full_backup(&mut self) {
+        if self.settings_read_only {
+            self.message="Full backup of a temporary fallback profile is disabled. Preserve the original settings file and its existing database for recovery.".into();
+            return;
+        }
         if let Err(e)=self.prefs.save() {
             self.message=format!("Full backup failed saving preferences: {e}");
             return;
@@ -1358,6 +1376,15 @@ impl eframe::App for Typefinch {
                         ui.add_space(18.0);
                     }
                     ui.add_space(8.0);
+                    if self.settings_read_only {
+                        ui.group(|ui| {
+                            ui.colored_label(error_ink(ui.visuals().dark_mode),
+                                RichText::new("⚠ Settings recovery required — original file preserved").strong());
+                            ui.label("This session is temporary: preference saves and scored-session recording are disabled to avoid replacing or orphaning existing data.");
+                            ui.small("Repair settings.json or restore a valid matching backup. Do not delete the existing database.");
+                        });
+                        ui.add_space(12.0);
+                    }
                     ui.horizontal(|ui| {
                         if ui.button(if self.show_keyboard_help {"Hide keyboard guide (F1)"} else {"Keyboard guide (F1)"}).clicked() {
                             self.show_keyboard_help=!self.show_keyboard_help;

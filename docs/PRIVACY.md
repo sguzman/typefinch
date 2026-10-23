@@ -35,3 +35,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Keyboard path import:** The optional local file path is held only in the current UI process. It is never saved with preferences, uploaded or included in typing history. Paths to directories, devices and symbolic links are rejected. File reading is bounded to 65,537 bytes for strict 64-KiB rejection.
 
 - **Profile-goal transfer:** A manual versioned JSON export contains only goal values, not profile names, identifiers, or typed text. Importing from an explicit local regular file applies only to the currently selected profile's goals. Transfer paths are transient UI state, not persisted. Export file permissions are owner-only on Linux.
+
+- **Settings corruption guard:** When a settings file exists but is invalid or unreadable, the original remains untouched. New default values are temporary and never written over it; scored sessions and profile-mutation persistence are disabled to protect the existing identity/history association. The UI visibly warns about recovery.

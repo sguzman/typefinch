@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `█████░░░░░ 49%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `█████░░░░░ 53%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -87,3 +87,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Daily practice goal:** Each local profile can configure a target number of qualifying timed benchmark sessions per calendar day. The progress bar derives counts and weighted accuracy from saved aggregate history using the computer's local timezone, excluding private passages and short practice runs. No calendar service, reminders, or background tracking is involved.
 
 **Optional streak:** An opt-in checkbox shows consecutive days with substantive benchmark sessions, calculated from local dates. It is off by default and offers a one-day grace window for a day still in progress. No notifications, network service, or penalties are attached.
+
+**Latest acceptance:** [66 Rust tests + native X11 session QA with daily targets, opt-in streak and local achievements](https://github.com/sguzman/typefinch/actions/runs/39947014970). Real Hyprland hardware acceptance remains pending.

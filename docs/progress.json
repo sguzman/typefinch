@@ -685,7 +685,7 @@
               "id": "T504",
               "emoji": "🌱",
               "name": "Daily targets and accuracy-first practice",
-              "progress": 33,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Goal engine",
@@ -694,11 +694,13 @@
                 },
                 {
                   "text": "Challenge UI",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs: editable per-profile daily benchmark slider, progress bar and optional streak control; CI 39947014970"
                 },
                 {
                   "text": "Performance summaries",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/daily.rs: weighted-accuracy and local-calendar benchmark summaries with timezone tests; CI 39947014970"
                 }
               ]
             }
@@ -762,7 +764,7 @@
               "id": "T602",
               "emoji": "📉",
               "name": "Progress charts and consistency",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Timeseries store",
@@ -771,7 +773,8 @@
                 },
                 {
                   "text": "Graphs and filters",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs selectable metric summaries and context filter; src/app.rs 4-metric chart/table UI; CI 39947014970 (66 Rust tests and X11 smoke)"
                 },
                 {
                   "text": "Consistency formulas",
@@ -804,19 +807,22 @@
               "id": "T604",
               "emoji": "🏆",
               "name": "Achievements and streaks",
-              "progress": 0,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Rules and earned records",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/achievements.rs: six deterministic, profile-scoped earned badges with qualification and anti-gaming unit tests; CI 39947014970"
                 },
                 {
                   "text": "Celebration UI",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs: award celebration message and achievement status panel; CI 39947014970 native executable"
                 },
                 {
                   "text": "Optional streaks",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/daily.rs: opt-in local-day streak with grace and timezone tests; src/preferences.rs default disabled; CI 39947014970"
                 }
               ]
             }

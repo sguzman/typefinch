@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████░░░░░ 49%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████░░░░░ 53%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -131,11 +131,11 @@
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
-## 🎓 M2 — Typing academy — `█████░░░░░ 50%`
+## 🎓 M2 — Typing academy — `███████░░░ 67%`
 
 **Acceptance gate:** Adaptive lessons, weak-key drills, and course progression.
 
-### 🧠 P5 — Practice and learning — `█████░░░░░ 50%`
+### 🧠 P5 — Practice and learning — `███████░░░ 67%`
 
 - 📚 **T501** Courses and lessons — `██████████ 100%`
   - [x] Lesson content schema — src/lesson.rs: five original licensed-by-author lesson definitions; Actions 39888678045
@@ -149,43 +149,43 @@
   - [x] Finger models — src/layouts.rs and src/app.rs: tested ANSI positional finger assignments and keycap guide; Actions 39896389227
   - [ ] Heatmaps
   - [ ] Accessibility tests
-- 🌱 **T504** Daily targets and accuracy-first practice — `███░░░░░░░ 33%`
+- 🌱 **T504** Daily targets and accuracy-first practice — `██████████ 100%`
   - [x] Goal engine — src/preferences.rs and src/app.rs: user-configured benchmark targets and progress calculations; Actions 39888678045
-  - [ ] Challenge UI
-  - [ ] Performance summaries
+  - [x] Challenge UI — src/app.rs: editable per-profile daily benchmark slider, progress bar and optional streak control; CI 39947014970
+  - [x] Performance summaries — src/daily.rs: weighted-accuracy and local-calendar benchmark summaries with timezone tests; CI 39947014970
 
 **Feature inventory** (computed from associated task progress):
 
-- 🎓 Structured curriculum — `███████░░░ 67%`
+- 🎓 Structured curriculum — `██████████ 100%`
 - 🧠 Adaptive exercises — `███░░░░░░░ 33%`
 
-## 📊 M3 — Statistics and achievements — `████░░░░░░ 42%`
+## 📊 M3 — Statistics and achievements — `████████░░ 75%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `████░░░░░░ 42%`
+### 📈 P6 — Analytics and progression — `████████░░ 75%`
 
 - 🏅 **T601** Records by layout and test mode — `██████████ 100%`
   - [x] Basic profile bests tracked — src/app.rs
   - [x] Segmented history — src/history.rs: context-specific comparisons and per-profile recent history; Actions 39888678045
   - [x] Versioned scoring policies — src/history.rs: SCORING_VERSION 2 preserves v1 data and excludes cross-version trends; Actions 39896389227
-- 📉 **T602** Progress charts and consistency — `███████░░░ 67%`
+- 📉 **T602** Progress charts and consistency — `██████████ 100%`
   - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
-  - [ ] Graphs and filters
+  - [x] Graphs and filters — src/history.rs selectable metric summaries and context filter; src/app.rs 4-metric chart/table UI; CI 39947014970 (66 Rust tests and X11 smoke)
   - [x] Consistency formulas — src/history.rs: mean, best and population standard deviation with unit test; Actions 39888678045
 - 🔥 **T603** Key timing and error heatmaps — `░░░░░░░░░░ 0%`
   - [ ] Event recording
   - [ ] Aggregations
   - [ ] Visual heatmaps
-- 🏆 **T604** Achievements and streaks — `░░░░░░░░░░ 0%`
-  - [ ] Rules and earned records
-  - [ ] Celebration UI
-  - [ ] Optional streaks
+- 🏆 **T604** Achievements and streaks — `██████████ 100%`
+  - [x] Rules and earned records — src/achievements.rs: six deterministic, profile-scoped earned badges with qualification and anti-gaming unit tests; CI 39947014970
+  - [x] Celebration UI — src/app.rs: award celebration message and achievement status panel; CI 39947014970 native executable
+  - [x] Optional streaks — src/daily.rs: opt-in local-day streak with grace and timezone tests; src/preferences.rs default disabled; CI 39947014970
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `██████░░░░ 56%`
-- 🏆 Achievements — `░░░░░░░░░░ 0%`
+- 📊 Statistics — `███████░░░ 67%`
+- 🏆 Achievements — `██████████ 100%`
 
 ## 🎨 M4 — Profile card studio — `████░░░░░░ 36%`
 

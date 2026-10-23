@@ -21,6 +21,8 @@
 
 **Acceptance-based overall progress:** `███████░░░ 74%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
+**Current keyboard inspector acceptance:** [GitHub Actions 40032741759](https://github.com/sguzman/typefinch/actions/runs/40032741759) passed 147 Rust tests, synthetic Hyprland/Wayland failure scenarios, native Weston connectivity, and X11 GUI QA. Real Hyprland keyboard/hotplug and physical per-device attribution remain unverified.
+
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
 ```sh

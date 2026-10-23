@@ -585,7 +585,7 @@
                 {
                   "text": "Read-only standard Wayland seat capability query",
                   "passed": true,
-                  "evidence": "src/wayland_seat.rs and src/devices.rs: wl_registry/wl_seat metadata only, no wl_keyboard or raw key events, timeout-bounded subprocess, unit tests for missing/duplicate/multi-seat identities, and native Weston headless protocol connection (0 seats) in CI 40023774467, 136 Rust tests and full X11 GUI pass. Seat-capable hardware not verified."
+                  "evidence": "src/wayland_seat.rs and src/devices.rs: read-only wl_registry/wl_seat metadata, no wl_keyboard or raw key events; bounded subprocess, duplicate-name IDs, malformed/oversized/failing probes and stale-layout guards. CI 40032741759: 147 Rust tests, eight synthetic Wayland process scenarios, six synthetic Hyprland transitions, native headless Weston protocol probe (0 seats), X11 seat and graphical QA all passed. Keyboard-equipped Wayland and physical device attribution remain unverified."
                 },
                 {
                   "text": "Generic XKB seat detection",

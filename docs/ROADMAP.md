@@ -124,7 +124,7 @@
   - [x] Reliable per-device event attribution or explicit unsupported mode — src/devices.rs CapturePolicy::InspectionOnly and src/app.rs: visible no-per-device typing mode, no physical event stream; unit test with two separate keyboard inspection identities, CI 40014109451: complete Rust and native X11 suites passed
 - 🪟 **T403** Generic compositor fallback — `████████░░ 75%`
   - [x] Safe Hyprland-unavailable state coded — src/devices.rs
-  - [x] Read-only standard Wayland seat capability query — src/wayland_seat.rs and src/devices.rs: wl_registry/wl_seat metadata only, no wl_keyboard or raw key events, timeout-bounded subprocess, unit tests for missing/duplicate/multi-seat identities, and native Weston headless protocol connection (0 seats) in CI 40023774467, 136 Rust tests and full X11 GUI pass. Seat-capable hardware not verified.
+  - [x] Read-only standard Wayland seat capability query — src/wayland_seat.rs and src/devices.rs: read-only wl_registry/wl_seat metadata, no wl_keyboard or raw key events; bounded subprocess, duplicate-name IDs, malformed/oversized/failing probes and stale-layout guards. CI 40032741759: 147 Rust tests, eight synthetic Wayland process scenarios, six synthetic Hyprland transitions, native headless Weston protocol probe (0 seats), X11 seat and graphical QA all passed. Keyboard-equipped Wayland and physical device attribution remain unverified.
   - [ ] Generic XKB seat detection
   - [x] X11 fallback — src/devices.rs: gated read-only setxkbmap -query on genuine X11 sessions, one clearly labeled aggregate seat rather than invented devices; CI 40008974131: 122 Rust tests and dedicated live Xvfb seat probe, plus graphical suite passed
 - 🔐 **T404** Optional authorized per-device capture — `███░░░░░░░ 33%`

@@ -1274,7 +1274,7 @@ impl eframe::App for Typefinch {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     if !wide {
                         egui::CollapsingHeader::new("Profiles, appearance and keyboard settings")
-                            .default_open(true).show(ui, |ui| {
+                            .default_open(false).show(ui, |ui| {
                                 self.show_profile(ui);
                                 ui.add_space(12.0);
                                 self.show_settings(ui, ctx);

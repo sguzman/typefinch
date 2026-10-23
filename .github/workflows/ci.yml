@@ -6,6 +6,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -26,14 +27,18 @@ jobs:
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview
+        if: contains(github.event.head_commit.message, '[package]') || github.event_name == 'workflow_dispatch'
         run: cargo build --release --locked
       - name: Package versioned Linux archive
+        if: contains(github.event.head_commit.message, '[package]') || github.event_name == 'workflow_dispatch'
         run: |
-          VERSION="$(sed -n 's/^version = "\\([^"]*\\)"/\\1/p' Cargo.toml | head -n1)"
+          VERSION="$(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"
           lua5.4 tools/package_release.lua "$VERSION" "$GITHUB_SHA"
       - name: Verify user-local install and rollback
+        if: contains(github.event.head_commit.message, '[package]') || github.event_name == 'workflow_dispatch'
         run: bash tests/release_smoke.sh
       - uses: actions/upload-artifact@v4
+        if: contains(github.event.head_commit.message, '[package]') || github.event_name == 'workflow_dispatch'
         with:
           name: typefinch-linux-preview
           path: |

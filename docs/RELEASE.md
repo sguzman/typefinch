@@ -30,3 +30,12 @@ the Rust executable is not independently proven reproducible.
 
 No GitHub Releases or tags are created by the CI preview job. Publication
 and MVP acceptance remain separate release gates.
+
+## Expensive preview-build gate
+
+Fast Rust/X11 CI runs for every push to `main`. Optimized packaging is
+intentionally opt-in: include `[package]` in a commit message or run the
+workflow manually from GitHub Actions. This prevents the release compiler
+from rebuilding the complete dependency graph on every development commit.
+The archive is attached to that verified workflow run only if its packaging
+and install/rollback tests pass.

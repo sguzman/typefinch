@@ -2,6 +2,7 @@ use crate::{
     achievements,
     custom_layout::CustomLayout,
     daily,
+    goal_transfer,
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
@@ -108,6 +109,7 @@ pub struct Typefinch {
     new_profile: String,
     custom_text: String,
     custom_import_path:String,
+    goal_import_path:String,
     message: String,
 }
 impl Typefinch {
@@ -144,7 +146,7 @@ impl Typefinch {
         Self { prefs, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), message: String::new() }
+               device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), message: String::new() }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -408,6 +410,36 @@ impl Typefinch {
             ui.small("Includes yesterday while today is still unfinished. Turn off above to hide this display.");
         }
         ui.small("Goals and progress belong to the selected local profile.");
+        ui.add_space(8.0);
+        ui.label(RichText::new("Transfer profile goals").strong());
+        ui.small("Import replaces only this profile's goal targets and optional streak setting. It does not replace identity, history, test counts or records.");
+        let mut export_requested=false;
+        let mut import_requested=false;
+        ui.add_enabled_ui(self.session.state!=State::Running,|ui| {
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Export goals JSON").clicked() {export_requested=true;}
+                if ui.button("Import goals JSON").clicked() {import_requested=true;}
+            });
+            ui.add(egui::TextEdit::singleline(&mut self.goal_import_path)
+                .hint_text("Local path to goals JSON").desired_width(ui.available_width()));
+        });
+        if export_requested {
+            let goals=&self.prefs.profiles[self.prefs.active_profile].goals;
+            self.message=match goal_transfer::export(goals) {
+                Ok(path)=>format!("Local goals exported: {}",path.display()),
+                Err(e)=>format!("Goals export failed: {e}"),
+            };
+        }
+        if import_requested {
+            match goal_transfer::import(std::path::Path::new(self.goal_import_path.trim())) {
+                Ok(goals)=>{
+                    self.prefs.profiles[self.prefs.active_profile].goals=goals;
+                    self.save();
+                    self.message="Goals imported into the selected local profile; history and identity unchanged.".into();
+                },
+                Err(e)=>self.message=format!("Goals import failed: {e}"),
+            }
+        }
     }
     fn import_personal_keymap(&mut self) {
         let filename=self.layout_import_path.trim();

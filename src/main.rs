@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 mod achievements;
 mod daily;
+mod goal_transfer;
 mod custom_layout;
 mod app;
 mod devices;

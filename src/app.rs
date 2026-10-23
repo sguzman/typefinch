@@ -99,6 +99,19 @@ fn recorded_layout(mode:Mode, target:&str, keyboards:&[Keyboard], installed:&[In
     }
 }
 
+// The detected input identity is a snapshot, not a hardware event source.
+// While a session is active, a fresh read-only inventory may invalidate an
+// earlier compositor-reported layout; never retroactively upgrade unknown
+// attribution or rewrite an emulated target.
+fn validated_session_layout(
+    current:&str,mode:Mode,keyboards:&[Keyboard],installed:&[InstalledLayout]
+)->String {
+    if mode==Mode::System && current.starts_with("detected/")
+        && recorded_layout(Mode::System,"",keyboards,installed)!=current {
+        "os:unknown".into()
+    } else { current.to_owned() }
+}
+
 // The brand swatch is too light for text on white. Use theme-specific ink.
 fn accent_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(170,181,255) }
@@ -287,6 +300,14 @@ impl Typefinch {
         self.device_index=devices::preserve_selection(selected.as_deref(),&updated);
         self.keyboards=updated;
         self.device_error=error;
+        if self.session.state==State::Running && self.mode==Mode::System {
+            let validated=validated_session_layout(
+                &self.session_layout,self.mode,&self.keyboards,&self.installed_layouts);
+            if validated!=self.session_layout {
+                self.session_layout=validated;
+                self.message="Session layout attribution downgraded to unknown after a keyboard inventory change; typing continues normally.".into();
+            }
+        }
     }
     fn request_device_query(&mut self,ctx:&egui::Context) {
         if launch_device_inspection(
@@ -1869,6 +1890,38 @@ mod palette_tests {
             assert_eq!(recorded_layout(Mode::System,"us",&[seat],&xkb),"os:unknown");
         }
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[single],&xkb),"us");
+    }
+    #[test] fn active_session_layout_is_downgraded_not_relabelled_on_hotplug() {
+        let installed=vec![
+            InstalledLayout{id:"us".into(),name:"English (US)".into()},
+            InstalledLayout{id:"de".into(),name:"German".into()},
+        ];
+        let us=Keyboard{
+            address:"first".into(),active_keymap:"English (US)".into(),
+            ..Default::default()
+        };
+        let de=Keyboard{
+            address:"second".into(),active_keymap:"German".into(),
+            ..Default::default()
+        };
+        // Adding an identical mapping or changing inspection order alone
+        // does not invalidate the original aggregate layout identity.
+        let us2=Keyboard{address:"second".into(),..us.clone()};
+        assert_eq!(validated_session_layout("detected/us",Mode::System,
+            &[us2,us.clone()],&installed),"detected/us");
+        // A newly attached second keyboard with a different keymap makes
+        // the original seat-level claim unsafe, even if one device was selected.
+        assert_eq!(validated_session_layout("detected/us",Mode::System,
+            &[us.clone(),de.clone()],&installed),"os:unknown");
+        assert_eq!(validated_session_layout("detected/us",Mode::System,
+            &[],&installed),"os:unknown");
+        // Unknown layout cannot be opportunistically upgraded mid-session.
+        assert_eq!(validated_session_layout("os:unknown",Mode::System,
+            &[us.clone()],&installed),"os:unknown");
+        // An explicit per-session emulation target does not follow device
+        // metadata or a selected inspection row.
+        assert_eq!(validated_session_layout("us(colemak)",Mode::Emulated,
+            &[us,de],&installed),"us(colemak)");
     }
     #[test] fn key_heat_levels_preserve_readable_error_glyphs() {
         for dark in [false,true] {

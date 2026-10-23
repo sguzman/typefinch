@@ -398,7 +398,7 @@
               "id": "T302",
               "emoji": "🔀",
               "name": "Starter software emulation",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Four initial ANSI row mappings coded",
@@ -412,7 +412,8 @@
                 },
                 {
                   "text": "Native mapping QA",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Full modifiers and punctuation layers",
@@ -445,19 +446,22 @@
               "id": "T304",
               "emoji": "🛠️",
               "name": "User-editable custom layouts",
-              "progress": 0,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Editor and geometry",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Versioned schema",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/custom_layout.rs v1 UUID-identified serde JSON schema, Unicode grapheme validation, malformed-input unit tests; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Import/export and tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs bounded JSON file import/export, collision renaming, per-profile persistence and synthetic custom-keyboard input; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 }
               ]
             },
@@ -790,15 +794,17 @@
               "id": "T603",
               "emoji": "🔥",
               "name": "Key timing and error heatmaps",
-              "progress": 0,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Event recording",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs bounded in-memory key/error interval recording, privacy-safe aggregates; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Aggregations",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs deterministic missed-key counts and per-key timing averages; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed"
                 },
                 {
                   "text": "Visual heatmaps",

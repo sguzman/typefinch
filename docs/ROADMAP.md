@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██████░░░░ 59%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `██████░░░░ 64%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -78,29 +78,29 @@
 - 🐦 Local identity — `████████░░ 78%`
 - 🌗 Appearance — `██████░░░░ 58%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `████░░░░░░ 35%`
+## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 49%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `████░░░░░░ 37%`
+### 🧬 P3 — Recognition, emulation and geometry — `██████░░░░ 62%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
   - [x] Discover installed XKB variants — src/registry.rs; GitHub Actions 39872686067 discovered XKB layouts and passed 30 tests
   - [x] Normalize identities and availability — src/registry.rs and src/app.rs: deduplicated variants, unique active-map resolution, unavailable-map fallback; Actions 39880764327
-- 🔀 **T302** Starter software emulation — `█████░░░░░ 50%`
+- 🔀 **T302** Starter software emulation — `████████░░ 75%`
   - [x] Four initial ANSI row mappings coded — src/layouts.rs
   - [x] Physical key event handling coded — src/app.rs
-  - [ ] Native mapping QA
+  - [x] Native mapping QA — src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [ ] Full modifiers and punctuation layers
 - 🌐 **T303** libxkbcommon-backed full emulation — `███░░░░░░░ 33%`
   - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
   - [ ] Shift/AltGr/dead-key handling
   - [ ] Layout regression corpus
-- 🛠️ **T304** User-editable custom layouts — `░░░░░░░░░░ 0%`
-  - [ ] Editor and geometry
-  - [ ] Versioned schema
-  - [ ] Import/export and tests
+- 🛠️ **T304** User-editable custom layouts — `██████████ 100%`
+  - [x] Editor and geometry — src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
+  - [x] Versioned schema — src/custom_layout.rs v1 UUID-identified serde JSON schema, Unicode grapheme validation, malformed-input unit tests; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
+  - [x] Import/export and tests — src/app.rs bounded JSON file import/export, collision renaming, per-profile persistence and synthetic custom-keyboard input; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
 - 🌍 **T305** ANSI, ISO, JIS and split geometries — `░░░░░░░░░░ 0%`
   - [ ] Geometry definitions
   - [ ] Physical key routing
@@ -128,7 +128,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `███████░░░ 67%`
-- 🔀 Software layout emulation — `██░░░░░░░░ 21%`
+- 🔀 Software layout emulation — `█████░░░░░ 52%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`
@@ -159,11 +159,11 @@
 - 🎓 Structured curriculum — `██████████ 100%`
 - 🧠 Adaptive exercises — `████████░░ 84%`
 
-## 📊 M3 — Statistics and achievements — `████████░░ 75%`
+## 📊 M3 — Statistics and achievements — `█████████░ 92%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `████████░░ 75%`
+### 📈 P6 — Analytics and progression — `█████████░ 92%`
 
 - 🏅 **T601** Records by layout and test mode — `██████████ 100%`
   - [x] Basic profile bests tracked — src/app.rs
@@ -173,9 +173,9 @@
   - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
   - [x] Graphs and filters — src/history.rs selectable metric summaries and context filter; src/app.rs 4-metric chart/table UI; CI 39947014970 (66 Rust tests and X11 smoke)
   - [x] Consistency formulas — src/history.rs: mean, best and population standard deviation with unit test; Actions 39888678045
-- 🔥 **T603** Key timing and error heatmaps — `░░░░░░░░░░ 0%`
-  - [ ] Event recording
-  - [ ] Aggregations
+- 🔥 **T603** Key timing and error heatmaps — `███████░░░ 67%`
+  - [x] Event recording — src/engine.rs bounded in-memory key/error interval recording, privacy-safe aggregates; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
+  - [x] Aggregations — src/engine.rs deterministic missed-key counts and per-key timing averages; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [ ] Visual heatmaps
 - 🏆 **T604** Achievements and streaks — `██████████ 100%`
   - [x] Rules and earned records — src/achievements.rs: six deterministic, profile-scoped earned badges with qualification and anti-gaming unit tests; CI 39947014970
@@ -184,7 +184,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `███████░░░ 67%`
+- 📊 Statistics — `█████████░ 89%`
 - 🏆 Achievements — `██████████ 100%`
 
 ## 🎨 M4 — Profile card studio — `███████░░░ 69%`

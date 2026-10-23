@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `██████░░░░ 59%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `██████░░░░ 64%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -107,3 +107,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Latest academy validation:** [73 passing tests, contrast-checked graded in-memory keyboard heatmap and timing summaries](https://github.com/sguzman/typefinch/actions/runs/39950437760). Full physical-key analytics and Hyprland hardware QA are still outstanding.
 
 **Personal ANSI layouts:** Create and edit three ten-key rows (base and Shift) within Typefinch, using a validated v1 JSON schema. Custom keymaps are saved in local settings, selectable as software-emulated targets, and never modify the OS or capture global input. Explicit JSON import is limited to 16 KiB and refuses invalid mappings; export writes to the local `exports/` folder.
+
+**Personal ANSI layouts and private settings:** [79 passing Rust tests plus native physical-key, SVG/PNG and input QA](https://github.com/sguzman/typefinch/actions/runs/39953436230). The v1 custom mapping editor is in-app ANSI only; physical-device routing and live Hyprland acceptance remain pending.

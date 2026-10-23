@@ -141,6 +141,39 @@ pub fn comparable<'a>(records: &'a [Record], layout: &str, content: &str,
     entries.sort_by_key(|r| (r.finished_at_ms, r.id));
     entries
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistoryMetric { CorrectedWpm, RawWpm, Accuracy, RawAccuracy }
+impl HistoryMetric {
+    pub const ALL: [Self;4] = [Self::CorrectedWpm,Self::RawWpm,Self::Accuracy,Self::RawAccuracy];
+    pub fn label(self)->&'static str {
+        match self {Self::CorrectedWpm=>"Corrected WPM",Self::RawWpm=>"Raw WPM",
+            Self::Accuracy=>"Final accuracy",Self::RawAccuracy=>"Raw accuracy"}
+    }
+    pub fn unit(self)->&'static str {
+        match self {Self::CorrectedWpm|Self::RawWpm=>"WPM",_=>"%"}
+    }
+    /// Before raw input capture was introduced, zero meant unavailable.
+    pub fn value(self,r:&Record)->Option<f64> {
+        let value=match self {
+            Self::CorrectedWpm=>r.wpm,
+            Self::RawWpm if r.attempts>0=>r.raw_wpm,
+            Self::Accuracy=>r.accuracy,
+            Self::RawAccuracy if r.attempts>0=>r.raw_accuracy,
+            _=>return None,
+        };
+        value.is_finite().then_some(value)
+    }
+}
+#[derive(Debug, Clone, Copy)]
+pub struct MetricSummary {pub mean:f64,pub best:f64,pub deviation:f64}
+pub fn metric_summary(values:&[f64])->Option<MetricSummary> {
+    if values.is_empty() {return None;}
+    let n=values.len() as f64;
+    let mean=values.iter().sum::<f64>()/n;
+    let deviation=(values.iter().map(|v|(v-mean).powi(2)).sum::<f64>()/n).sqrt();
+    let best=values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
+    Some(MetricSummary {mean,best,deviation})
+}
 #[derive(Debug, Clone, Copy)]
 pub struct Trend {
     pub mean_wpm: f64,
@@ -225,6 +258,20 @@ mod tests {
             correct:114, wpm:45.6, accuracy:95.0, raw_wpm:51.2,
             raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:SCORING_VERSION
         }
+    }
+    #[test] fn selectable_metrics_do_not_invent_legacy_raw_data() {
+        let mut old=item("p");
+        old.attempts=0;
+        old.raw_wpm=0.0;
+        old.raw_accuracy=0.0;
+        let mut latest=item("p");
+        latest.raw_wpm=80.0;
+        let records=[old,latest];
+        let raw=records.iter().filter_map(|r|HistoryMetric::RawWpm.value(r)).collect::<Vec<_>>();
+        assert_eq!(raw,vec![80.0]);
+        assert_eq!(metric_summary(&[50.0,70.0]).unwrap().deviation,10.0);
+        assert_eq!(metric_summary(&[50.0,70.0]).unwrap().best,70.0);
+        assert!(metric_summary(&[]).is_none());
     }
     #[test] fn spanish_and_english_history_stays_separate() {
         let mut english=item("p");

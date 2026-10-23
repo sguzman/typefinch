@@ -61,6 +61,8 @@ pub struct Typefinch {
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     history: Vec<Record>,
+    history_only_matching: bool,
+    history_metric: history::HistoryMetric,
     completed_lessons: std::collections::HashSet<String>,
     keyboards: Vec<Keyboard>,
     device_index: usize,
@@ -95,7 +97,8 @@ impl Typefinch {
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, completed_lessons, keyboards, device_error,
+        Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+            completed_lessons, keyboards, device_error,
                device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -661,72 +664,89 @@ impl Typefinch {
         ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Recent tests");
+        ui.heading("Typing history");
         if self.history.is_empty() {
             ui.label("No completed scored tests yet. Results stay on this device.");
             return;
         }
-        let mode=if self.mode==Mode::System { "OS" } else { "Emulated" };
+        ui.horizontal_wrapped(|ui| {
+            ui.checkbox(&mut self.history_only_matching, "Only comparable sessions");
+            egui::ComboBox::from_id_salt("history-metric")
+                .selected_text(self.history_metric.label())
+                .show_ui(ui, |ui| {
+                    for metric in history::HistoryMetric::ALL {
+                        ui.selectable_value(&mut self.history_metric,metric,metric.label());
+                    }
+                });
+        });
+        let input_mode=if self.mode==Mode::System {"OS"} else {"Emulated"};
         let identity=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
         let comparable=history::comparable(&self.history, &identity,
-            self.session.history_mode().as_str(), self.prefs.duration_seconds as i64*1000, mode);
-        if comparable.len()>=2 {
-            if let Some(stats)=history::trend(&comparable) {
-                ui.label(format!("Comparable sessions: {} · Avg {:.1} WPM · Best {:.1} WPM · Std. dev. {:.1} WPM",
-                    comparable.len(), stats.mean_wpm, stats.best_wpm, stats.deviation_wpm));
+            self.session.history_mode().as_str(), self.prefs.duration_seconds as i64*1000, input_mode);
+        let measurements=comparable.iter()
+            .filter_map(|r|self.history_metric.value(r).map(|v|(*r,v))).collect::<Vec<_>>();
+        let values=measurements.iter().map(|(_,v)|*v).collect::<Vec<_>>();
+        if values.len()>=2 {
+            if let Some(summary)=history::metric_summary(&values) {
+                ui.label(format!("{} matching sessions · {} · Avg {:.1} {} · Best {:.1} {} · Std. dev. {:.1} {}",
+                    values.len(),self.history_metric.label(),
+                    summary.mean,self.history_metric.unit(),summary.best,self.history_metric.unit(),
+                    summary.deviation,self.history_metric.unit()));
             }
-            let h=146.0_f32;
-            let (rect,_) = ui.allocate_exact_size(egui::vec2(ui.available_width().max(160.0),h),egui::Sense::hover());
+            let (rect,_) = ui.allocate_exact_size(egui::vec2(ui.available_width().max(160.0),150.0),egui::Sense::hover());
             let painter=ui.painter_at(rect);
-            let area=rect.shrink2(egui::vec2(14.0,14.0));
-            let low=comparable.iter().map(|r|r.wpm).fold(f64::MAX,f64::min).max(0.0);
-            let high=comparable.iter().map(|r|r.wpm).fold(0.0_f64,f64::max);
-            let bottom=(low-4.0).max(0.0);
-            let top=high+4.0;
-            painter.line_segment(
-                [area.left_bottom(),area.right_bottom()],
-                egui::Stroke::new(1.0,ui.visuals().weak_text_color())
-            );
-            let mut previous:Option<egui::Pos2>=None;
-            for (index,result) in comparable.iter().enumerate() {
-                let x=area.left()+area.width()*index as f32/(comparable.len()-1) as f32;
-                let y=area.bottom()-area.height()*((result.wpm-bottom)/(top-bottom)) as f32;
+            let area=rect.shrink2(egui::vec2(16.0,16.0));
+            let lowest=values.iter().copied().fold(f64::INFINITY,f64::min);
+            let highest=values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
+            let padding=(highest-lowest).max(4.0)*0.12;
+            let bottom=(lowest-padding).max(0.0);
+            let top=highest+padding;
+            painter.line_segment([area.left_bottom(),area.right_bottom()],
+                egui::Stroke::new(1.0,ui.visuals().weak_text_color()));
+            let mut last=None;
+            for (index,(_,value)) in measurements.iter().enumerate() {
+                let x=area.left()+area.width()*index as f32/(measurements.len()-1) as f32;
+                let y=area.bottom()-area.height()*((value-bottom)/(top-bottom)) as f32;
                 let point=egui::pos2(x,y);
-                if let Some(last)=previous {
-                    painter.line_segment([last,point],egui::Stroke::new(2.0,PERIWINKLE));
+                if let Some(prev)=last {
+                    painter.line_segment([prev,point],egui::Stroke::new(2.0,PERIWINKLE));
                 }
                 painter.circle_filled(point,3.0,PERIWINKLE);
-                previous=Some(point);
+                last=Some(point);
             }
-            ui.small("Trend: comparable layout, content, input mode, duration and scoring version only.");
-        } else if self.prefs.test_mode==TestMode::Custom {
-            ui.small("Custom passages are intentionally not ranked against different custom texts.");
+            ui.small("Oldest → newest · Same layout, language/content, input mode, duration and scoring version.");
         } else {
-            ui.small("Complete two tests with the same layout, content, input mode and duration to see your trend.");
+            ui.small("A trend requires two compatible sessions with available measurements. Unknown OS layouts and private passages are not compared.");
         }
         ui.add_space(10.0);
-        ui.label("Latest sessions");
+        let visible:Vec<&Record>=if self.history_only_matching {
+            comparable.iter().rev().take(12).copied().collect()
+        } else {
+            self.history.iter().take(12).collect()
+        };
+        ui.label(format!("{} · {} displayed",if self.history_only_matching {"Matching history"} else {"Recent history"},visible.len()));
+        if visible.is_empty() {
+            ui.small("No compatible sessions for these settings. Turn off the filter to inspect all recent sessions.");
+            return;
+        }
         egui::ScrollArea::horizontal().id_salt("recent-history-horizontal").show(ui, |ui| {
-        egui::Grid::new("recent-tests").striped(true).min_col_width(75.0).show(ui, |ui| {
-            ui.strong("WPM");
-            ui.strong("Raw WPM");
-            ui.strong("Content");
-            ui.strong("Accuracy");
-            ui.strong("Duration");
-            ui.strong("Layout");
-            ui.strong("Input");
-            ui.end_row();
-            for r in self.history.iter().take(8) {
-                ui.label(format!("{:.1}", r.wpm));
-                ui.label(if r.attempts>0 {format!("{:.1}",r.raw_wpm)} else {"—".to_owned()});
-                ui.label(&r.test_mode);
-                ui.label(format!("{:.1}%", r.accuracy));
-                ui.label(format!("{}s", r.duration_ms / 1000));
-                ui.label(&r.layout);
-                ui.label(&r.input_mode);
+            egui::Grid::new("recent-tests").striped(true).min_col_width(70.0).show(ui, |ui| {
+                for heading in ["WPM","Raw WPM","Content","Accuracy","Raw accuracy","Duration","Layout","Input"] {
+                    ui.strong(heading);
+                }
                 ui.end_row();
-            }
-        });
+                for r in &visible {
+                    ui.label(format!("{:.1}",r.wpm));
+                    ui.label(if r.attempts>0 {format!("{:.1}",r.raw_wpm)} else {"—".to_owned()});
+                    ui.label(&r.test_mode);
+                    ui.label(format!("{:.1}%",r.accuracy));
+                    ui.label(if r.attempts>0 {format!("{:.1}%",r.raw_accuracy)} else {"—".to_owned()});
+                    ui.label(format!("{}s",r.duration_ms/1000));
+                    ui.label(&r.layout);
+                    ui.label(&r.input_mode);
+                    ui.end_row();
+                }
+            });
         });
     }
     fn export_widget(&mut self) {

@@ -79,3 +79,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Complex IME and bidirectional input are not yet validated.
 
 **Latest Unicode acceptance:** [59 passing Rust tests, NFC grapheme scoring and full Lua-backed X11 QA](https://github.com/sguzman/typefinch/actions/runs/39896389227). Complex IME and Hyprland hardware QA remain pending.
+
+**History explorer:** Filter the recent-session table to the currently comparable test configuration and switch the trend between corrected/raw WPM and final/raw accuracy. Older results without recorded raw attempts display a dash, not a fabricated zero. Charts exclude incompatible scoring versions, layouts, durations and content/language tiers.

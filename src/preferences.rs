@@ -17,6 +17,13 @@ impl CardTheme {
 }
 #[derive(Clone,Copy,Debug,Default,PartialEq,Eq,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
+pub enum CardTemplate {#[default] Classic, Compact}
+impl CardTemplate {
+    pub const ALL:[Self;2]=[Self::Classic,Self::Compact];
+    pub fn label(self)->&'static str {match self {Self::Classic=>"Classic · 550×205",Self::Compact=>"Compact · 550×145"}}
+}
+#[derive(Clone,Copy,Debug,Default,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(rename_all="lowercase")]
 pub enum CardFont {#[default] Sans, Mono}
 impl CardFont {
     pub const ALL:[Self;2]=[Self::Sans,Self::Mono];
@@ -66,6 +73,7 @@ pub struct Preferences {
     pub theme: Theme,
     pub card_theme:CardTheme,
     pub card_font:CardFont,
+    pub card_template:CardTemplate,
     pub test_mode: TestMode,
     pub language: Language,
     pub word_difficulty: WordDifficulty,
@@ -76,7 +84,7 @@ pub struct Preferences {
     pub duration_seconds: u64,
 }
 impl Default for Preferences {
-    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
+    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, card_template:CardTemplate::Classic, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
 }
 pub fn base_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)
@@ -194,9 +202,11 @@ mod tests {
         let mut data=serde_json::to_value(Preferences::default()).unwrap();
         data.as_object_mut().unwrap().remove("card_theme");
         data.as_object_mut().unwrap().remove("card_font");
+        data.as_object_mut().unwrap().remove("card_template");
         let older:Preferences=serde_json::from_value(data).unwrap();
         assert_eq!(older.card_theme,CardTheme::Dusk);
         assert_eq!(older.card_font,CardFont::Sans);
+        assert_eq!(older.card_template,CardTemplate::Classic);
     }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {
@@ -206,6 +216,7 @@ mod tests {
         assert_eq!(q.layout, "us");
         assert_eq!(q.card_theme,CardTheme::Dusk);
         assert_eq!(q.card_font,CardFont::Sans);
+        assert_eq!(q.card_template,CardTemplate::Classic);
         assert_eq!(q.test_mode, TestMode::Words);
         assert_eq!(q.language, Language::English);
         assert_eq!(q.word_difficulty, WordDifficulty::Standard);

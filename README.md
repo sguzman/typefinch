@@ -95,3 +95,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **PNG card export:** F9 or the Export PNG button rasterizes the current styled SVG locally via the pure-Rust resvg renderer and writes `typefinch-profile.png` beside the SVG. No external converter, shell script, or network service is needed.
 
 **Latest verified export:** [native Rust SVG-to-PNG, 550×205 output plus Daybreak/mono F9 graphical verification](https://github.com/sguzman/typefinch/actions/runs/39948522387). Card layout templates beyond the original format remain open.
+
+**Card layouts:** Classic (550×205) and Compact (550×145) are distinct native-preview/SVG/PNG templates; either can use Dusk, Daybreak, Fern, sans-serif or monospace. Classic remains the persisted default for existing installs.

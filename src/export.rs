@@ -1,5 +1,5 @@
 //! A standalone, static, script-free GitHub-compatible SVG snapshot.
-use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile,CardTheme,CardFont}};
+use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile,CardTheme,CardFont,CardTemplate}};
 use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
 
 fn xml(s: &str) -> String {
@@ -65,6 +65,37 @@ pub fn card_with_style(profile:&Profile,layout:&str,theme:CardTheme,font:CardFon
     bird=p.bird,wing=p.wing,eye=p.eye,beak=p.beak,name_ink=p.name,
     labels=p.labels,numbers=p.numbers,footer=p.footer,family=family)
 }
+/// Two actual SVG geometry templates; both use the same owned palette and
+/// exclusively static SVG text/shapes, suitable for GitHub image rendering.
+pub fn card_with_template(profile:&Profile, layout:&str, theme:CardTheme,font:CardFont,
+    template:CardTemplate)->String {
+    if template==CardTemplate::Classic {return card_with_style(profile,layout,theme,font);}
+    let p=palette(theme);
+    let family=font.svg_family();
+    let name=xml(&profile.name.chars().take(32).collect::<String>());
+    let layout=xml(&layout.chars().take(34).collect::<String>());
+    format!(r##"<svg xmlns="http://www.w3.org/2000/svg" width="550" height="145" viewBox="0 0 550 145" role="img" aria-label="Typefinch compact profile">
+<rect width="550" height="145" rx="20" fill="{bg}"/>
+<rect x="1" y="1" width="548" height="143" rx="19" fill="none" stroke="{border}" stroke-width="2"/>
+<text x="23" y="31" fill="{heading}" font-family="{family}" font-weight="700" font-size="20">Typefinch</text>
+<text x="155" y="30" fill="{name_ink}" font-family="{family}" font-size="16">{name}</text>
+<rect x="500" y="11" width="34" height="34" rx="10" fill="{emblem_bg}"/>
+<ellipse cx="516" cy="30" rx="10" ry="8" fill="{bird}"/>
+<circle cx="521" cy="23" r="5" fill="{wing}"/>
+<circle cx="523" cy="21" r="1.3" fill="{eye}"/>
+<path d="M526 23 L533 26 L526 29Z" fill="{beak}"/>
+<text x="23" y="66" fill="{labels}" font-family="{family}" font-size="11">BEST WPM</text>
+<text x="23" y="96" fill="{numbers}" font-family="{family}" font-size="27" font-weight="700">{:.0}</text>
+<text x="204" y="66" fill="{labels}" font-family="{family}" font-size="11">SESSIONS</text>
+<text x="204" y="96" fill="{numbers}" font-family="{family}" font-size="27" font-weight="700">{}</text>
+<text x="379" y="66" fill="{labels}" font-family="{family}" font-size="11">BEST ACCURACY</text>
+<text x="379" y="96" fill="{numbers}" font-family="{family}" font-size="27" font-weight="700">{:.1}%</text>
+<text x="23" y="128" fill="{footer}" font-family="{family}" font-size="11">Layout: {layout} · Timed bests · All sessions counted</text>
+</svg>"##,profile.best_wpm,profile.tests,profile.best_accuracy,
+        bg=p.bg,border=p.border,heading=p.heading,name_ink=p.name,emblem_bg=p.emblem_bg,
+        bird=p.bird,wing=p.wing,eye=p.eye,beak=p.beak,labels=p.labels,
+        numbers=p.numbers,footer=p.footer,family=family)
+}
 pub fn markdown_embed() -> &'static str {
     "![Typefinch typing profile](./typefinch-profile.svg)\n"
 }
@@ -73,10 +104,17 @@ pub fn save_widget(profile: &Profile, layout: &str) -> Result<(PathBuf, PathBuf)
 }
 pub fn save_widget_with_style(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
     -> Result<(PathBuf, PathBuf),String> {
-    let svg = save_card_with_style(profile,layout,theme,font)?;
+    let svg = save_card_with_template(profile,layout,theme,font,CardTemplate::Classic)?;
     let md = svg.with_file_name("typefinch-profile.md");
     fs::write(&md, markdown_embed()).map_err(|e| e.to_string())?;
     Ok((svg, md))
+}
+pub fn save_widget_with_template(profile:&Profile,layout:&str,theme:CardTheme,
+    font:CardFont,template:CardTemplate)->Result<(PathBuf,PathBuf),String> {
+    let svg=save_card_with_template(profile,layout,theme,font,template)?;
+    let md=svg.with_file_name("typefinch-profile.md");
+    fs::write(&md,markdown_embed()).map_err(|e|e.to_string())?;
+    Ok((svg,md))
 }
 /// Versioned, explicit offline export. No profile nickname, typed text,
 /// credentials, or physical keyboard identifiers are part of this payload.
@@ -146,13 +184,26 @@ pub fn rasterize_card(svg:&str)->Result<Vec<u8>,String> {
 }
 pub fn save_card_png(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
     ->Result<PathBuf,String> {
+    save_card_png_with_template(profile,layout,theme,font,CardTemplate::Classic)
+}
+pub fn save_card_png_with_template(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont,
+    template:CardTemplate)->Result<PathBuf,String> {
     let folder=base_dir().join("exports");
     fs::create_dir_all(&folder).map_err(|e|e.to_string())?;
     let output=folder.join("typefinch-profile.png");
-    let png=rasterize_card(&card_with_style(profile,layout,theme,font))?;
+    let png=rasterize_card(&card_with_template(profile,layout,theme,font,template))?;
     let temp=output.with_extension("png.tmp");
     fs::write(&temp,png).map_err(|e|e.to_string())?;
     fs::rename(&temp,&output).map_err(|e|e.to_string())?;
+    Ok(output)
+}
+pub fn save_card_with_template(profile:&Profile,layout:&str,theme:CardTheme,
+    font:CardFont,template:CardTemplate)->Result<PathBuf,String> {
+    let dir=base_dir().join("exports");
+    fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
+    let output=dir.join("typefinch-profile.svg");
+    fs::write(&output,card_with_template(profile,layout,theme,font,template))
+        .map_err(|e|e.to_string())?;
     Ok(output)
 }
 pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
@@ -196,6 +247,18 @@ mod tests {
             }
         }
         assert_ne!(palette(CardTheme::Dusk).bg,palette(CardTheme::Daybreak).bg);
+    }
+    #[test] fn compact_svg_has_independent_geometry_and_png_dimensions() {
+        let p=Profile {name:"<Finch>&".into(),..Default::default()};
+        for palette in CardTheme::ALL {
+            let compact=card_with_template(&p,"us",palette,CardFont::Mono,CardTemplate::Compact);
+            assert!(compact.contains("height=\"145\""));
+            assert!(compact.contains("&lt;Finch&gt;&amp;"));
+            assert!(!compact.contains("<script"));
+            let png=rasterize_card(&compact).unwrap();
+            assert_eq!(u32::from_be_bytes(png[16..20].try_into().unwrap()),550);
+            assert_eq!(u32::from_be_bytes(png[20..24].try_into().unwrap()),145);
+        }
     }
     #[test] fn raster_export_is_a_real_png_with_expected_dimensions() {
         let p=Profile::default();

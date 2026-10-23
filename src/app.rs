@@ -77,6 +77,9 @@ where F:FnOnce()->Result<Vec<Keyboard>,String>+Send+'static {
 const X11_AGGREGATE_SEAT:&str="x11:aggregate-seat";
 fn inspected_target<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout])
     ->Option<&'a InstalledLayout> {
+    // wl_seat only advertises aggregate capability, never active XKB
+    // identity. Even a future accidental value must not turn into a target.
+    if keyboard.address.starts_with("wayland:seat:") {return None;}
     if keyboard.address==X11_AGGREGATE_SEAT {
         // X11 setxkbmap -query reports configured groups, not the active
         // input group. Only a single unambiguous layout can be offered as a
@@ -98,7 +101,8 @@ fn inspected_target<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout])
 fn recorded_layout(mode:Mode, target:&str, keyboards:&[Keyboard], installed:&[InstalledLayout])->String {
     if mode == Mode::Emulated { return target.to_owned(); }
     let Some(first)=keyboards.first() else { return "os:unknown".to_owned() };
-    if keyboards.iter().any(|k|k.address==X11_AGGREGATE_SEAT) {
+    if keyboards.iter().any(|k|
+        k.address==X11_AGGREGATE_SEAT || k.address.starts_with("wayland:seat:")) {
         return "os:unknown".to_owned();
     }
     if first.active_keymap.trim().is_empty() ||
@@ -375,13 +379,17 @@ impl Typefinch {
                 self.apply_device_result(result,focused);
             }
         }
-        let hyprland=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
+        let inspectable_wayland=std::env::var("XDG_SESSION_TYPE").as_deref()==Ok("wayland")
+            && (std::env::var_os("WAYLAND_DISPLAY").is_some()
+                || std::env::var_os("WAYLAND_SOCKET").is_some());
+        let can_poll=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
+            || inspectable_wayland;
         let focus_gained=focused && !self.last_window_focused;
-        if should_poll_devices(hyprland,focused,focus_gained,self.device_poll_started.elapsed())
+        if should_poll_devices(can_poll,focused,focus_gained,self.device_poll_started.elapsed())
             && self.pending_device_query.is_none() {
             self.request_device_query(ctx);
         }
-        if focused && hyprland {
+        if focused && can_poll {
             ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
         }
     }
@@ -1032,7 +1040,7 @@ impl Typefinch {
         ui.heading("Keyboard / seat inspector");
         ui.colored_label(accent_ink(ui.visuals().dark_mode),
             devices::CAPTURE_POLICY.explanation());
-        ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
+        ui.small("Read-only Hyprland device metadata, Wayland aggregate seat capabilities, or X11 configuration. Supported Wayland inspectors refresh on focus and every 20 seconds; no input capture.");
         if !self.device_inventory_fresh {
             ui.small("Keyboard inventory unverified after startup, focus change or failed inspection; recorded OS layout stays unknown.");
         }
@@ -1056,7 +1064,11 @@ impl Typefinch {
                     });
                 let k = &self.keyboards[self.device_index];
                 let is_x11=k.address==X11_AGGREGATE_SEAT;
-                if is_x11 {
+                let is_wayland=k.address.starts_with("wayland:seat:");
+                if is_wayland {
+                    ui.label("Wayland seat reports keyboard capability.");
+                    ui.small("Standard wl_seat gives no physical keyboard identity or active XKB layout. No key events are requested.");
+                } else if is_x11 {
                     ui.label(format!("Configured X11 seat layout: {} · variant: {}",
                         k.layout,if k.variant.is_empty(){"(none)"}else{&k.variant}));
                     ui.small("setxkbmap reports configured groups, not the active input group.");
@@ -1082,6 +1094,8 @@ impl Typefinch {
                             "Emulation target updated from reported Hyprland metadata; system settings unchanged.".into()
                         };
                     }
+                } else if is_wayland {
+                    ui.small("This aggregate Wayland seat cannot identify or select a physical keyboard's layout.");
                 } else if is_x11 {
                     ui.small("No unique installed layout for this seat; multiple X11 groups cannot be treated as one active layout.");
                 } else {
@@ -1935,6 +1949,20 @@ mod palette_tests {
         });
         assert_eq!(recorded_layout(Mode::System,"us",&keyboards,&xkb),"os:unknown");
         assert_eq!(recorded_layout(Mode::System,"us",&[],&xkb),"os:unknown");
+    }
+    #[test] fn wayland_seat_capability_does_not_carry_observed_layout_or_target() {
+        let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];
+        let seat=Keyboard{
+            name:"Wayland seat seat0 (not a physical keyboard)".into(),
+            address:"wayland:seat:seat0".into(),
+            active_keymap:"English (US)".into(), // Malicious/stale metadata cannot promote it
+            layout:"us".into(),
+            ..Default::default()
+        };
+        assert!(inspected_target(&seat,&installed).is_none());
+        assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
+            "os:unknown");
+        assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
     }
     #[test] fn x11_configured_groups_are_never_claimed_as_observed_session_input() {
         let xkb=vec![

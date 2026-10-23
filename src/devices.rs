@@ -1,6 +1,13 @@
 //! Read-only Hyprland device inspection; not a privileged input grab.
 use serde_json::Value;
-use std::{collections::HashSet,process::Command};
+use std::{
+    collections::HashSet,
+    io::Read,
+    process::{Command,Stdio},
+    sync::mpsc,
+    thread,
+    time::{Duration,Instant},
+};
 
 /// Input originates from the compositor's aggregate seat. This application
 /// only inspects physical keyboard metadata; no per-device stream, grant,
@@ -48,17 +55,64 @@ pub fn inspect() -> Result<Vec<Keyboard>, String> {
             "No supported compositor keyboard inspector; native app input still works.".into()),
     }
 }
+/// A metadata query must not hold the only GUI inspector worker forever.
+/// Both tools are invoked with constant, non-shell arguments. Limit elapsed
+/// time and bytes *before* parsing, and never persist their raw output.
+const INSPECT_TIMEOUT:Duration=Duration::from_secs(3);
+const X11_QUERY_MAX_BYTES:usize=16*1024;
+const HYPRLAND_QUERY_MAX_BYTES:usize=256*1024;
+fn bounded_query(program:&str,args:&[&str],limit:usize,timeout:Duration)
+    ->Result<Vec<u8>,String> {
+    let mut child=Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e|format!("{program} unavailable: {e}"))?;
+    let pipe=child.stdout.take().ok_or("Inspector stdout pipe unavailable.")?;
+    let (send,receive)=mpsc::channel();
+    thread::spawn(move||{
+        let mut buf=Vec::new();
+        // The extra byte distinguishes an exact-size response from an
+        // overlarge one; never allocate an unbounded compositor response.
+        let result=pipe.take((limit+1) as u64).read_to_end(&mut buf);
+        let _=send.send(result.map(|_|buf));
+    });
+    let started=Instant::now();
+    let status=loop {
+        match child.try_wait() {
+            Ok(Some(status))=>break status,
+            Ok(None) if started.elapsed()<timeout=>thread::sleep(Duration::from_millis(10)),
+            Ok(None)=>{
+                let _=child.kill();
+                let _=child.wait();
+                return Err(format!("{program} inspection timed out."));
+            }
+            Err(err)=>{
+                let _=child.kill();
+                let _=child.wait();
+                return Err(format!("{program} inspection failed: {err}"));
+            }
+        }
+    };
+    let remaining=timeout.saturating_sub(started.elapsed());
+    let bytes=receive.recv_timeout(remaining)
+        .map_err(|_|format!("{program} inspection output was not completed in time."))?
+        .map_err(|e|format!("{program} inspection output failed: {e}"))?;
+    if bytes.len()>limit {return Err(format!("{program} inspection output exceeded safe size."));}
+    if !status.success(){return Err(format!("{program} inspection command failed."));}
+    Ok(bytes)
+}
 fn inspect_hyprland() -> Result<Vec<Keyboard>, String> {
-    let out=Command::new("hyprctl").args(["-j","devices"]).output()
-        .map_err(|e|format!("hyprctl unavailable: {e}"))?;
-    if !out.status.success(){return Err("Hyprland did not return device information.".into());}
-    parse_json(&out.stdout)
+    let raw=bounded_query("hyprctl",&["-j","devices"],
+        HYPRLAND_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
+    parse_json(&raw)
 }
 fn inspect_x11_seat()->Result<Vec<Keyboard>,String> {
-    let out=Command::new("setxkbmap").arg("-query").output()
-        .map_err(|e|format!("X11 aggregate seat inspector unavailable: {e}"))?;
-    if !out.status.success(){return Err("X11 aggregate seat query failed.".into());}
-    parse_x11_query(&out.stdout)
+    let raw=bounded_query("setxkbmap",&["-query"],
+        X11_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
+    parse_x11_query(&raw)
 }
 /// An X11 core seat is NOT a physical device. Never return multiple
 /// invented keyboards, silently infer a hardware shape, or claim key events
@@ -93,7 +147,7 @@ fn parse_x11_query(data:&[u8])->Result<Vec<Keyboard>,String>{
     }])
 }
 
-const MAX_HYPRLAND_RESPONSE_BYTES:usize=256*1024;
+const MAX_HYPRLAND_RESPONSE_BYTES:usize=HYPRLAND_QUERY_MAX_BYTES;
 const MAX_INSPECTED_KEYBOARDS:usize=128;
 fn usable_metadata(value:&str,max_len:usize)->bool {
     !value.is_empty() && value.len()<=max_len
@@ -140,6 +194,23 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn metadata_subprocesses_are_bounded_and_do_not_require_a_shell_for_runtime_use() {
+        // The production path uses constant executable/argument pairs,
+        // never a user-controlled shell string. CI's shell is used here
+        // only to exercise a small, controllable test child.
+        let text=bounded_query("sh",&["-c","printf 'layout: us\\n'"],
+            128,Duration::from_secs(2)).unwrap();
+        assert_eq!(text,b"layout: us\n");
+        let err=bounded_query("sh",&["-c","head -c 1024 /dev/zero"],
+            128,Duration::from_secs(2)).unwrap_err();
+        assert!(err.contains("safe size")||err.contains("command failed"));
+        let started=Instant::now();
+        let err=bounded_query("sh",&["-c","exec sleep 2"],
+            128,Duration::from_millis(75)).unwrap_err();
+        assert!(err.contains("timed out"));
+        assert!(started.elapsed()<Duration::from_secs(1),
+            "a blocked inspector must never block the UI or future refreshes");
+    }
     #[test] fn per_device_input_is_an_explicit_unsupported_mode() {
         assert_eq!(CAPTURE_POLICY,CapturePolicy::InspectionOnly);
         assert!(CAPTURE_POLICY.explanation().contains("unsupported"));

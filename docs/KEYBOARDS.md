@@ -134,6 +134,14 @@ Protocol: [Wayland core wl_seat](https://wayland.app/protocols/wayland) and [Way
 
 **Acceptance update, 2026-10-23:** [CI 40032741759](https://github.com/sguzman/typefinch/actions/runs/40032741759) passed 147 Rust tests, eight synthetic Wayland parent/subprocess scenarios, six synthetic Hyprland inventory scenarios, actual read-only Weston protocol connectivity (0 keyboard-capable seats), native X11 seat inspection, and full X11 graphical QA. The suite covers duplicate Wayland seat names by registry ID, malformed seat names, incomplete Hyprland inventory rejection, stale/refreshing metadata guards, and disconnected compositor failures. These are software acceptance results, **not** live keyboard-equipped Wayland, physical Hyprland hotplug or per-device typing evidence.
 
+## Read-only keyboard inspector CLI
+
+`typefinch --inspect-keyboards` launches no GUI and reads the same bounded, read-only compositor metadata as the keyboard panel. It outputs JSON with `schema: 1`, `capture_policy: "inspection-only"`, and `rows`. Each row has a descriptive `label`, opaque compositor-local `inspection_id`, and nullable `reported_active_keymap`, `configured_layout`, and `configured_variant`. Null means that information is not available. The X11 layout describes configured groups, **not the active input group**; standard Wayland seats have no verified active keymap, even when keyboard-capable. IDs are not physical input sources.
+
+When no supported compositor or X11 session is available, the command emits an error on stderr, exits nonzero, and prints no success JSON. It never subscribes to `wl_keyboard`, opens raw input devices, intercepts keys, writes settings, or accesses saved profiles and sessions.
+
+[CI 40037472601](https://github.com/sguzman/typefinch/actions/runs/40037472601) passed 151 Rust tests and end-to-end CLI checks under actual nested Weston keyboard-capable and input-disabled virtual seats, an X11/Xvfb aggregate seat, and a disconnected session. The full native graphical suite passed separately in the same run. These tests do **not** establish live physical keyboard attribution, hardware hotplug, or active generic XKB seat detection.
+
 ## Private passage and goal transfer checks
 
 Although not keyboard hardware functions, personal goals and imported private text must not accidentally become input telemetry. [CI 40025534946](https://github.com/sguzman/typefinch/actions/runs/40025534946) validates 141 Rust tests including goals-only format isolation across two local profiles, atomic file export, negative symbolic-link imports and complete extended-grapheme preservation for large emoji passages. Existing egui UI controls are implemented, but specific native GUI clicking/typing acceptance remains open rather than being credited as complete.

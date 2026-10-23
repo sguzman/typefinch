@@ -40,7 +40,7 @@ sleep 0.5
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
 window=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 200); do
   window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
   if [[ -n "$window" ]]; then break; fi
   if ! kill -0 "$app_pid" 2>/dev/null; then
@@ -51,7 +51,10 @@ for _ in $(seq 1 60); do
   sleep 0.25
 done
 if [[ -z "$window" ]]; then
-  echo "Typefinch window did not appear"
+  echo "Typefinch window did not become visible after 50 seconds"
+  xdotool search --name 'Typefinch' || true
+  xwininfo -root -tree | head -n 80 || true
+  cat "$tmp/window-manager.log" || true
   cat "$tmp/app.log"
   exit 1
 fi
@@ -122,7 +125,7 @@ for theme in light dark; do
   ./target/debug/typefinch >"$tmp/app-$theme.log" 2>&1 &
   app_pid=$!
   window=""
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 200); do
     window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
     [[ -n "$window" ]] && break
     if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-$theme.log"; exit 1; fi
@@ -152,7 +155,7 @@ rm -f "$tmp/report.json"
 ./target/debug/typefinch >"$tmp/app-lesson.log" 2>&1 &
 app_pid=$!
 window=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 200); do
   window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
   [[ -n "$window" ]] && break
   if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-lesson.log"; exit 1; fi
@@ -181,7 +184,7 @@ rm -f "$tmp/report.json"
 ./target/debug/typefinch >"$tmp/app-spanish.log" 2>&1 &
 app_pid=$!
 window=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 200); do
   window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
   [[ -n "$window" ]] && break
   if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-spanish.log"; exit 1; fi

@@ -107,6 +107,28 @@ elseif mode == "prepare-lesson" then
     config.lesson_id="home"
     config.theme="dark"
     save(path,json.encode(config))
+elseif mode == "prepare-spanish" then
+    local path=assert(arg[2])
+    local config=assert(json.decode(read(path)))
+    config.test_mode="words"
+    config.language="es-MX"
+    config.word_difficulty="easy"
+    config.theme="dark"
+    save(path,json.encode(config))
+elseif mode == "spanish" then
+    local r=report(assert(arg[2]))
+    assert(r.state=="finished")
+    equals(r.tests,5)
+    equals(r.entered,#"casa mesa gato perro")
+    equals(r.correct,r.entered)
+    local rows=dbquery("SELECT test_mode,duration_ms,entered,correct FROM sessions ORDER BY id")
+    equals(#rows,5)
+    equals(rows[1].test_mode,"words")
+    local latest=rows[5]
+    equals(latest.test_mode,"words/es-MX/easy")
+    equals(latest.duration_ms,2000)
+    equals(latest.entered,latest.correct)
+    print("Multilingual native typing PASS: Spanish easy corpus and isolated SQLite history")
 elseif mode == "lesson" then
     local r=report(assert(arg[2]))
     assert(r.state=="finished")

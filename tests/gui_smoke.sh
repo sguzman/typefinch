@@ -170,3 +170,29 @@ sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
 sleep 0.7
 lua5.4 tests/smoke_assert.lua lesson "$tmp/report.json"
+
+# Verify the running native GUI honors a persisted Mexican Spanish Easy
+# language selection and never merges it with existing English history.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+lua5.4 tests/smoke_assert.lua prepare-spanish "$XDG_CONFIG_HOME/typefinch/settings.json"
+rm -f "$tmp/report.json"
+./target/debug/typefinch >"$tmp/app-spanish.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 60); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-spanish.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No Spanish test window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 35 "casa mesa gato perro"
+sleep 2.4
+lua5.4 tests/smoke_assert.lua spanish "$tmp/report.json"

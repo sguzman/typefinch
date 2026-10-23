@@ -214,3 +214,29 @@ backup_db="${backups[0]}"
 backup_settings="${backup_db%-sessions.sqlite3}-settings.json"
 [[ -s "$backup_settings" ]] || { echo "Full backup settings are missing"; exit 1; }
 lua5.4 tests/smoke_assert.lua backup "$backup_db" "$backup_settings"
+
+# Native SVG profile designer: verify selected palette and font are honored.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+lua5.4 tests/smoke_assert.lua prepare-card-theme "$XDG_CONFIG_HOME/typefinch/settings.json"
+./target/debug/typefinch >"$tmp/app-card.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-card.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No profile-card window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool key --clearmodifiers F6
+for _ in $(seq 1 40); do
+  [[ -s "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg" ]] && break
+  sleep 0.1
+done
+xmllint --noout "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
+lua5.4 tests/smoke_assert.lua card-theme "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"

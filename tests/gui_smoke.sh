@@ -64,6 +64,11 @@ fi
 xdotool windowfocus --sync "$window"
 # The native window can become visible before its first egui input frame.
 sleep 0.4
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.4
 xdotool type --clearmodifiers --delay 55 "little finches practice every day"
@@ -83,6 +88,11 @@ fi
 echo "Native X11 window and synthetic typing session both verified."
 
 # A second session exercises real clipboard paste suppression, not just unit logic.
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 35 "little finches"
@@ -91,6 +101,11 @@ xdotool key --clearmodifiers ctrl+v
 sleep 2.4
 lua5.4 tests/smoke_assert.lua paste "$tmp/report.json"
 # Exercise a real corrected error to separate raw from final metrics.
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 32 "little finchex"
@@ -168,6 +183,11 @@ fi
 xdotool windowfocus --sync "$window"
 # The native window can become visible before its first egui input frame.
 sleep 0.4
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
@@ -194,6 +214,11 @@ done
 xdotool windowactivate --sync "$window" 2>/dev/null || true
 xdotool windowfocus --sync "$window"
 sleep 0.4
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 35 "casa mesa gato perro"
@@ -268,6 +293,11 @@ done
 xdotool windowactivate --sync "$window" 2>/dev/null || true
 xdotool windowfocus --sync "$window"
 sleep 0.4
+# Window focus can move after ImageMagick captures and restarts.
+# Explicit refocus prevents a missed F5 from silently corrupting QA.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 29 "cat dog sun moon"

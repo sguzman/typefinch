@@ -236,6 +236,19 @@ mod tests {
             }
         }
     }
+    #[test] fn printable_geometry_matches_xkb_physical_codes_without_ambiguous_edges() {
+        use crate::geometry::{self,Shape,SlotKind};
+        for shape in Shape::ALL {
+            for slot in geometry::slots(shape) {
+                if slot.kind==SlotKind::Character {
+                    assert_eq!(evdev_code(slot.egui_key.expect("character slot requires egui key")),
+                        Some(slot.evdev), "{shape:?} {}",slot.name);
+                } else {
+                    assert!(slot.egui_key.is_none(),"non-character slot attributed: {}",slot.name);
+                }
+            }
+        }
+    }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());
     }

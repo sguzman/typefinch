@@ -120,13 +120,13 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
     let jis=shape==Shape::Jis;
     let split=shape==Shape::Split;
     result.extend([
-        special("Backspace","⌫",14,0,if jis {150} else {130},20,false),
-        special("Tab","⇥",15,1,0,15,false),
+        special("Backspace","Bksp",14,0,if jis {150} else {130},20,false),
+        special("Tab","Tab",15,1,0,15,false),
         special("Caps Lock","Caps",58,2,0,20,true),
-        special("Enter","↵",28,2,if shape==Shape::Split {158} else {130},
+        special("Enter","Enter",28,2,if shape==Shape::Split {158} else {130},
             if jis {25} else if split {20} else {22},false),
-        special("Left Shift","⇧",42,3,0,if shape==Shape::Iso {20} else {30},true),
-        special("Right Shift","⇧",54,3,
+        special("Left Shift","Shift",42,3,0,if shape==Shape::Iso {20} else {30},true),
+        special("Right Shift","Shift",54,3,
             if split {158} else if jis {140} else {130},
             if split {18} else {22},true),
         special("Left Ctrl","Ctrl",29,4,0,12,true),

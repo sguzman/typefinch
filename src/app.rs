@@ -1060,7 +1060,7 @@ impl Typefinch {
             self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(key,shift,alt_gr))
         } else {None};
         let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
-        let value=if key==egui::Key::Space && value==" " {"␣".to_string()} else {value};
+        let value=if key==egui::Key::Space && value==" " {"Space".to_string()} else {value};
         let missed=if value.chars().count()==1 {
             value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
         } else {0};
@@ -1102,7 +1102,7 @@ impl Typefinch {
         };
         let symbol=match slot.kind {
             SlotKind::Control|SlotKind::Modifier=>slot.caption.to_string(),
-            SlotKind::Decoration=>"␣".to_string(),
+            SlotKind::Decoration=>"Space".to_string(),
             SlotKind::Extra=>mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()}),
             SlotKind::Character=>unreachable!("normal keys use show_preview_key"),
         };
@@ -1179,7 +1179,7 @@ impl Typefinch {
             }
         });
         ui.small("Control and modifier positions are illustrations, not separately captured physical events. ISO/JIS extras are unattributed. Split geometry never duplicates scored Space.");
-        ui.small("◌ = actual XKB dead key (hover for name); – = unknown/unmapped; ␣ = Space. Shift/AltGr levels shown are inspected symbols, not evidence of physical AltGr input.");
+        ui.small("Dead accents (◌) and unknown mappings (–) have distinct labels. Space and modifier captions are always readable text. AltGr inspection is not physical AltGr attribution.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty(){
             ui.small("Slower single-key intervals (current session only; ≥2 samples each):");

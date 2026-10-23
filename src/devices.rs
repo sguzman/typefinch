@@ -40,18 +40,32 @@ pub fn preserve_selection(previous:Option<&str>, devices:&[Keyboard])->usize {
 enum InspectorBackend {Hyprland, X11Aggregate, WaylandAggregate, Unavailable}
 fn backend_for_session(hyprland:bool,session_type:Option<&str>,
     has_x11_display:bool,has_wayland_socket:bool)->InspectorBackend {
-    if hyprland {InspectorBackend::Hyprland}
-    else if session_type==Some("x11") && has_x11_display {InspectorBackend::X11Aggregate}
+    // An explicit X11 session is authoritative: a stale inherited Hyprland
+    // signature must not force Hyprland inspection or Wayland polling.
+    if session_type==Some("x11") {
+        if has_x11_display {InspectorBackend::X11Aggregate}
+        else {InspectorBackend::Unavailable}
+    } else if hyprland {InspectorBackend::Hyprland}
     else if session_type==Some("wayland") && has_wayland_socket {InspectorBackend::WaylandAggregate}
     else {InspectorBackend::Unavailable}
 }
-pub fn inspect() -> Result<Vec<Keyboard>, String> {
-    match backend_for_session(
-        std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some(),
+fn env_has_value(name:&str)->bool {
+    std::env::var_os(name).is_some_and(|value|!value.is_empty())
+}
+fn configured_backend()->InspectorBackend {
+    backend_for_session(
+        env_has_value("HYPRLAND_INSTANCE_SIGNATURE"),
         std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
-        std::env::var_os("DISPLAY").is_some(),
-        std::env::var_os("WAYLAND_DISPLAY").is_some()
-            || std::env::var_os("WAYLAND_SOCKET").is_some()) {
+        env_has_value("DISPLAY"),
+        env_has_value("WAYLAND_DISPLAY") || env_has_value("WAYLAND_SOCKET"))
+}
+/// Only active Wayland-compositor inspectors poll while focused. Configured
+/// X11 metadata remains on-demand even when stale Hyprland variables exist.
+pub fn supports_polling()->bool {
+    matches!(configured_backend(),InspectorBackend::Hyprland|InspectorBackend::WaylandAggregate)
+}
+pub fn inspect() -> Result<Vec<Keyboard>, String> {
+    match configured_backend() {
         InspectorBackend::Hyprland=>inspect_hyprland(),
         InspectorBackend::X11Aggregate=>inspect_x11_seat(),
         InspectorBackend::WaylandAggregate=>inspect_wayland_seats(),
@@ -296,7 +310,8 @@ mod tests {
         assert_eq!(backend_for_session(false,Some("x11"),false,true),Unavailable);
         assert_eq!(backend_for_session(false,Some("x11"),true,true),X11Aggregate);
         assert_eq!(backend_for_session(true,Some("wayland"),true,true),Hyprland);
-        assert_eq!(backend_for_session(true,Some("x11"),true,true),Hyprland);
+        assert_eq!(backend_for_session(true,Some("x11"),true,true),X11Aggregate);
+        assert_eq!(backend_for_session(true,Some("x11"),false,true),Unavailable);
     }
     #[test] fn wayland_seat_protocol_metadata_never_invents_input_layouts() {
         let payload=serde_json::to_vec(&vec![

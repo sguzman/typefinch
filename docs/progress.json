@@ -543,7 +543,7 @@
               "id": "T402",
               "emoji": "🎛️",
               "name": "Multiple connected keyboards",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Read-only device chooser coded",
@@ -556,7 +556,8 @@
                 },
                 {
                   "text": "Reliable per-device event attribution or explicit unsupported mode",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/devices.rs CapturePolicy::InspectionOnly and src/app.rs: visible no-per-device typing mode, no physical event stream; unit test with two separate keyboard inspection identities, CI 40014109451: complete Rust and native X11 suites passed"
                 }
               ]
             },
@@ -586,11 +587,12 @@
               "id": "T404",
               "emoji": "🔐",
               "name": "Optional authorized per-device capture",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Permission and threat model",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "docs/DEVICE_INPUT_SECURITY.md: threat boundary, explicit permission requirements, revocation, focus scoping, no global evdev/root capture, no double-scoring and negative acceptance tests; design-only, no capture implementation"
                 },
                 {
                   "text": "Opt-in backend",

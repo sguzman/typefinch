@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███████░░░ 72%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███████░░░ 74%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `████████░░ 77%`
 
@@ -78,7 +78,7 @@
 - 🐦 Local identity — `█████████░ 89%`
 - 🌗 Appearance — `███████░░░ 70%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 65%`
+## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 72%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
@@ -110,22 +110,22 @@
   - [x] Function/navigation and numeric keypad reference views — src/geometry.rs, src/app.rs and tests/gui_smoke.sh: 26 function/navigation and 17 keypad Linux evdev reference keys, non-overlap/uniqueness/non-attribution tests and F10 native selection; Actions 40006834967 passed 118 Rust tests and X11 GUI assertions, both archived screenshots visually inspected
   - [ ] Complete control/modifier and edge-key geometry
 
-### 🔌 P4 — Keyboard detection and selection — `████░░░░░░ 42%`
+### 🔌 P4 — Keyboard detection and selection — `██████░░░░ 59%`
 
 - 🔍 **T401** Hyprland device inspection — `███████░░░ 67%`
   - [x] Read-only hyprctl query coded — src/devices.rs
   - [x] Device and active map display coded — src/app.rs
   - [ ] Live connected-keyboard test
-- 🎛️ **T402** Multiple connected keyboards — `███░░░░░░░ 33%`
+- 🎛️ **T402** Multiple connected keyboards — `███████░░░ 67%`
   - [x] Read-only device chooser coded — src/app.rs
   - [ ] Hotplug support
-  - [ ] Reliable per-device event attribution or explicit unsupported mode
+  - [x] Reliable per-device event attribution or explicit unsupported mode — src/devices.rs CapturePolicy::InspectionOnly and src/app.rs: visible no-per-device typing mode, no physical event stream; unit test with two separate keyboard inspection identities, CI 40014109451: complete Rust and native X11 suites passed
 - 🪟 **T403** Generic compositor fallback — `███████░░░ 67%`
   - [x] Safe Hyprland-unavailable state coded — src/devices.rs
   - [ ] Generic XKB seat detection
   - [x] X11 fallback — src/devices.rs: gated read-only setxkbmap -query on genuine X11 sessions, one clearly labeled aggregate seat rather than invented devices; CI 40008974131: 122 Rust tests and dedicated live Xvfb seat probe, plus graphical suite passed
-- 🔐 **T404** Optional authorized per-device capture — `░░░░░░░░░░ 0%`
-  - [ ] Permission and threat model
+- 🔐 **T404** Optional authorized per-device capture — `███░░░░░░░ 33%`
+  - [x] Permission and threat model — docs/DEVICE_INPUT_SECURITY.md: threat boundary, explicit permission requirements, revocation, focus scoping, no global evdev/root capture, no double-scoring and negative acceptance tests; design-only, no capture implementation
   - [ ] Opt-in backend
   - [ ] No global interception verification
 
@@ -133,7 +133,7 @@
 
 - 🗺️ Layout recognition — `████████░░ 78%`
 - 🔀 Software layout emulation — `████████░░ 79%`
-- 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
+- 🔌 Multi-keyboard selection — `█████░░░░░ 50%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`
 

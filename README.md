@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███████░░░ 66%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `███████░░░ 69%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -141,3 +141,7 @@ The guarded startup path also avoids opening or migrating the saved SQLite datab
 **Non-overwriting restore staging:** `typefinch --restore-backup-to-new-dir SETTINGS.json SESSIONS.sqlite3 NEW_DIRECTORY` validates a paired backup then copies it into a brand-new directory, with owner-only permissions on Unix. It refuses preexisting destinations and does not touch or activate the current profile. In-app recovery verification remains a separate read-only control.
 
 **XKB modifier-layer inspector:** The keyboard preview now switches among Base, Shift, AltGr and Shift+AltGr to inspect installed layouts. Linux XKB Level-3 symbols (for example, German AltGr+E → €) are resolved with the same native keymap, while unsupported personal-map AltGr layers show an explicit unavailable glyph. Input emulation still does not claim compositor-independent physical AltGr or dead-key/Compose support.
+
+**Keyboard-driven preview:** F3 cycles Base, Shift, AltGr and Shift+AltGr without changing the system keyboard or the active typing session. This is an in-app symbol inspector, not modifier-event interception.
+
+**Recovery and focus QA:** [102 passing Rust tests plus native recovery staging, corrupt/orphaned settings protection, and two-window focus-loss cancellation](https://github.com/sguzman/typefinch/actions/runs/39967868689). Real Hyprland hardware acceptance and full IME handling remain open.

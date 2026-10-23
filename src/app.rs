@@ -28,6 +28,10 @@ impl PreviewLayer {
     }
     fn shift(self)->bool {matches!(self,Self::Shift|Self::ShiftAltGr)}
     fn alt_gr(self)->bool {matches!(self,Self::AltGr|Self::ShiftAltGr)}
+    fn next(self)->Self {
+        match self {Self::Base=>Self::Shift,Self::Shift=>Self::AltGr,
+            Self::AltGr=>Self::ShiftAltGr,Self::ShiftAltGr=>Self::Base}
+    }
 }
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
@@ -1000,7 +1004,7 @@ impl Typefinch {
         ];
         ui.heading("Keyboard mapping preview");
         ui.horizontal_wrapped(|ui| {
-            ui.label("Modifier layer");
+            ui.label("Modifier layer (F3 cycles)");
             egui::ComboBox::from_id_salt("preview-modifier-layer")
                 .selected_text(self.preview_layer.label()).show_ui(ui,|ui| {
                     for layer in PreviewLayer::ALL {
@@ -1381,6 +1385,9 @@ impl eframe::App for Typefinch {
         if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
             ctx.memory_mut(|m|m.request_focus(egui::Id::new("typing_surface")));
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
+            self.preview_layer=self.preview_layer.next();
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
         }
@@ -1490,7 +1497,7 @@ impl eframe::App for Typefinch {
                         ui.group(|ui| {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
-                            ui.label("F1: toggle this guide · F2: focus typing · F5: start or restart · Escape: cancel an active test.");
+                            ui.label("F1: toggle guide · F2: focus typing · F3: cycle keyboard preview · F5: start/restart · Escape: cancel.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");
@@ -1535,6 +1542,18 @@ mod palette_tests {
     fn contrast(a:Color32,b:Color32)->f64 {
         let x=brightness(a);let y=brightness(b);
         (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn preview_modifier_cycle_is_deterministic_and_only_presentation() {
+        let mut layer=PreviewLayer::Base;
+        for expected in [PreviewLayer::Shift,PreviewLayer::AltGr,
+            PreviewLayer::ShiftAltGr,PreviewLayer::Base] {
+            layer=layer.next();
+            assert_eq!(layer,expected);
+        }
+        assert_eq!(PreviewLayer::ALL.len(),4);
+        assert!(PreviewLayer::AltGr.alt_gr());
+        assert!(!PreviewLayer::Shift.alt_gr());
+        assert!(PreviewLayer::ShiftAltGr.shift());
     }
     #[test] fn reduced_motion_preserves_normal_timing_when_disabled() {
         assert_eq!(motion_seconds(true,0.15),0.0);

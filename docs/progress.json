@@ -117,7 +117,7 @@
               "id": "T101",
               "emoji": "👤",
               "name": "Multiple local profiles",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Create/select profile UI coded",
@@ -131,7 +131,8 @@
                 },
                 {
                   "text": "Recovery, collisions, migrations and actual runtime testing",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/preferences.rs: stable profile UUID migrations, missing/corrupt identity guards; src/backup_verify.rs: validated isolated recovery; native X11 recovery and rollback tests, Actions 39967868689"
                 }
               ]
             },
@@ -191,7 +192,7 @@
               "id": "T201",
               "emoji": "⚡",
               "name": "Typing input and session lifecycle",
-              "progress": 50,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Input handlers implemented",
@@ -205,7 +206,8 @@
                 },
                 {
                   "text": "End-to-end text/paste/focus QA",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "tests/gui_smoke.sh: real typed/paste prevention and two-window focus-loss cancellation, no SQLite row; Actions 39967868689"
                 },
                 {
                   "text": "IME support",
@@ -1162,7 +1164,7 @@
               "id": "T903",
               "emoji": "♿",
               "name": "Accessibility review",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Keyboard-only audit",
@@ -1170,7 +1172,8 @@
                 },
                 {
                   "text": "Contrast/reduced motion",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs: WCAG-oriented contrast palette tests and reduce-motion timing tests; native light/dark screenshot QA, Actions 39967868689"
                 },
                 {
                   "text": "Unicode fonts",

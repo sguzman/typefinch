@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███████░░░ 66%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███████░░░ 69%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `███████░░░ 72%`
+## 🐣 M0 — Native typing MVP — `████████░░ 77%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -28,12 +28,12 @@
   - [ ] Keyboard navigation audit
   - [x] HiDPI/small-window screenshots — CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface
 
-### 🐦 P1 — Profiles and persistence — `████████░░ 78%`
+### 🐦 P1 — Profiles and persistence — `█████████░ 89%`
 
-- 👤 **T101** Multiple local profiles — `███████░░░ 67%`
+- 👤 **T101** Multiple local profiles — `██████████ 100%`
   - [x] Create/select profile UI coded — src/app.rs
   - [x] JSON persistence coded — src/preferences.rs
-  - [ ] Recovery, collisions, migrations and actual runtime testing
+  - [x] Recovery, collisions, migrations and actual runtime testing — src/preferences.rs: stable profile UUID migrations, missing/corrupt identity guards; src/backup_verify.rs: validated isolated recovery; native X11 recovery and rollback tests, Actions 39967868689
 - 🗄️ **T102** SQLite test history — `██████████ 100%`
   - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
   - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
@@ -43,12 +43,12 @@
   - [x] Per-profile setting persistence — src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045
   - [ ] Export/import
 
-### ⌨️ P2 — Tests and core scoring — `███████░░░ 72%`
+### ⌨️ P2 — Tests and core scoring — `████████░░ 77%`
 
-- ⚡ **T201** Typing input and session lifecycle — `█████░░░░░ 50%`
+- ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
   - [x] Input handlers implemented — src/app.rs
   - [x] Start/cancel/restart coded — src/engine.rs
-  - [ ] End-to-end text/paste/focus QA
+  - [x] End-to-end text/paste/focus QA — tests/gui_smoke.sh: real typed/paste prevention and two-window focus-loss cancellation, no SQLite row; Actions 39967868689
   - [ ] IME support
 - 📏 **T202** WPM and accuracy calculations — `██████████ 100%`
   - [x] Pure scoring function implemented — src/engine.rs
@@ -74,8 +74,8 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `███████░░░ 72%`
-- 🐦 Local identity — `████████░░ 78%`
+- ⌨️ Typing tests — `████████░░ 77%`
+- 🐦 Local identity — `█████████░ 89%`
 - 🌗 Appearance — `███████░░░ 70%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 49%`
@@ -244,11 +244,11 @@
 - 🌏 Languages — `███░░░░░░░ 33%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
-## 📦 M6 — Release quality — `█████░░░░░ 50%`
+## 📦 M6 — Release quality — `██████░░░░ 58%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `█████░░░░░ 50%`
+### 🧪 P9 — Acceptance and release — `██████░░░░ 58%`
 
 - 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
@@ -258,9 +258,9 @@
   - [x] Headless run — Xvfb + Openbox + Mesa launched native egui app, typed 33 chars and captured screenshot; Actions 39870050679
   - [ ] Keyboard/input QA
   - [ ] Theme/layout screenshots
-- ♿ **T903** Accessibility review — `░░░░░░░░░░ 0%`
+- ♿ **T903** Accessibility review — `███░░░░░░░ 33%`
   - [ ] Keyboard-only audit
-  - [ ] Contrast/reduced motion
+  - [x] Contrast/reduced motion — src/app.rs: WCAG-oriented contrast palette tests and reduce-motion timing tests; native light/dark screenshot QA, Actions 39967868689
   - [ ] Unicode fonts
 - 🚀 **T904** Reproducible Linux release — `███████░░░ 67%`
   - [x] Versioned packages — GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal
@@ -270,5 +270,5 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🧪 Automated QA — `███████░░░ 67%`
-- 🚀 Release readiness — `███░░░░░░░ 34%`
+- 🚀 Release readiness — `█████░░░░░ 50%`
 

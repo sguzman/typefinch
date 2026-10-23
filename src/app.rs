@@ -98,6 +98,12 @@ fn inspected_target<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout])
         registry::resolve_active(installed,&keyboard.active_keymap)
     }
 }
+// Read-only inspection metadata must be freshly confirmed before users can
+// adopt it as an emulation target. Stale rows remain visible for diagnosis.
+fn inspected_target_if_fresh<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout],
+    inventory_fresh:bool)->Option<&'a InstalledLayout> {
+    if inventory_fresh {inspected_target(keyboard,installed)} else {None}
+}
 fn recorded_layout(mode:Mode, target:&str, keyboards:&[Keyboard], installed:&[InstalledLayout])->String {
     if mode == Mode::Emulated { return target.to_owned(); }
     let Some(first)=keyboards.first() else { return "os:unknown".to_owned() };
@@ -1076,7 +1082,8 @@ impl Typefinch {
                         k.active_keymap,k.layout,k.variant));
                 }
                 ui.small(format!("Inspection identifier: {}",k.address));
-                let matched=inspected_target(k,&self.installed_layouts).map(|l|l.id.clone());
+                let matched=inspected_target_if_fresh(k,&self.installed_layouts,
+                    self.device_inventory_fresh).map(|l|l.id.clone());
                 if let Some(id)=matched {
                     let label=if is_x11 {
                         "Use configured X11 layout as target"
@@ -1092,6 +1099,8 @@ impl Typefinch {
                             "Emulation target updated from reported Hyprland metadata; system settings unchanged.".into()
                         };
                     }
+                } else if !self.device_inventory_fresh {
+                    ui.small("Inspector metadata is unverified; refresh before adopting a layout target.");
                 } else if is_wayland {
                     ui.small("This aggregate Wayland seat cannot identify or select a physical keyboard's layout.");
                 } else if is_x11 {
@@ -1961,6 +1970,23 @@ mod palette_tests {
         assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
+    }
+    #[test] fn stale_inspector_inventory_cannot_supply_emulation_target() {
+        let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];
+        let configured=Keyboard{
+            address:X11_AGGREGATE_SEAT.into(),layout:"us".into(),
+            ..Default::default()
+        };
+        assert!(inspected_target_if_fresh(&configured,&installed,false).is_none());
+        assert_eq!(inspected_target_if_fresh(&configured,&installed,true).unwrap().id,"us");
+        let hyprland=Keyboard{
+            address:"0x1".into(),active_keymap:"English (US)".into(),
+            ..Default::default()
+        };
+        assert!(inspected_target_if_fresh(&hyprland,&installed,false).is_none());
+        assert_eq!(inspected_target_if_fresh(&hyprland,&installed,true).unwrap().id,"us");
+        let wayland=Keyboard{address:"wayland:seat:10".into(),..hyprland};
+        assert!(inspected_target_if_fresh(&wayland,&installed,true).is_none());
     }
     #[test] fn x11_configured_groups_are_never_claimed_as_observed_session_input() {
         let xkb=vec![

@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████░░░░░░ 40%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████░░░░░░ 44%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `███████░░░ 67%`
+## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -28,16 +28,16 @@
   - [ ] Keyboard navigation audit
   - [ ] HiDPI/small-window screenshots
 
-### 🐦 P1 — Profiles and persistence — `███████░░░ 67%`
+### 🐦 P1 — Profiles and persistence — `████████░░ 78%`
 
 - 👤 **T101** Multiple local profiles — `███████░░░ 67%`
   - [x] Create/select profile UI coded — src/app.rs
   - [x] JSON persistence coded — src/preferences.rs
   - [ ] Recovery, collisions, migrations and actual runtime testing
-- 🗄️ **T102** SQLite test history — `███████░░░ 67%`
+- 🗄️ **T102** SQLite test history — `██████████ 100%`
   - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
   - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
-  - [ ] Retention and backup tests
+  - [x] Retention and backup tests — src/history.rs: >100-session retention query, VACUUM INTO snapshot test and native F8 backup QA, CI 39895462191
 - 🎯 **T103** Per-profile goals and settings — `███████░░░ 67%`
   - [x] Settings and goals UI — src/app.rs: independent editable WPM/accuracy goals and progress bars; Actions 39888678045
   - [x] Per-profile setting persistence — src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045
@@ -75,7 +75,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - ⌨️ Typing tests — `███████░░░ 72%`
-- 🐦 Local identity — `███████░░░ 67%`
+- 🐦 Local identity — `████████░░ 78%`
 - 🌗 Appearance — `██████░░░░ 58%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `████░░░░░░ 35%`
@@ -216,16 +216,16 @@
 - 🐤 GitHub widget — `█████░░░░░ 47%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
-## 🌎 M5 — Multilingual typing — `░░░░░░░░░░ 0%`
+## 🌎 M5 — Multilingual typing — `███░░░░░░░ 25%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `░░░░░░░░░░ 0%`
+### 🗣️ P8 — Languages and input methods — `███░░░░░░░ 25%`
 
-- 🧾 **T801** Language packs and corpora — `░░░░░░░░░░ 0%`
-  - [ ] English/Spanish data
-  - [ ] Corpus provenance and license
-  - [ ] Difficulty grading
+- 🧾 **T801** Language packs and corpora — `██████████ 100%`
+  - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
+  - [x] Corpus provenance and license — docs/LANGUAGES.md: original Typefinch-authored passages with provenance/license description, CI 39895462191
+  - [x] Difficulty grading — src/engine.rs: heuristic Easy/Standard/Challenge word tiers and history isolation, CI 39895462191
 - 🔤 **T802** Grapheme and normalization scoring — `░░░░░░░░░░ 0%`
   - [ ] Grapheme segmentation
   - [ ] Normalization rules
@@ -241,7 +241,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🌏 Languages — `░░░░░░░░░░ 0%`
+- 🌏 Languages — `███░░░░░░░ 33%`
 - 🔤 Unicode correctness — `░░░░░░░░░░ 0%`
 
 ## 📦 M6 — Release quality — `███░░░░░░░ 33%`

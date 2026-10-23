@@ -138,7 +138,7 @@
               "id": "T102",
               "emoji": "🗄️",
               "name": "SQLite test history",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Schema and migrations",
@@ -152,7 +152,8 @@
                 },
                 {
                   "text": "Retention and backup tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: >100-session retention query, VACUUM INTO snapshot test and native F8 backup QA, CI 39895462191"
                 }
               ]
             },
@@ -975,19 +976,22 @@
               "id": "T801",
               "emoji": "🧾",
               "name": "Language packs and corpora",
-              "progress": 0,
+              "progress": 100,
               "checks": [
                 {
                   "text": "English/Spanish data",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: English and Mexican Spanish corpora, CI 39895462191"
                 },
                 {
                   "text": "Corpus provenance and license",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "docs/LANGUAGES.md: original Typefinch-authored passages with provenance/license description, CI 39895462191"
                 },
                 {
                   "text": "Difficulty grading",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: heuristic Easy/Standard/Challenge word tiers and history isolation, CI 39895462191"
                 }
               ]
             },

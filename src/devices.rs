@@ -362,12 +362,15 @@ mod tests {
         assert!(after[0].active_keymap.is_empty());
     }
     #[test] fn native_wayland_child_inspector_is_bounded_and_unattributed() {
-        // The CI Weston compositor has no attached hardware keyboard.
-        // This checks the actual production probe binary and parent parser,
-        // not seat-capability acceptance with physical keyboard hardware.
+        // This probes the real production child executable under either
+        // input-less headless Weston or a keyboard-capable nested Weston seat.
+        // The latter is compositor-level virtual input, NOT hardware QA.
         let Ok(exe)=std::env::var("TYPEFINCH_QA_WAYLAND_INSPECTOR") else {return;};
         assert_eq!(std::env::var("XDG_SESSION_TYPE").as_deref(),Ok("wayland"));
         let devices=inspect_wayland_seats_from_executable(&exe).unwrap();
+        if std::env::var_os("TYPEFINCH_QA_REQUIRE_KEYBOARD_SEAT").is_some() {
+            assert!(!devices.is_empty(),"virtual compositor must advertise a keyboard-capable wl_seat");
+        }
         assert!(devices.iter().all(|seat|
             seat.address.starts_with("wayland:seat:")
             && seat.active_keymap.is_empty()

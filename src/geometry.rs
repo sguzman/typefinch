@@ -5,7 +5,7 @@ use eframe::egui::Key;
 
 /// Rendered size of one tenth-key geometry unit. At this scale even
 /// the widest split main row stays within a typical 1100px QA window.
-pub const PREVIEW_UNIT_PX:f32=3.9;
+pub const PREVIEW_UNIT_PX:f32=3.8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape { Ansi, Iso, Jis, Split }
@@ -123,7 +123,8 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
         special("Backspace","⌫",14,0,if jis {150} else {130},20,false),
         special("Tab","⇥",15,1,0,15,false),
         special("Caps Lock","Caps",58,2,0,20,true),
-        special("Enter","↵",28,2,if shape==Shape::Split {148} else {130},if jis {25} else {22},false),
+        special("Enter","↵",28,2,if shape==Shape::Split {158} else {130},
+            if jis {25} else if split {20} else {22},false),
         special("Left Shift","⇧",42,3,0,if shape==Shape::Iso {20} else {30},true),
         special("Right Shift","⇧",54,3,
             if split {158} else if jis {140} else {130},

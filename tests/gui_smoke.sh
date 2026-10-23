@@ -19,6 +19,9 @@ cleanup() {
     for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png typefinch-recovery.png; do
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
+    for img in "$tmp"/typefinch-geometry-*.png; do
+      if [[ -s "$img" ]]; then cp "$img" "$GITHUB_WORKSPACE/"; fi
+    done
   fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
     for file in "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md" "$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.png"; do
@@ -545,6 +548,11 @@ for shape in iso jis split; do
   xdotool windowfocus --sync "$window"
   xdotool windowsize "$window" 1100 850
   sleep 0.7
+  # The keyboard is below the initial typing passage. Scroll the CENTRAL
+  # pane into view instead of saving an irrelevant top-of-page screenshot.
+  xdotool mousemove --window "$window" 825 590
+  xdotool click --repeat 8 --delay 70 5
+  sleep 0.6
   lua5.4 tests/smoke_assert.lua geometry-preview "$tmp/geometry-$shape.json" "$shape"
   import -window "$window" "$tmp/typefinch-geometry-$shape.png"
   [[ -s "$tmp/typefinch-geometry-$shape.png" ]] || {

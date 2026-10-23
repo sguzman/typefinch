@@ -3,6 +3,10 @@
 //! egui physical key event cannot yet prove ISO/JIS extra-key attribution.
 use eframe::egui::Key;
 
+/// Rendered size of one tenth-key geometry unit. At this scale even
+/// the widest split main row stays within a typical 1100px QA window.
+pub const PREVIEW_UNIT_PX:f32=3.9;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Shape { Ansi, Iso, Jis, Split }
 impl Shape {
@@ -105,6 +109,14 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn main_block_preview_row_fits_native_qa_center_pane() {
+        // This is a model bound, not a replacement for a rendered screenshot.
+        for shape in Shape::ALL {
+            let max_units=slots(shape).iter().map(|s|s.x + u16::from(s.width)).max().unwrap();
+            assert!((max_units as f32 * PREVIEW_UNIT_PX) <= 690.0,
+                "{shape:?} exceeds native QA geometry space");
+        }
+    }
     #[test] fn every_geometry_has_unique_real_evdev_positions() {
         for shape in Shape::ALL {
             let slots=slots(shape);

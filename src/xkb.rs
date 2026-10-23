@@ -131,7 +131,7 @@ fn evdev_code(key: Key) -> Option<u32> {
 mod tests {
     use super::*;
     #[test] fn common_system_xkb_layouts_compile() {
-        for id in ["us", "de", "fr", "es", "latam", "ru", "gr", "ara", "il"] {
+        for id in ["us", "de", "fr", "es", "latam", "ru", "gr", "ara", "il", "jp"] {
             assert!(Emulator::compile(id).is_ok(), "{id} did not compile");
         }
     }

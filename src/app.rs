@@ -145,6 +145,12 @@ impl Typefinch {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let loaded=Preferences::load_guarded();
         let mut prefs=loaded.prefs;
+        // Only synthetic native graphical QA swaps the XKB target so the JIS
+        // snapshot exercises installed Japanese symbols. Never persist this.
+        if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+            && std::env::var("TYPEFINCH_QA_PREVIEW_SHAPE").as_deref()==Ok("jis") {
+            prefs.layout="jp".to_owned();
+        }
         let settings_read_only=loaded.read_only;
         let startup_warning=loaded.warning.unwrap_or_default();
         if std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
@@ -202,7 +208,7 @@ impl Typefinch {
         if std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some()
             && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
             let _=crate::qa::write_geometry_report(
-                preview_shape.label(),&geometry::slots(preview_shape));
+                preview_shape.label(),&prefs.layout,&geometry::slots(preview_shape));
         }
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
@@ -1146,12 +1152,12 @@ impl Typefinch {
                     // That padding previously accumulated across the row,
                     // pushing ISO/JIS positions outside their model bounds.
                     ui.spacing_mut().item_spacing.x=0.0;
-                    const UNIT:f32=4.2;
+                    const UNIT:f32=geometry::PREVIEW_UNIT_PX;
                     let mut prev_end=0_u16;
                     for slot in slots.iter().filter(|s|s.row==row) {
                         let gap=slot.x.saturating_sub(prev_end) as f32*UNIT;
                         if gap>0.0 {ui.add_space(gap);}
-                        let width=(slot.width as f32*UNIT-14.0).max(26.0);
+                        let width=(slot.width as f32*UNIT-14.0).max(24.0);
                         if let Some(key)=slot.egui_key {
                             self.show_preview_key(ui,key,shift,alt_gr,width);
                         } else {

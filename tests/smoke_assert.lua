@@ -181,6 +181,7 @@ elseif mode == "geometry-preview" then
     local v=assert(expected[shape],"unknown geometry")
     assert(r.synthetic and r.state=="geometry-preview")
     equals(r.shape,v.name)
+    equals(r.target,shape=="jis" and "jp" or "us")
     equals(r.slots,v.slots)
     equals(r.unattributed,v.unattributed)
     equals(r.visual_only,v.visual_only)

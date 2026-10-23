@@ -158,6 +158,38 @@ mod tests {
         assert_eq!(session.attempts, 1);
         assert_eq!(session.score().accuracy, 100.0);
     }
+    #[test] fn installed_layout_regression_matrix_preserves_symbols_and_levels() {
+        // Actual XKB symbols, not inferred transliterations. The matrix covers
+        // ANSI punctuation, Shift, Level 3 and several non-Latin alphabets.
+        // Full geometry and compositor-specific modifier handling are separate.
+        let cases: &[(&str, Key, bool, bool, &str)] = &[
+            ("us", Key::Num1, false, false, "1"),
+            ("us", Key::Num1, true, false, "!"),
+            ("us", Key::Minus, true, false, "_"),
+            ("us", Key::OpenBracket, true, false, "{"),
+            ("us", Key::Quote, true, false, "\""),
+            ("us", Key::Backslash, true, false, "|"),
+            ("de", Key::Y, false, false, "z"),
+            ("de", Key::Z, false, false, "y"),
+            ("de", Key::E, false, true, "€"),
+            ("fr", Key::Q, false, false, "a"),
+            ("fr", Key::A, false, false, "q"),
+            ("fr", Key::Num1, true, false, "1"),
+            ("es", Key::Num1, false, false, "1"),
+            ("latam", Key::E, false, false, "e"),
+            ("us(dvorak)", Key::E, false, false, "."),
+            ("us(colemak)", Key::E, false, false, "f"),
+            ("ru", Key::Q, false, false, "й"),
+            ("gr", Key::A, false, false, "α"),
+            ("il", Key::A, false, false, "ש"),
+            ("ara", Key::Q, false, false, "ض"),
+        ];
+        for &(id, key, shift, alt_gr, expected) in cases {
+            let layout = Emulator::compile(id).unwrap_or_else(|_| panic!("missing XKB layout {id}"));
+            assert_eq!(layout.translate_layer(key, shift, alt_gr).as_deref(), Some(expected),
+                "regression in {id} {key:?}, Shift={shift}, AltGr={alt_gr}");
+        }
+    }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());
     }

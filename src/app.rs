@@ -39,6 +39,25 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
     hyprland && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
 }
+// Manual requests and the focus/hotplug watcher share one bounded inspector.
+// A slow external compositor command must not block typing or allow repeated
+// clicks to create an unbounded number of detached processes.
+fn launch_device_inspection<F>(
+    pending:&mut Option<Receiver<Result<Vec<Keyboard>,String>>>,
+    repaint:Option<egui::Context>,
+    inspect:F,
+)->bool
+where F:FnOnce()->Result<Vec<Keyboard>,String>+Send+'static {
+    if pending.is_some(){return false;}
+    let (sender,receiver)=mpsc::channel();
+    *pending=Some(receiver);
+    std::thread::spawn(move || {
+        let result=inspect();
+        let _=sender.send(result);
+        if let Some(ctx)=repaint {ctx.request_repaint();}
+    });
+    true
+}
 // Wayland normally combines physical keyboards into a seat-level event stream.
 // Only tag OS input with a detected layout when all reported Hyprland keyboards
 // agree. A configured X11 seat layout is *not* an active input group and must
@@ -270,18 +289,10 @@ impl Typefinch {
         self.device_error=error;
     }
     fn request_device_query(&mut self,ctx:&egui::Context) {
-        // A newer request replaces the receiver for an older result. The
-        // detached inspector never runs on the UI thread, and a stale
-        // response cannot overwrite more recent keyboard metadata.
-        let (send,receive)=mpsc::channel();
-        self.pending_device_query=Some(receive);
-        self.device_poll_started=Instant::now();
-        let repaint=ctx.clone();
-        std::thread::spawn(move || {
-            let result=devices::inspect();
-            let _=send.send(result);
-            repaint.request_repaint();
-        });
+        if launch_device_inspection(
+            &mut self.pending_device_query,Some(ctx.clone()),devices::inspect) {
+            self.device_poll_started=Instant::now();
+        }
     }
     fn refresh_keyboards(&mut self,ctx:&egui::Context) {
         self.request_device_query(ctx);
@@ -963,11 +974,14 @@ impl Typefinch {
         ui.heading("Keyboard / seat inspector");
         ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
         ui.vertical(|ui| {
-            if ui.button("Refresh device list").clicked() {
+            let pending=self.pending_device_query.is_some();
+            if ui.add_enabled(!pending,
+                egui::Button::new(if pending {"Inspecting..."} else {"Refresh device list"}))
+                .clicked() {
                 self.refresh_keyboards(ui.ctx());
             }
-            if self.pending_device_query.is_some() {
-                ui.small("Refreshing keyboard / seat metadata in the background.");
+            if pending {
+                ui.small("One read-only keyboard / seat inspection is running; typing stays responsive.");
             }
             if !self.keyboards.is_empty() {
                 self.device_index = self.device_index.min(self.keyboards.len() - 1);
@@ -1782,6 +1796,33 @@ mod palette_tests {
         assert_eq!(motion_seconds(true,0.15),0.0);
         assert_eq!(motion_seconds(false,0.15),0.15);
         assert_eq!(motion_seconds(false,0.0),0.0);
+    }
+    #[test] fn keyboard_inspector_is_single_flight_and_never_blocks_the_ui_thread() {
+        use std::sync::{Arc,atomic::{AtomicUsize,Ordering}};
+        let counter=Arc::new(AtomicUsize::new(0));
+        let (release,blocked)=mpsc::channel::<()>();
+        let mut pending=None;
+        let seen=Arc::clone(&counter);
+        assert!(launch_device_inspection(&mut pending,None,move||{
+            seen.fetch_add(1,Ordering::SeqCst);
+            blocked.recv_timeout(Duration::from_secs(5))
+                .map_err(|e|format!("test worker release: {e}"))?;
+            Ok(vec![Keyboard{address:"first".into(),..Default::default()}])
+        }));
+        assert!(pending.is_some());
+        let rejected=Arc::clone(&counter);
+        assert!(!launch_device_inspection(&mut pending,None,move||{
+            rejected.fetch_add(1,Ordering::SeqCst);
+            Ok(vec![Keyboard{address:"second".into(),..Default::default()}])
+        }));
+        // The UI can still handle input while the first inspector is waiting.
+        release.send(()).unwrap();
+        let first=pending.take().unwrap().recv_timeout(Duration::from_secs(5))
+            .unwrap().unwrap();
+        assert_eq!(first[0].address,"first");
+        assert_eq!(counter.load(Ordering::SeqCst),1);
+        assert!(launch_device_inspection(&mut pending,None,||Ok(Vec::new())));
+        assert!(pending.take().unwrap().recv_timeout(Duration::from_secs(5)).unwrap().unwrap().is_empty());
     }
     #[test] fn hyprland_hotplug_watch_is_bounded_focus_aware_and_opt_in_by_session() {
         assert!(!should_poll_devices(false,true,true,Duration::from_secs(30)));

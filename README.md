@@ -121,3 +121,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Verified versioned Linux preview:** [80 Rust tests, real X11 QA, optimized package and safe user-local upgrade/rollback](https://github.com/sguzman/typefinch/actions/runs/39958743350). This is a development preview; the MVP release gate is still open.
 
 **Headless CLI:** `typefinch --version` and `typefinch --help` return immediately without opening egui. Unknown flags fail explicitly instead of launching an unexpected window. This is verified by standard CI; packaged previews built before the change retain their original CLI behavior.
+
+**Keyboard access and reduced motion:** F1 opens a keyboard-navigation guide; F2 focuses the typing surface, Tab/Shift+Tab navigates egui controls, and Escape cancels a focused active test. A saved Reduce UI animations toggle sets egui transition time to zero without altering scored timers. System/Light/Dark remains independent and System stays the default. A full physical keyboard-only acceptance audit is still pending.

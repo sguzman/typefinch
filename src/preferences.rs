@@ -82,6 +82,7 @@ impl Default for Profile {
 #[serde(default)]
 pub struct Preferences {
     pub theme: Theme,
+    pub reduce_motion:bool,
     pub card_theme:CardTheme,
     pub card_font:CardFont,
     pub card_template:CardTemplate,
@@ -96,7 +97,7 @@ pub struct Preferences {
     pub duration_seconds: u64,
 }
 impl Default for Preferences {
-    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, card_template:CardTemplate::Classic, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), custom_layouts:Vec::new(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
+    fn default() -> Self { Self { theme:Theme::System, reduce_motion:false, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, card_template:CardTemplate::Classic, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), custom_layouts:Vec::new(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
 }
 pub fn base_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)
@@ -274,6 +275,12 @@ mod tests {
         let goals:Goals=serde_json::from_str(old).unwrap();
         assert_eq!(goals.daily_sessions,3);
         assert!(!goals.show_streak);
+    }
+    #[test] fn older_settings_default_to_animation_enabled() {
+        let mut data=serde_json::to_value(Preferences::default()).unwrap();
+        data.as_object_mut().unwrap().remove("reduce_motion");
+        let old:Preferences=serde_json::from_value(data).unwrap();
+        assert!(!old.reduce_motion);
     }
     #[test] fn older_settings_migrate_to_default_card_style() {
         let mut data=serde_json::to_value(Preferences::default()).unwrap();

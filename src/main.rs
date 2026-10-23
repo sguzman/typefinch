@@ -37,7 +37,7 @@ fn main() -> eframe::Result {
         LaunchIntent::Help=>{
             println!("Typefinch {} · local-first typing trainer",env!("CARGO_PKG_VERSION"));
             println!("Usage: typefinch [--version|--help]");
-            println!("GUI shortcuts: F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG");
+            println!("GUI shortcuts: F1 guide · F2 focus typing · F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG");
             return Ok(());
         },
         LaunchIntent::Invalid=>{

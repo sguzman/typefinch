@@ -77,8 +77,13 @@ fn key_heat_fill(errors:u32,dark:bool)->Color32 {
 }
 
 
+fn motion_seconds(reduced:bool,normal:f32)->f32 {
+    if reduced {0.0} else {normal}
+}
 pub struct Typefinch {
     prefs: Preferences,
+    normal_animation_time:f32,
+    show_keyboard_help:bool,
     session: Session,
     mode: Mode,
     session_layout: String,
@@ -116,7 +121,9 @@ impl Typefinch {
             Theme::Light => egui::ThemePreference::Light,
             Theme::Dark => egui::ThemePreference::Dark,
         });
+        let normal_animation_time=cc.egui_ctx.style().animation_time;
         cc.egui_ctx.all_styles_mut(|s| {
+            s.animation_time=motion_seconds(prefs.reduce_motion,normal_animation_time);
             s.spacing.item_spacing = egui::vec2(10.0, 9.0);
             s.spacing.button_padding = egui::vec2(11.0, 7.0);
             s.visuals.selection.bg_fill = PERIWINKLE;
@@ -133,7 +140,7 @@ impl Typefinch {
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let all_history=history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let earned_badges=achievements::earned(&all_history);
-        Self { prefs, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), message: String::new() }
@@ -665,6 +672,15 @@ impl Typefinch {
                 });
                 self.save();
             }
+            let was_reduced=self.prefs.reduce_motion;
+            if ui.checkbox(&mut self.prefs.reduce_motion,"Reduce UI animations").changed() {
+                let seconds=motion_seconds(self.prefs.reduce_motion,self.normal_animation_time);
+                ctx.all_styles_mut(|style|style.animation_time=seconds);
+                self.save();
+            }
+            if was_reduced!=self.prefs.reduce_motion {
+                ui.small("Transitions update immediately. This does not change typing test timers.");
+            }
         });
         ui.add_enabled_ui(self.session.state != State::Running, |ui| {
           ui.vertical(|ui| {
@@ -1194,6 +1210,12 @@ impl eframe::App for Typefinch {
         let focused=ctx.input(|i|i.focused);
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
+        if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
+            self.show_keyboard_help=!self.show_keyboard_help;
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
+            ctx.memory_mut(|m|m.request_focus(egui::Id::new("typing_surface")));
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             self.start_test(ctx);
         }
@@ -1284,6 +1306,22 @@ impl eframe::App for Typefinch {
                         ui.add_space(18.0);
                     }
                     ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui.button(if self.show_keyboard_help {"Hide keyboard guide (F1)"} else {"Keyboard guide (F1)"}).clicked() {
+                            self.show_keyboard_help=!self.show_keyboard_help;
+                        }
+                    });
+                    if self.show_keyboard_help {
+                        ui.group(|ui| {
+                            ui.strong("Keyboard-only navigation");
+                            ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
+                            ui.label("F1: toggle this guide · F2: focus typing · F5: start or restart · Escape: cancel an active test.");
+                            ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG.");
+                            ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
+                            ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");
+                        });
+                        ui.add_space(12.0);
+                    }
                     self.show_test(ui, ctx);
                     ui.add_space(24.0);
                     ui.separator();
@@ -1322,6 +1360,11 @@ mod palette_tests {
     fn contrast(a:Color32,b:Color32)->f64 {
         let x=brightness(a);let y=brightness(b);
         (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn reduced_motion_preserves_normal_timing_when_disabled() {
+        assert_eq!(motion_seconds(true,0.15),0.0);
+        assert_eq!(motion_seconds(false,0.15),0.15);
+        assert_eq!(motion_seconds(false,0.0),0.0);
     }
     #[test] fn hyprland_hotplug_watch_is_bounded_focus_aware_and_opt_in_by_session() {
         assert!(!should_poll_devices(false,true,true,Duration::from_secs(30)));

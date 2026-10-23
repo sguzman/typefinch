@@ -100,6 +100,12 @@ fn inspected_target<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout])
 }
 // Read-only inspection metadata must be freshly confirmed before users can
 // adopt it as an emulation target. Stale rows remain visible for diagnosis.
+fn inspection_confirmed(inventory_fresh:bool,inspection_pending:bool)->bool {
+    // A previously successful inventory is not current evidence while a
+    // newer inspection is running. Do not certify a new session's layout
+    // or adopt a reported keymap until the refresh finishes successfully.
+    inventory_fresh && !inspection_pending
+}
 fn inspected_target_if_fresh<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout],
     inventory_fresh:bool)->Option<&'a InstalledLayout> {
     if inventory_fresh {inspected_target(keyboard,installed)} else {None}
@@ -468,7 +474,8 @@ impl Typefinch {
             return;
         }
         self.session_layout = layout_for_new_session(self.mode,&self.prefs.layout,
-            &self.keyboards,&self.installed_layouts,self.device_inventory_fresh);
+            &self.keyboards,&self.installed_layouts,
+            inspection_confirmed(self.device_inventory_fresh,self.pending_device_query.is_some()));
         self.session_input_mode = if self.mode == Mode::System { "OS".into() } else { "Emulated".into() };
         self.composition = if self.mode == Mode::Emulated {
             self.emulator.as_ref().and_then(Emulator::compose_state)
@@ -1045,8 +1052,8 @@ impl Typefinch {
         ui.colored_label(accent_ink(ui.visuals().dark_mode),
             devices::CAPTURE_POLICY.explanation());
         ui.small("Read-only Hyprland device metadata, Wayland aggregate seat capabilities, or X11 configuration. Supported Wayland inspectors refresh on focus and every 20 seconds; no input capture.");
-        if !self.device_inventory_fresh {
-            ui.small("Keyboard inventory unverified after startup, focus change or failed inspection; recorded OS layout stays unknown.");
+        if !inspection_confirmed(self.device_inventory_fresh,self.pending_device_query.is_some()) {
+            ui.small("Keyboard inventory not yet verified after startup, focus change, refresh, or failed inspection; new OS layout attribution stays unknown.");
         }
         ui.vertical(|ui| {
             let pending=self.pending_device_query.is_some();
@@ -1083,7 +1090,8 @@ impl Typefinch {
                 }
                 ui.small(format!("Inspection identifier: {}",k.address));
                 let matched=inspected_target_if_fresh(k,&self.installed_layouts,
-                    self.device_inventory_fresh).map(|l|l.id.clone());
+                    inspection_confirmed(self.device_inventory_fresh,
+                        self.pending_device_query.is_some())).map(|l|l.id.clone());
                 if let Some(id)=matched {
                     let label=if is_x11 {
                         "Use configured X11 layout as target"
@@ -1099,8 +1107,9 @@ impl Typefinch {
                             "Emulation target updated from reported Hyprland metadata; system settings unchanged.".into()
                         };
                     }
-                } else if !self.device_inventory_fresh {
-                    ui.small("Inspector metadata is unverified; refresh before adopting a layout target.");
+                } else if !inspection_confirmed(self.device_inventory_fresh,
+                    self.pending_device_query.is_some()) {
+                    ui.small("Inspector metadata is unverified or refreshing; wait for a fresh result before adopting a layout target.");
                 } else if is_wayland {
                     ui.small("This aggregate Wayland seat cannot identify or select a physical keyboard's layout.");
                 } else if is_x11 {
@@ -1970,6 +1979,27 @@ mod palette_tests {
         assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
+    }
+    #[test] fn pending_inspection_never_certifies_new_session_or_target() {
+        let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];
+        let keyboard=Keyboard{
+            address:"0x1".into(),active_keymap:"English (US)".into(),
+            ..Default::default()
+        };
+        let keyboards=vec![keyboard.clone()];
+        assert!(inspection_confirmed(true,false));
+        assert!(!inspection_confirmed(true,true),
+            "a pending refresh invalidates adoption of old metadata");
+        assert!(!inspection_confirmed(false,false));
+        assert!(!inspection_confirmed(false,true));
+        assert_eq!(layout_for_new_session(Mode::System,"us",&keyboards,&installed,
+            inspection_confirmed(true,true)),"os:unknown");
+        assert!(inspected_target_if_fresh(&keyboard,&installed,
+            inspection_confirmed(true,true)).is_none());
+        assert_eq!(layout_for_new_session(Mode::System,"us",&keyboards,&installed,
+            inspection_confirmed(true,false)),"detected/us");
+        assert_eq!(layout_for_new_session(Mode::Emulated,"us",&keyboards,&installed,
+            inspection_confirmed(false,true)),"us");
     }
     #[test] fn stale_inspector_inventory_cannot_supply_emulation_target() {
         let installed=vec![InstalledLayout{id:"us".into(),name:"English (US)".into()}];

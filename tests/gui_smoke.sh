@@ -183,3 +183,43 @@ light,dark=map(float,sys.argv[1:3])
 assert light > dark + 0.25,(light,dark)
 print(f"Theme render PASS: light luminance={light:.3f}, dark={dark:.3f}")
 PY
+
+# Complete a native untimed practice lesson; duration zero must not finish early.
+python3 - "$XDG_CONFIG_HOME/typefinch/settings.json" <<'PY'
+import json,sys
+path=sys.argv[1]
+with open(path,encoding="utf-8") as f: data=json.load(f)
+data["test_mode"]="lesson"
+data["lesson_id"]="home"
+data["theme"]="dark"
+with open(path,"w",encoding="utf-8") as f: json.dump(data,f)
+PY
+rm -f "$tmp/report.json"
+./target/debug/typefinch >"$tmp/app-lesson.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 60); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-lesson.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No lesson window"; exit 1; }
+xdotool windowactivate --sync "$window"
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
+sleep 0.7
+python3 - "$tmp/report.json" <<'PY'
+import json,os,sqlite3,sys
+report=json.load(open(sys.argv[1]))
+assert report["state"]=="finished" and report["tests"]==4,report
+expected="asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
+with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
+    row=db.execute("SELECT test_mode,duration_ms,elapsed_ms,entered,correct FROM sessions ORDER BY id DESC LIMIT 1").fetchone()
+assert row is not None
+mode,duration,elapsed,entered,correct=row
+assert mode=="lesson/home" and duration==0 and elapsed>0,row
+assert entered==correct==len(expected),row
+print("Untimed practice PASS: native typing finished on last lesson character and persisted with distinct tag")
+PY

@@ -136,9 +136,17 @@ impl Preferences {
         let unsafe_to_write=|warning:&str|SettingsLoad{
             prefs:Self::default(),read_only:true,warning:Some(warning.to_owned())
         };
+        match fs::symlink_metadata(path) {
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>
+                return SettingsLoad{prefs:Self::default(),read_only:false,warning:None},
+            Err(_)=>return unsafe_to_write(
+                "Could not inspect the settings path. No data is replaced; settings and session recording are disabled."),
+            Ok(metadata) if !metadata.file_type().is_file()=>
+                return unsafe_to_write(
+                    "Existing settings path is not a regular file (or is a symbolic link). The original is preserved; settings and session recording are disabled."),
+            Ok(_)=>{},
+        }
         match fs::read(path) {
-            Err(e) if e.kind()==std::io::ErrorKind::NotFound =>
-                SettingsLoad{prefs:Self::default(),read_only:false,warning:None},
             Err(_)=>unsafe_to_write(
                 "Existing settings could not be read. The original is unchanged; settings and session recording are disabled to protect it."),
             Ok(bytes)=>match Self::parse_and_migrate(&bytes) {
@@ -215,6 +223,19 @@ mod tests {
         assert_eq!(fs::read(&settings).unwrap(),corrupt);
         assert_eq!(fs::read_dir(&dir).unwrap().count(),1);
         fs::remove_dir_all(&dir).unwrap();
+    }
+    #[cfg(unix)]
+    #[test] fn dangling_settings_symlink_must_not_count_as_first_run() {
+        use std::os::unix::fs::symlink;
+        let dir=std::env::temp_dir().join(format!("typefinch-symlink-{}",uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let link=dir.join("settings.json");
+        symlink("missing-target", &link).unwrap();
+        let result=Preferences::load_at(&link);
+        assert!(result.read_only);
+        assert!(result.warning.unwrap().contains("symbolic link"));
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        fs::remove_dir_all(dir).unwrap();
     }
     #[test] fn first_run_is_writable_but_empty_existing_profiles_are_guarded() {
         let dir=std::env::temp_dir().join(format!("typefinch-guard-{}",uuid::Uuid::new_v4()));

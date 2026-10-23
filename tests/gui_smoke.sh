@@ -62,7 +62,7 @@ if [[ ! -s "$tmp/report.json" ]]; then
   cat "$tmp/app.log"
   exit 1
 fi
-()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
+lua5.4 tests/smoke_assert.lua first "$tmp/report.json"
 if [[ ! -s "$tmp/typefinch-window.png" ]]; then
   echo "GUI screenshot missing"; exit 1
 fi
@@ -75,7 +75,7 @@ xdotool type --clearmodifiers --delay 35 "little finches"
 printf "PASTE SHOULD NEVER CHANGE A SCORED SESSION" | xclip -selection clipboard
 xdotool key --clearmodifiers ctrl+v
 sleep 2.4
-()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
+lua5.4 tests/smoke_assert.lua paste "$tmp/report.json"
 # Exercise a real corrected error to separate raw from final metrics.
 xdotool key --clearmodifiers F5
 sleep 0.3
@@ -83,7 +83,7 @@ xdotool type --clearmodifiers --delay 32 "little finchex"
 xdotool key --clearmodifiers BackSpace
 xdotool type --clearmodifiers --delay 35 "s"
 sleep 2.4
-()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
+lua5.4 tests/smoke_assert.lua correction "$tmp/report.json"
 xdotool key --clearmodifiers F6
 svg="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
 md="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"
@@ -141,4 +141,4 @@ xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
 sleep 0.7
-()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
+lua5.4 tests/smoke_assert.lua lesson "$tmp/report.json"

@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███░░░░░░░ 30%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%.
+**Acceptance-based overall progress:** `███░░░░░░░ 33%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%.
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -43,3 +43,5 @@ GitHub Actions runs a real X11/virtual-display smoke test using Openbox and soft
 **Keyboard shortcuts:** F5 starts or restarts a test; F6 exports the local SVG/Markdown GitHub profile card. Both are application-local actions.
 
 **Export acceptance:** [F6 native SVG + Markdown integration passed in CI](https://github.com/sguzman/typefinch/actions/runs/39873211637).
+
+**Latest acceptance evidence:** [39 Rust tests + native X11 corrected-error, paste, theme and export QA](https://github.com/sguzman/typefinch/actions/runs/39880764327). Hyprland physical-device QA remains pending.

@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███░░░░░░░ 30%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███░░░░░░░ 33%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `██████░░░░ 57%`
+## 🐣 M0 — Native typing MVP — `██████░░░░ 61%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -43,7 +43,7 @@
   - [ ] Per-profile setting persistence
   - [ ] Export/import
 
-### ⌨️ P2 — Tests and core scoring — `██████░░░░ 62%`
+### ⌨️ P2 — Tests and core scoring — `███████░░░ 72%`
 
 - ⚡ **T201** Typing input and session lifecycle — `█████░░░░░ 50%`
   - [x] Input handlers implemented — src/app.rs
@@ -59,34 +59,35 @@
   - [x] Monotonic timer coded — src/engine.rs
   - [ ] Live timing edge-case QA
   - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
-- 📚 **T204** Word, quote, punctuation and custom tests — `██████░░░░ 60%`
+- 📚 **T204** Word, quote, punctuation and custom tests — `████████░░ 83%`
   - [x] Starter English corpus — src/engine.rs
   - [x] Quote passages — src/engine.rs quotes corpus; GitHub Actions 39872686067
-  - [ ] Dedicated paragraph test content
+  - [x] Dedicated paragraph test content — src/engine.rs: paragraph content; GitHub Actions 39880764327: 39 tests passed
   - [x] Punctuation and numbers — src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067
-  - [ ] Custom/imported text
-- 🧮 **T205** Scoring taxonomy and fair comparisons — `███░░░░░░░ 25%`
-  - [ ] Raw vs corrected WPM
+  - [x] Editable private custom passages — src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327
+  - [ ] Import local text files into custom passages
+- 🧮 **T205** Scoring taxonomy and fair comparisons — `█████░░░░░ 50%`
+  - [x] Raw vs corrected WPM — src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA
   - [ ] Per-language speed definitions
   - [ ] Pause/focus/repeat rules
   - [x] Anti-cheat tests — Real X11 Ctrl+V injection excluded from scored session; GitHub Actions 39872686067
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `██████░░░░ 62%`
+- ⌨️ Typing tests — `███████░░░ 72%`
 - 🐦 Local identity — `█████░░░░░ 45%`
 - 🌗 Appearance — `██████░░░░ 58%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `███░░░░░░░ 31%`
+## 🗺️ M1 — Keyboard layout laboratory — `████░░░░░░ 35%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `███░░░░░░░ 30%`
+### 🧬 P3 — Recognition, emulation and geometry — `████░░░░░░ 37%`
 
-- 📖 **T301** Known layout catalog — `███████░░░ 67%`
+- 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
   - [x] Discover installed XKB variants — src/registry.rs; GitHub Actions 39872686067 discovered XKB layouts and passed 30 tests
-  - [ ] Normalize identities and availability
+  - [x] Normalize identities and availability — src/registry.rs and src/app.rs: deduplicated variants, unique active-map resolution, unavailable-map fallback; Actions 39880764327
 - 🔀 **T302** Starter software emulation — `█████░░░░░ 50%`
   - [x] Four initial ANSI row mappings coded — src/layouts.rs
   - [x] Physical key event handling coded — src/app.rs
@@ -126,7 +127,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🗺️ Layout recognition — `██████░░░░ 56%`
+- 🗺️ Layout recognition — `███████░░░ 67%`
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
@@ -158,18 +159,18 @@
 - 🎓 Structured curriculum — `░░░░░░░░░░ 0%`
 - 🧠 Adaptive exercises — `░░░░░░░░░░ 0%`
 
-## 📊 M3 — Statistics and achievements — `█░░░░░░░░░ 8%`
+## 📊 M3 — Statistics and achievements — `██░░░░░░░░ 17%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `█░░░░░░░░░ 8%`
+### 📈 P6 — Analytics and progression — `██░░░░░░░░ 17%`
 
 - 🏅 **T601** Records by layout and test mode — `███░░░░░░░ 33%`
   - [x] Basic profile bests tracked — src/app.rs
   - [ ] Segmented history
   - [ ] Versioned scoring policies
-- 📉 **T602** Progress charts and consistency — `░░░░░░░░░░ 0%`
-  - [ ] Timeseries store
+- 📉 **T602** Progress charts and consistency — `███░░░░░░░ 33%`
+  - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
   - [ ] Graphs and filters
   - [ ] Consistency formulas
 - 🔥 **T603** Key timing and error heatmaps — `░░░░░░░░░░ 0%`
@@ -183,7 +184,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `█░░░░░░░░░ 11%`
+- 📊 Statistics — `██░░░░░░░░ 22%`
 - 🏆 Achievements — `░░░░░░░░░░ 0%`
 
 ## 🎨 M4 — Profile card studio — `███░░░░░░░ 27%`

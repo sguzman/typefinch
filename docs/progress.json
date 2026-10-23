@@ -263,7 +263,7 @@
               "id": "T204",
               "emoji": "📚",
               "name": "Word, quote, punctuation and custom tests",
-              "progress": 60,
+              "progress": 83,
               "checks": [
                 {
                   "text": "Starter English corpus",
@@ -277,7 +277,8 @@
                 },
                 {
                   "text": "Dedicated paragraph test content",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: paragraph content; GitHub Actions 39880764327: 39 tests passed"
                 },
                 {
                   "text": "Punctuation and numbers",
@@ -285,7 +286,12 @@
                   "evidence": "src/engine.rs provides distinct numeric and punctuation corpora; GitHub Actions 39872686067"
                 },
                 {
-                  "text": "Custom/imported text",
+                  "text": "Editable private custom passages",
+                  "passed": true,
+                  "evidence": "src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327"
+                },
+                {
+                  "text": "Import local text files into custom passages",
                   "passed": false
                 }
               ]
@@ -294,11 +300,12 @@
               "id": "T205",
               "emoji": "🧮",
               "name": "Scoring taxonomy and fair comparisons",
-              "progress": 25,
+              "progress": 50,
               "checks": [
                 {
                   "text": "Raw vs corrected WPM",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA"
                 },
                 {
                   "text": "Per-language speed definitions",
@@ -365,7 +372,7 @@
               "id": "T301",
               "emoji": "📖",
               "name": "Known layout catalog",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Curated identifiers and names coded",
@@ -379,7 +386,8 @@
                 },
                 {
                   "text": "Normalize identities and availability",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/registry.rs and src/app.rs: deduplicated variants, unique active-map resolution, unavailable-map fallback; Actions 39880764327"
                 }
               ]
             },
@@ -743,11 +751,12 @@
               "id": "T602",
               "emoji": "📉",
               "name": "Progress charts and consistency",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Timeseries store",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327"
                 },
                 {
                   "text": "Graphs and filters",

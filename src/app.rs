@@ -40,11 +40,36 @@ fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Dura
     hyprland && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
 }
 // Wayland normally combines physical keyboards into a seat-level event stream.
-// Only tag OS input with a detected layout when all reported keyboards agree;
-// selecting a device for inspection does NOT attribute its events to it.
+// Only tag OS input with a detected layout when all reported Hyprland keyboards
+// agree. A configured X11 seat layout is *not* an active input group and must
+// not be promoted to a scored layout identity.
+const X11_AGGREGATE_SEAT:&str="x11:aggregate-seat";
+fn inspected_target<'a>(keyboard:&Keyboard, installed:&'a [InstalledLayout])
+    ->Option<&'a InstalledLayout> {
+    if keyboard.address==X11_AGGREGATE_SEAT {
+        // X11 setxkbmap -query reports configured groups, not the active
+        // input group. Only a single unambiguous layout can be offered as a
+        // user-requested emulation target, never as detected OS input.
+        let base=keyboard.layout.trim();
+        let variant=keyboard.variant.trim();
+        if base.is_empty() || base.contains(',') || variant.contains(',') {
+            return None;
+        }
+        let id=if variant.is_empty(){base.to_string()}
+            else{format!("{base}({variant})")};
+        let mut candidates=installed.iter().filter(|l|l.id==id);
+        let first=candidates.next()?;
+        if candidates.next().is_some(){None}else{Some(first)}
+    } else {
+        registry::resolve_active(installed,&keyboard.active_keymap)
+    }
+}
 fn recorded_layout(mode:Mode, target:&str, keyboards:&[Keyboard], installed:&[InstalledLayout])->String {
     if mode == Mode::Emulated { return target.to_owned(); }
     let Some(first)=keyboards.first() else { return "os:unknown".to_owned() };
+    if keyboards.iter().any(|k|k.address==X11_AGGREGATE_SEAT) {
+        return "os:unknown".to_owned();
+    }
     if first.active_keymap.trim().is_empty() ||
         keyboards.iter().any(|k|k.active_keymap != first.active_keymap) {
         return "os:unknown".to_owned();
@@ -932,8 +957,8 @@ impl Typefinch {
         }
     }
     fn show_devices(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Connected keyboards");
-        ui.small("Read-only Hyprland enumeration: refreshes on focus and every 20 seconds while active. Event input remains seat-level.");
+        ui.heading("Keyboard / seat inspector");
+        ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
         ui.vertical(|ui| {
             if ui.button("Refresh device list").clicked() {
                 self.refresh_keyboards();
@@ -947,25 +972,43 @@ impl Typefinch {
                         }
                     });
                 let k = &self.keyboards[self.device_index];
-                let active_map = k.active_keymap.clone();
-                ui.label(format!("Active map: {} · configured: {} {}", k.active_keymap, k.layout, k.variant));
-                ui.small(format!("Device: {}", k.address));
-                let matched = registry::resolve_active(&self.installed_layouts, &active_map).map(|l|l.id.clone());
-                if let Some(id) = matched {
-                    if ui.add_enabled(self.session.state != State::Running, egui::Button::new("Use detected layout")).clicked() {
-                        self.prefs.layout = id;
-                        self.emulator = Emulator::compile(&self.prefs.layout).ok();
-                        self.save();
-                        self.message = "Target layout updated from this device's reported active keymap. Your system layout is unchanged.".into();
-                    }
+                let is_x11=k.address==X11_AGGREGATE_SEAT;
+                if is_x11 {
+                    ui.label(format!("Configured X11 seat layout: {} · variant: {}",
+                        k.layout,if k.variant.is_empty(){"(none)"}else{&k.variant}));
+                    ui.small("setxkbmap reports configured groups, not the active input group.");
+                    ui.small("This is one aggregate seat, never a physical keyboard.");
                 } else {
-                    ui.small("No unique installed XKB match for this device's active map.");
+                    ui.label(format!("Reported active map: {} · configured: {} {}",
+                        k.active_keymap,k.layout,k.variant));
+                }
+                ui.small(format!("Inspection identifier: {}",k.address));
+                let matched=inspected_target(k,&self.installed_layouts).map(|l|l.id.clone());
+                if let Some(id)=matched {
+                    let label=if is_x11 {
+                        "Use configured X11 layout as target"
+                    } else { "Use reported active layout as target" };
+                    if ui.add_enabled(self.session.state != State::Running,
+                        egui::Button::new(label)).clicked() {
+                        self.prefs.layout=id;
+                        self.emulator=Emulator::compile(&self.prefs.layout).ok();
+                        self.save();
+                        self.message=if is_x11 {
+                            "Emulation target updated from the single configured X11 layout; the active input group is unverified and system settings are unchanged.".into()
+                        } else {
+                            "Emulation target updated from reported Hyprland metadata; system settings unchanged.".into()
+                        };
+                    }
+                } else if is_x11 {
+                    ui.small("No unique installed layout for this seat; multiple X11 groups cannot be treated as one active layout.");
+                } else {
+                    ui.small("No unique installed XKB match for this keyboard's active map.");
                 }
             } else {
                 ui.label(self.device_error.as_deref().unwrap_or("No inspected keyboard seats available."));
             }
         });
-        ui.small("This selector inspects keyboard metadata. Ordinary Wayland typing events are seat-level: this is not yet a per-device input filter.");
+        ui.small("Inspection only. Neither Wayland seat-level typing nor X11 configuration metadata provides per-device key attribution.");
     }
     fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
         self.custom_text=drill;
@@ -1756,6 +1799,29 @@ mod palette_tests {
         });
         assert_eq!(recorded_layout(Mode::System,"us",&keyboards,&xkb),"os:unknown");
         assert_eq!(recorded_layout(Mode::System,"us",&[],&xkb),"os:unknown");
+    }
+    #[test] fn x11_configured_groups_are_never_claimed_as_observed_session_input() {
+        let xkb=vec![
+            InstalledLayout{id:"us".into(),name:"English (US)".into()},
+            InstalledLayout{id:"de(nodeadkeys)".into(),name:"German (no dead keys)".into()},
+        ];
+        let single=Keyboard {
+            name:"X11 aggregate seat (not a physical keyboard)".into(),
+            address:X11_AGGREGATE_SEAT.into(),
+            layout:"us".into(),active_keymap:"English (US)".into(),..Default::default()
+        };
+        // Even when the installed registry matches the configured ID, X11
+        // does not report which group actually generated the key events.
+        assert_eq!(recorded_layout(Mode::System,"us",&[single.clone()],&xkb),"os:unknown");
+        assert_eq!(inspected_target(&single,&xkb).unwrap().id,"us");
+        let variant=Keyboard{layout:"de".into(),variant:"nodeadkeys".into(),..single.clone()};
+        assert_eq!(inspected_target(&variant,&xkb).unwrap().id,"de(nodeadkeys)");
+        for (layout,variant) in [("us,de",""),("us",",nodeadkeys"),("missing",""),("","")] {
+            let seat=Keyboard{layout:layout.into(),variant:variant.into(),..single.clone()};
+            assert!(inspected_target(&seat,&xkb).is_none());
+            assert_eq!(recorded_layout(Mode::System,"us",&[seat],&xkb),"os:unknown");
+        }
+        assert_eq!(recorded_layout(Mode::Emulated,"us",&[single],&xkb),"us");
     }
     #[test] fn key_heat_levels_preserve_readable_error_glyphs() {
         for dark in [false,true] {

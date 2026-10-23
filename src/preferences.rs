@@ -140,17 +140,69 @@ impl Preferences {
         }
     }
     pub fn save(&self) -> Result<(), String> {
-        let dir=base_dir();
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let data=serde_json::to_vec_pretty(self).map_err(|e| e.to_string())?;
-        let tmp=dir.join("settings.json.tmp");
-        fs::write(&tmp, data).map_err(|e| e.to_string())?;
-        fs::rename(&tmp, dir.join("settings.json")).map_err(|e| e.to_string())
+        self.save_to_dir(&base_dir())
+    }
+    /// A private, atomic same-directory replacement. This also upgrades the
+    /// permissions of older installs whose JSON files used the system umask.
+    fn save_to_dir(&self,dir:&std::path::Path)->Result<(),String> {
+        use std::io::Write;
+        fs::create_dir_all(dir).map_err(|e|e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(dir,fs::Permissions::from_mode(0o700))
+                .map_err(|e|format!("Cannot restrict settings directory: {e}"))?;
+        }
+        let bytes=serde_json::to_vec_pretty(self).map_err(|e|e.to_string())?;
+        let temp=dir.join(format!("settings-{}.tmp",uuid::Uuid::new_v4()));
+        let mut options=fs::OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file=options.open(&temp).map_err(|e|e.to_string())?;
+        let result=(||->Result<(),String>{
+            file.write_all(&bytes).map_err(|e|e.to_string())?;
+            file.sync_all().map_err(|e|e.to_string())?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&temp,fs::Permissions::from_mode(0o600))
+                    .map_err(|e|e.to_string())?;
+            }
+            fs::rename(&temp,dir.join("settings.json")).map_err(|e|e.to_string())?;
+            Ok(())
+        })();
+        if result.is_err() {let _=fs::remove_file(&temp);}
+        result
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn atomic_settings_save_is_private_and_leaves_no_temp_files() {
+        let dir=std::env::temp_dir().join(format!("typefinch-prefs-{}",uuid::Uuid::new_v4()));
+        let mut prefs=Preferences::default();
+        prefs.profiles[0].name="Local account".into();
+        prefs.save_to_dir(&dir).unwrap();
+        prefs.profiles[0].name="Updated local account".into();
+        prefs.save_to_dir(&dir).unwrap();
+        let files=fs::read_dir(&dir).unwrap()
+            .map(|entry|entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(files,vec!["settings.json"]);
+        let bytes=fs::read(dir.join("settings.json")).unwrap();
+        let parsed:Preferences=serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(parsed.profiles[0].name,"Updated local account");
+        #[cfg(unix)] {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(fs::metadata(&dir).unwrap().permissions().mode()&0o777,0o700);
+            assert_eq!(fs::metadata(dir.join("settings.json")).unwrap().permissions().mode()&0o777,0o600);
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
     #[test] fn saved_practice_sessions_never_inflate_benchmark_bests() {
         let mut profile=Profile::default();
         let clean=crate::engine::score("abcdefghij","abcdefghij",

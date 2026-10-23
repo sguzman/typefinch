@@ -42,6 +42,18 @@ fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Dura
 // Manual requests and the focus/hotplug watcher share one bounded inspector.
 // A slow external compositor command must not block typing or allow repeated
 // clicks to create an unbounded number of detached processes.
+fn take_device_query_result(
+    pending:&mut Option<Receiver<Result<Vec<Keyboard>,String>>>,
+)->Option<Result<Vec<Keyboard>,String>> {
+    let result=match pending.as_ref()?.try_recv() {
+        Ok(answer)=>Some(answer),
+        Err(TryRecvError::Disconnected)=>
+            Some(Err("Keyboard inspection worker disconnected; stale inventory cleared.".into())),
+        Err(TryRecvError::Empty)=>None,
+    };
+    if result.is_some(){*pending=None;}
+    result
+}
 fn launch_device_inspection<F>(
     pending:&mut Option<Receiver<Result<Vec<Keyboard>,String>>>,
     repaint:Option<egui::Context>,
@@ -319,18 +331,11 @@ impl Typefinch {
         self.request_device_query(ctx);
     }
     fn poll_keyboard_hotplug(&mut self,ctx:&egui::Context,focused:bool) {
-        if let Some(receiver)=self.pending_device_query.as_ref() {
-            match receiver.try_recv() {
-                Ok(result)=>{
-                    self.pending_device_query=None;
-                    self.apply_device_result(result);
-                },
-                Err(TryRecvError::Disconnected)=>{
-                    self.pending_device_query=None;
-                    self.device_error=Some("Keyboard inspection thread disconnected.".into());
-                },
-                Err(TryRecvError::Empty)=>{},
-            }
+        if let Some(result)=take_device_query_result(&mut self.pending_device_query) {
+            // A disconnected inspector must invalidate the old inventory,
+            // just like any other failed query. Never leave a stale row
+            // visible as a currently connected physical keyboard.
+            self.apply_device_result(result);
         }
         let hyprland=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
         let focus_gained=focused && !self.last_window_focused;
@@ -1819,6 +1824,22 @@ mod palette_tests {
         assert_eq!(motion_seconds(true,0.15),0.0);
         assert_eq!(motion_seconds(false,0.15),0.15);
         assert_eq!(motion_seconds(false,0.0),0.0);
+    }
+    #[test] fn disconnected_inspector_is_consumed_as_failure_not_stale_success() {
+        let (sender,receiver)=mpsc::channel();
+        let mut pending=Some(receiver);
+        assert!(take_device_query_result(&mut pending).is_none());
+        assert!(pending.is_some());
+        drop(sender);
+        let failure=take_device_query_result(&mut pending).unwrap();
+        assert!(failure.unwrap_err().contains("stale inventory"));
+        assert!(pending.is_none());
+        let (sender,receiver)=mpsc::channel();
+        let mut pending=Some(receiver);
+        sender.send(Ok(vec![Keyboard{address:"valid".into(),..Default::default()}])).unwrap();
+        let result=take_device_query_result(&mut pending).unwrap().unwrap();
+        assert_eq!(result[0].address,"valid");
+        assert!(pending.is_none());
     }
     #[test] fn keyboard_inspector_is_single_flight_and_never_blocks_the_ui_thread() {
         use std::sync::{Arc,atomic::{AtomicUsize,Ordering}};

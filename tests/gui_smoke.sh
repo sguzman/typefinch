@@ -11,7 +11,7 @@ cleanup() {
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
   if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
-    for img in typefinch-window.png typefinch-light.png typefinch-dark.png; do
+    for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png; do
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
   fi
@@ -273,3 +273,35 @@ sleep 0.3
 xdotool type --clearmodifiers --delay 29 "cat dog sun moon"
 sleep 2.4
 lua5.4 tests/smoke_assert.lua personal-keymap "$tmp/report.json"
+
+# Responsive screenshots from the actual graphical binary, not mocks.
+# Retain captures as CI artifacts for visual inspection; dimensions alone do
+# not establish that every text label is unclipped.
+xdotool windowsize "$window" 740 590
+sleep 0.6
+import -window "$window" "$tmp/typefinch-narrow.png"
+[[ -s "$tmp/typefinch-narrow.png" ]] || { echo "Missing narrow viewport screenshot"; exit 1; }
+identify -format 'Narrow native viewport: %wx%h pixels\n' "$tmp/typefinch-narrow.png"
+
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+# Winit's X11 DPI override provides an isolated 150% environment for visual QA;
+# the screenshot itself is still a physical-pixel recording.
+WINIT_X11_SCALE_FACTOR=1.5 ./target/debug/typefinch >"$tmp/app-hidpi.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-hidpi.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No HiDPI window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.6
+import -window "$window" "$tmp/typefinch-hidpi.png"
+[[ -s "$tmp/typefinch-hidpi.png" ]] || { echo "Missing 150% scaled viewport screenshot"; exit 1; }
+identify -format '150% X11 DPI override viewport: %wx%h pixels\n' "$tmp/typefinch-hidpi.png"
+

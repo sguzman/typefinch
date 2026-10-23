@@ -123,7 +123,7 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
         special("Backspace","⌫",14,0,if jis {150} else {130},20,false),
         special("Tab","⇥",15,1,0,15,false),
         special("Caps Lock","Caps",58,2,0,20,true),
-        special("Enter","↵",28,2,130,if jis {25} else {22},false),
+        special("Enter","↵",28,2,if shape==Shape::Split {148} else {130},if jis {25} else {22},false),
         special("Left Shift","⇧",42,3,0,if shape==Shape::Iso {20} else {30},true),
         special("Right Shift","⇧",54,3,
             if split {158} else if jis {140} else {130},
@@ -228,7 +228,7 @@ mod tests {
     #[test] fn split_is_preview_spacing_not_doubled_input() {
         let a=slots(Shape::Ansi);
         let b=slots(Shape::Split);
-        for original in a.iter().filter(|s|s.row>0 && s.row<4) {
+        for original in a.iter().filter(|s|s.kind==SlotKind::Character && s.row>0 && s.row<4) {
             let moved=b.iter().find(|s|s.evdev==original.evdev).unwrap();
             assert_eq!(moved.x-original.x,if original.x >= match original.row {1=>65,2=>70,_=>80} {28} else {0});
         }

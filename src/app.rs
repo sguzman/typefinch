@@ -7,7 +7,7 @@ use crate::{
     history::{self, Record},
     lesson,
     layouts::{self, Mode},
-    preferences::{Preferences, Profile, Theme},
+    preferences::{Preferences, Profile, Theme, CardTheme, CardFont},
     registry::{self, InstalledLayout},
     xkb::Emulator,
 };
@@ -803,7 +803,7 @@ impl Typefinch {
         let display = self.installed_layouts.iter().find(|l|l.id==self.prefs.layout)
             .map(|l|l.name.as_str()).or_else(||layouts::find(&self.prefs.layout).map(|l|l.name))
             .unwrap_or("Custom XKB");
-        self.message = match export::save_widget(p, display) {
+        self.message = match export::save_widget_with_style(p, display,self.prefs.card_theme,self.prefs.card_font) {
             Ok((svg, md)) => format!("Exported: {} and {}", svg.display(), md.display()),
             Err(e) => format!("Export failed: {e}"),
         };
@@ -829,7 +829,28 @@ impl Typefinch {
     }
     fn show_export(&mut self, ui: &mut egui::Ui) {
         ui.heading("GitHub profile card");
-        ui.label("Export a static SVG card and matching Markdown for your GitHub profile.");
+        ui.label("Design and export a script-free static SVG card and matching Markdown.");
+        let old_theme=self.prefs.card_theme;
+        let old_font=self.prefs.card_font;
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Palette");
+            egui::ComboBox::from_id_salt("card-theme")
+                .selected_text(self.prefs.card_theme.label()).show_ui(ui,|ui| {
+                    for theme in CardTheme::ALL {
+                        ui.selectable_value(&mut self.prefs.card_theme,theme,theme.label());
+                    }
+                });
+            ui.label("Typography");
+            egui::ComboBox::from_id_salt("card-font")
+                .selected_text(self.prefs.card_font.label()).show_ui(ui,|ui| {
+                    for font in CardFont::ALL {
+                        ui.selectable_value(&mut self.prefs.card_font,font,font.label());
+                    }
+                });
+        });
+        if old_theme!=self.prefs.card_theme || old_font!=self.prefs.card_font {self.save();}
+        self.show_card_preview(ui);
+        ui.small("Live native preview of theme and statistics; exported SVG renders using GitHub-safe system font families.");
         ui.horizontal_wrapped(|ui| {
             if ui.button("Export SVG + Markdown").clicked() { self.export_widget(); }
             if ui.button("Export session history JSON").clicked() {self.export_statistics();}

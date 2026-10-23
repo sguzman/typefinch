@@ -89,3 +89,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Optional streak:** An opt-in checkbox shows consecutive days with substantive benchmark sessions, calculated from local dates. It is off by default and offers a one-day grace window for a day still in progress. No notifications, network service, or penalties are attached.
 
 **Latest acceptance:** [66 Rust tests + native X11 session QA with daily targets, opt-in streak and local achievements](https://github.com/sguzman/typefinch/actions/runs/39947014970). Real Hyprland hardware acceptance remains pending.
+
+**Card studio palettes:** Profile exports now support Dusk, Daybreak and Fern themes and sans-serif/monospace typography. Controls persist locally, and the preview updates immediately; SVG generation remains static and escapes user-controlled profile/layout text. No hosted fonts or network dependency.

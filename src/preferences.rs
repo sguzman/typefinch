@@ -6,6 +6,23 @@ use std::{fs, path::PathBuf};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Theme { #[default] System, Light, Dark }
+#[derive(Clone,Copy,Debug,Default,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum CardTheme {#[default] Dusk, Daybreak, Fern}
+impl CardTheme {
+    pub const ALL:[Self;3]=[Self::Dusk,Self::Daybreak,Self::Fern];
+    pub fn label(self)->&'static str {
+        match self {Self::Dusk=>"🌙 Dusk",Self::Daybreak=>"☀ Daybreak",Self::Fern=>"🌿 Fern"}
+    }
+}
+#[derive(Clone,Copy,Debug,Default,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum CardFont {#[default] Sans, Mono}
+impl CardFont {
+    pub const ALL:[Self;2]=[Self::Sans,Self::Mono];
+    pub fn label(self)->&'static str {match self {Self::Sans=>"Sans-serif",Self::Mono=>"Monospace"}}
+    pub fn svg_family(self)->&'static str {match self {Self::Sans=>"sans-serif",Self::Mono=>"monospace"}}
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Goals {
@@ -47,6 +64,8 @@ impl Default for Profile {
 #[serde(default)]
 pub struct Preferences {
     pub theme: Theme,
+    pub card_theme:CardTheme,
+    pub card_font:CardFont,
     pub test_mode: TestMode,
     pub language: Language,
     pub word_difficulty: WordDifficulty,
@@ -57,7 +76,7 @@ pub struct Preferences {
     pub duration_seconds: u64,
 }
 impl Default for Preferences {
-    fn default() -> Self { Self { theme:Theme::System, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
+    fn default() -> Self { Self { theme:Theme::System, card_theme:CardTheme::Dusk, card_font:CardFont::Sans, test_mode:TestMode::Words, language:Language::English, word_difficulty:WordDifficulty::Standard, lesson_id:"home".into(), layout:"us".into(), profiles:vec![Profile::default()], active_profile:0, duration_seconds:30 } }
 }
 pub fn base_dir() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from)
@@ -171,12 +190,22 @@ mod tests {
         assert_eq!(goals.daily_sessions,3);
         assert!(!goals.show_streak);
     }
+    #[test] fn older_settings_migrate_to_default_card_style() {
+        let mut data=serde_json::to_value(Preferences::default()).unwrap();
+        data.as_object_mut().unwrap().remove("card_theme");
+        data.as_object_mut().unwrap().remove("card_font");
+        let older:Preferences=serde_json::from_value(data).unwrap();
+        assert_eq!(older.card_theme,CardTheme::Dusk);
+        assert_eq!(older.card_font,CardFont::Sans);
+    }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {
         let p=Preferences::default();
         let b=serde_json::to_vec(&p).unwrap();
         let q: Preferences=serde_json::from_slice(&b).unwrap();
         assert_eq!(q.layout, "us");
+        assert_eq!(q.card_theme,CardTheme::Dusk);
+        assert_eq!(q.card_font,CardFont::Sans);
         assert_eq!(q.test_mode, TestMode::Words);
         assert_eq!(q.language, Language::English);
         assert_eq!(q.word_difficulty, WordDifficulty::Standard);

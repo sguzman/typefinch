@@ -1,39 +1,79 @@
 //! A standalone, static, script-free GitHub-compatible SVG snapshot.
-use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile}};
+use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile,CardTheme,CardFont}};
 use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
 
 fn xml(s: &str) -> String {
     s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;")
      .replace('"',"&quot;").replace('\'',"&apos;")
 }
+/// Static, approved palettes. Text ink is chosen independently from accent
+/// decoration for adequate contrast against both dark and light backgrounds.
+#[derive(Clone,Copy)]
+pub struct CardPalette {
+    pub bg:&'static str,pub border:&'static str,pub heading:&'static str,
+    pub emblem_bg:&'static str,pub bird:&'static str,pub wing:&'static str,
+    pub eye:&'static str,pub beak:&'static str,pub name:&'static str,
+    pub labels:&'static str,pub numbers:&'static str,pub footer:&'static str,
+}
+pub fn palette(theme:CardTheme)->CardPalette {
+    match theme {
+        CardTheme::Dusk=>CardPalette{
+            bg:"#202645",border:"#8696F5",heading:"#BCC6FF",
+            emblem_bg:"#303864",bird:"#8696F5",wing:"#BCC6FF",
+            eye:"#202645",beak:"#F6C376",name:"#F1F2FF",
+            labels:"#9FAADA",numbers:"#FFFFFF",footer:"#BEC7F3"},
+        CardTheme::Daybreak=>CardPalette{
+            bg:"#F5F6FF",border:"#526ABD",heading:"#364C92",
+            emblem_bg:"#DEE4FF",bird:"#8696F5",wing:"#445BA5",
+            eye:"#222D56",beak:"#A36B20",name:"#24315B",
+            labels:"#495982",numbers:"#24315B",footer:"#4D5B80"},
+        CardTheme::Fern=>CardPalette{
+            bg:"#173C36",border:"#86D6AD",heading:"#D4FFE5",
+            emblem_bg:"#225148",bird:"#74B996",wing:"#B9E8CB",
+            eye:"#122D27",beak:"#F6C376",name:"#F5FFF8",
+            labels:"#C5E8D7",numbers:"#FFFFFF",footer:"#C3E8D1"},
+    }
+}
 pub fn card(profile: &Profile, layout: &str) -> String {
+    card_with_style(profile,layout,CardTheme::Dusk,CardFont::Sans)
+}
+pub fn card_with_style(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)->String {
+    let p=palette(theme);
     let name=xml(&profile.name);
     let layout=xml(layout);
+    let family=font.svg_family();
     format!(r##"<svg xmlns="http://www.w3.org/2000/svg" width="550" height="205" viewBox="0 0 550 205" role="img" aria-label="Typefinch profile">
-<rect width="550" height="205" rx="22" fill="#202645"/>
-<rect x="1" y="1" width="548" height="203" rx="21" fill="none" stroke="#8696F5" stroke-width="2"/>
-<text x="28" y="44" fill="#BCC6FF" font-size="22" font-family="sans-serif" font-weight="700">Typefinch</text>
-<rect x="465" y="18" width="62" height="62" rx="17" fill="#303864"/>
-<ellipse cx="492" cy="51" rx="18" ry="14" fill="#8696F5"/>
-<circle cx="507" cy="36" r="10" fill="#8696F5"/>
-<circle cx="510" cy="33" r="2" fill="#202645"/>
-<path d="M517 38 L527 42 L517 46Z" fill="#F6C376"/>
-<path d="M470 49 Q480 35 491 45 Q484 57 470 49Z" fill="#BCC6FF"/>
-<text x="28" y="76" fill="#F1F2FF" font-size="19" font-family="sans-serif">{name}</text>
-<text x="29" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">BEST WPM</text>
-<text x="29" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{:.0}</text>
-<text x="200" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">SESSIONS</text>
-<text x="200" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{}</text>
-<text x="370" y="111" fill="#9FAADA" font-family="sans-serif" font-size="13">BEST ACCURACY</text>
-<text x="370" y="148" fill="#FFFFFF" font-family="sans-serif" font-size="32" font-weight="700">{:.1}%</text>
-<text x="29" y="184" fill="#BEC7F3" font-family="sans-serif" font-size="13">Layout: {layout} · Timed-test bests, all sessions counted</text>
-</svg>"##, profile.best_wpm, profile.tests, profile.best_accuracy)
+<rect width="550" height="205" rx="22" fill="{bg}"/>
+<rect x="1" y="1" width="548" height="203" rx="21" fill="none" stroke="{border}" stroke-width="2"/>
+<text x="28" y="44" fill="{heading}" font-size="22" font-family="{family}" font-weight="700">Typefinch</text>
+<rect x="465" y="18" width="62" height="62" rx="17" fill="{emblem_bg}"/>
+<ellipse cx="492" cy="51" rx="18" ry="14" fill="{bird}"/>
+<circle cx="507" cy="36" r="10" fill="{bird}"/>
+<circle cx="510" cy="33" r="2" fill="{eye}"/>
+<path d="M517 38 L527 42 L517 46Z" fill="{beak}"/>
+<path d="M470 49 Q480 35 491 45 Q484 57 470 49Z" fill="{wing}"/>
+<text x="28" y="76" fill="{name_ink}" font-size="19" font-family="{family}">{name}</text>
+<text x="29" y="111" fill="{labels}" font-family="{family}" font-size="13">BEST WPM</text>
+<text x="29" y="148" fill="{numbers}" font-family="{family}" font-size="32" font-weight="700">{:.0}</text>
+<text x="200" y="111" fill="{labels}" font-family="{family}" font-size="13">SESSIONS</text>
+<text x="200" y="148" fill="{numbers}" font-family="{family}" font-size="32" font-weight="700">{}</text>
+<text x="370" y="111" fill="{labels}" font-family="{family}" font-size="13">BEST ACCURACY</text>
+<text x="370" y="148" fill="{numbers}" font-family="{family}" font-size="32" font-weight="700">{:.1}%</text>
+<text x="29" y="184" fill="{footer}" font-family="{family}" font-size="13">Layout: {layout} · Timed-test bests, all sessions counted</text>
+</svg>"##, profile.best_wpm, profile.tests, profile.best_accuracy,
+    bg=p.bg,border=p.border,heading=p.heading,emblem_bg=p.emblem_bg,
+    bird=p.bird,wing=p.wing,eye=p.eye,beak=p.beak,name_ink=p.name,
+    labels=p.labels,numbers=p.numbers,footer=p.footer,family=family)
 }
 pub fn markdown_embed() -> &'static str {
     "![Typefinch typing profile](./typefinch-profile.svg)\n"
 }
 pub fn save_widget(profile: &Profile, layout: &str) -> Result<(PathBuf, PathBuf), String> {
-    let svg = save_card(profile, layout)?;
+    save_widget_with_style(profile,layout,CardTheme::Dusk,CardFont::Sans)
+}
+pub fn save_widget_with_style(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
+    -> Result<(PathBuf, PathBuf),String> {
+    let svg = save_card_with_style(profile,layout,theme,font)?;
     let md = svg.with_file_name("typefinch-profile.md");
     fs::write(&md, markdown_embed()).map_err(|e| e.to_string())?;
     Ok((svg, md))
@@ -92,10 +132,14 @@ pub fn save_backup(prefs:&Preferences)->Result<(PathBuf,PathBuf),String> {
     Ok((settings,database))
 }
 pub fn save_card(profile: &Profile, layout: &str) -> Result<PathBuf,String> {
+    save_card_with_style(profile,layout,CardTheme::Dusk,CardFont::Sans)
+}
+pub fn save_card_with_style(profile:&Profile,layout:&str,theme:CardTheme,font:CardFont)
+    -> Result<PathBuf,String> {
     let dir=base_dir().join("exports");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let output=dir.join("typefinch-profile.svg");
-    fs::write(&output, card(profile,layout)).map_err(|e| e.to_string())?;
+    fs::write(&output, card_with_style(profile,layout,theme,font)).map_err(|e| e.to_string())?;
     Ok(output)
 }
 #[cfg(test)]
@@ -114,6 +158,20 @@ mod tests {
         assert!(!serialized.contains("secret test sentence"));
         assert!(!serialized.contains("typed"));
         assert!(!serialized.contains("hardware_address"));
+    }
+    #[test] fn palettes_and_type_options_keep_static_svg_markup_safe() {
+        let p=Profile {name:"<script>&".into(), ..Default::default()};
+        for theme in CardTheme::ALL {
+            for font in CardFont::ALL {
+                let data=card_with_style(&p,"us(colemak)",theme,font);
+                assert!(data.starts_with("<svg"));
+                assert!(!data.contains("<script"));
+                assert!(data.contains("&lt;script&gt;&amp;"));
+                assert!(data.contains(palette(theme).bg));
+                assert!(data.contains(&format!("font-family=\"{}\"",font.svg_family())));
+            }
+        }
+        assert_ne!(palette(CardTheme::Dusk).bg,palette(CardTheme::Daybreak).bg);
     }
     #[test] fn markdown_link_uses_local_svg_without_remote_fetch() {
         assert_eq!(markdown_embed(),"![Typefinch typing profile](./typefinch-profile.svg)\n");

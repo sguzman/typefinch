@@ -522,6 +522,42 @@ impl Typefinch {
         if response.clicked() { response.request_focus(); }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
+    fn show_layout_preview(&self, ui: &mut egui::Ui) {
+        // This is a map of the selected typing target, not a device-level OS
+        // keyboard reading. An unknown key is shown explicitly, never guessed.
+        const ROWS:[[egui::Key;10];3] = [
+            [egui::Key::Q,egui::Key::W,egui::Key::E,egui::Key::R,egui::Key::T,
+             egui::Key::Y,egui::Key::U,egui::Key::I,egui::Key::O,egui::Key::P],
+            [egui::Key::A,egui::Key::S,egui::Key::D,egui::Key::F,egui::Key::G,
+             egui::Key::H,egui::Key::J,egui::Key::K,egui::Key::L,egui::Key::Semicolon],
+            [egui::Key::Z,egui::Key::X,egui::Key::C,egui::Key::V,egui::Key::B,
+             egui::Key::N,egui::Key::M,egui::Key::Comma,egui::Key::Period,egui::Key::Slash],
+        ];
+        ui.heading("Keyboard mapping preview");
+        ui.small(format!("Selected target: {} · ANSI base positions · {}",
+            self.prefs.layout,
+            if self.emulator.is_some() {"installed XKB symbols"} else {"built-in map where available"}));
+        ui.add_space(6.0);
+        for (row_index, keys) in ROWS.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.add_space((row_index*12) as f32);
+                for key in keys {
+                    let value = self.emulator.as_ref().and_then(|x|x.translate(*key,false))
+                        .or_else(||layouts::emulate(*key,&self.prefs.layout,false).map(|c|c.to_string()))
+                        .unwrap_or_else(||"–".into());
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::symmetric(7,7))
+                        .show(ui,|ui| {
+                            ui.add_sized([27.0,27.0],egui::Label::new(
+                                RichText::new(value).monospace().size(15.0)
+                            ).selectable(false));
+                        });
+                }
+            });
+            ui.add_space(2.0);
+        }
+        ui.small("Preview only. Actual OS input may differ; device-specific routing, ISO/JIS keys and composition remain separate work.");
+    }
     fn show_history(&mut self, ui: &mut egui::Ui) {
         ui.heading("Recent tests");
         if self.history.is_empty() {
@@ -696,6 +732,10 @@ impl eframe::App for Typefinch {
                     }
                     ui.add_space(8.0);
                     self.show_test(ui, ctx);
+                    ui.add_space(24.0);
+                    ui.separator();
+                    ui.add_space(16.0);
+                    self.show_layout_preview(ui);
                     ui.add_space(24.0);
                     ui.separator();
                     ui.add_space(16.0);

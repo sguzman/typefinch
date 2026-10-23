@@ -322,26 +322,35 @@ impl Session {
             self.corrections=self.corrections.saturating_add(1);
         }
     }
-    pub fn tick(&mut self) -> bool {
-        if self.state != State::Running { return false; }
-        self.elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
-        if self.pending_completion.is_some_and(|at|at.elapsed()>=Duration::from_millis(250)) {
-            self.finish();
+    pub fn tick(&mut self) -> bool { self.tick_at(Instant::now()) }
+    // One clock snapshot per frame; keeping the boundary deterministic lets
+    // CI prove deadline behavior without sleeping or relying on scheduling.
+    fn tick_at(&mut self,now:Instant)->bool {
+        if self.state!=State::Running {return false;}
+        self.elapsed=self.started.map_or(Duration::ZERO,
+            |start|now.saturating_duration_since(start));
+        // A timed cutoff takes precedence over the incomplete final combining
+        // sequence grace period: do not accept post-deadline key events.
+        if !self.duration.is_zero() && self.elapsed>=self.duration {
+            self.elapsed=self.duration;
+            self.pending_completion=None;
+            self.state=State::Finished;
             return true;
         }
-        if self.duration.is_zero() { return false; }
-        if self.elapsed >= self.duration {
-            self.elapsed = self.duration;
-            self.state = State::Finished;
+        if self.pending_completion.is_some_and(|at|
+            now.saturating_duration_since(at)>=Duration::from_millis(250)) {
+            self.finish_at(now);
             return true;
         }
         false
     }
-    fn finish(&mut self) {
+    fn finish(&mut self) {self.finish_at(Instant::now());}
+    fn finish_at(&mut self,now:Instant) {
         self.pending_completion=None;
-        let elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed());
-        self.elapsed = if self.duration.is_zero() { elapsed } else { elapsed.min(self.duration) };
-        self.state = State::Finished;
+        let elapsed=self.started.map_or(Duration::ZERO,
+            |start|now.saturating_duration_since(start));
+        self.elapsed=if self.duration.is_zero(){elapsed}else{elapsed.min(self.duration)};
+        self.state=State::Finished;
     }
     pub fn score(&self) -> Score {
         let mut result=score(&self.target, &self.typed, self.elapsed);
@@ -533,6 +542,46 @@ mod tests {
         for t in &targets { assert!(unique.insert(t)); assert!(t.len()>300); }
         assert!(Session::new_with_mode(30,TestMode::Numbers).target.contains("42"));
         assert!(Session::new_with_mode(30,TestMode::Punctuation).target.contains('?'));
+    }
+    #[test] fn timed_deadline_is_exact_and_rejects_late_input() {
+        let mut s=Session::new_with_custom(2,TestMode::Custom,"abcdef");
+        s.begin();
+        let start=s.started.unwrap();
+        s.type_text("ab");
+        assert!(!s.tick_at(start+Duration::from_millis(1999)));
+        assert_eq!(s.state,State::Running);
+        assert!(s.seconds_left()>0.0);
+        assert!(s.tick_at(start+Duration::from_secs(2)));
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.seconds_left(),0.0);
+        assert_eq!(s.score().elapsed,Duration::from_secs(2));
+        s.type_text("cdef");
+        s.backspace();
+        assert_eq!(s.typed,"ab","input after the exact cutoff is ignored");
+        assert!(!s.tick_at(start+Duration::from_secs(200)));
+        assert_eq!(s.score().elapsed,Duration::from_secs(2));
+    }
+    #[test] fn timed_pending_grapheme_does_not_extend_past_deadline() {
+        let mut s=Session::new_with_custom(2,TestMode::Custom,"é");
+        s.begin();
+        let start=s.started.unwrap();
+        s.type_text("e");
+        assert_eq!(s.state,State::Running);
+        assert!(s.pending_completion.is_some());
+        // Even with the incomplete-grapheme timeout outstanding, the
+        // session never extends beyond the configured timed cutoff.
+        assert!(s.tick_at(start+Duration::from_secs(2)));
+        assert_eq!(s.state,State::Finished);
+        assert!(s.pending_completion.is_none());
+        s.type_text("\u{301}");
+        assert_eq!(s.typed,"e");
+        assert_eq!(s.score().elapsed,Duration::from_secs(2));
+        // Untimed lessons are exempt from this deadline.
+        let mut lesson=Session::new_with_custom(0,TestMode::Lesson,"asdf");
+        lesson.begin();
+        let started=lesson.started.unwrap();
+        assert!(!lesson.tick_at(started+Duration::from_secs(120)));
+        assert_eq!(lesson.state,State::Running);
     }
     #[test] fn untimed_lesson_finishes_on_passage_completion_not_deadline() {
         let mut s=Session::new_with_custom(0,TestMode::Lesson,"asdf");

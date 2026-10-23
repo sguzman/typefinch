@@ -1782,8 +1782,17 @@ impl eframe::App for Typefinch {
         }
         self.accept_custom_file(ctx);
         let before = self.session.state;
-        self.apply_events(ctx);
-        self.session.tick();
+        if before==State::Running && !focused {
+            // Cancellation wins over deadline on a window that lost focus:
+            // an unobserved frame must not save a session as completed.
+            self.apply_events(ctx);
+        } else {
+            // Close the elapsed-time gate BEFORE consuming this frame's key
+            // events. The old ordering accepted late input in delayed frames.
+            self.session.tick();
+            self.apply_events(ctx);
+            self.session.tick();
+        }
         if before == State::Running && self.session.state == State::Finished { self.finish(); }
         egui::TopBottomPanel::top("typefinch-header")
             .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)).fill(ctx.style().visuals.panel_fill))

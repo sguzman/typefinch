@@ -14,9 +14,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Native dependencies
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox xclip
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox xclip lua5.4 lua-dkjson sqlite3 libxml2-utils
       - name: Verify acceptance ledger
-        run: python3 tools/verify_progress.py && python3 tools/render_roadmap.py --check
+        run: lua5.4 tools/roadmap.lua --check
       - name: Build
         run: cargo check --all-targets
       - name: Test

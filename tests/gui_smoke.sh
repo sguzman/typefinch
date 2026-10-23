@@ -62,22 +62,7 @@ if [[ ! -s "$tmp/report.json" ]]; then
   cat "$tmp/app.log"
   exit 1
 fi
-python3 - "$tmp/report.json" <<'PY'
-import json,sys
-r=json.load(open(sys.argv[1]))
-assert r["synthetic"] and r["state"]=="finished",r
-assert r["tests"] == 1, r
-assert r["entered"] >= 8, r
-assert r["correct"] >= 5, r
-assert r["wpm"] > 0.0, r
-assert 1500 <= r["elapsed_ms"] <= 2500, r
-import sqlite3,os
-dbpath=os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")
-with sqlite3.connect(dbpath) as db:
-    rows=db.execute("SELECT entered,correct,scoring_version,test_mode FROM sessions").fetchall()
-assert len(rows)==1 and rows[0][0]>=8 and rows[0][2]==1 and rows[0][3]=="words",rows
-print(f"X11 GUI smoke PASS: {r['entered']} entered, {r['correct']} correct, {r['wpm']:.1f} WPM")
-PY
+()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
 if [[ ! -s "$tmp/typefinch-window.png" ]]; then
   echo "GUI screenshot missing"; exit 1
 fi
@@ -90,17 +75,7 @@ xdotool type --clearmodifiers --delay 35 "little finches"
 printf "PASTE SHOULD NEVER CHANGE A SCORED SESSION" | xclip -selection clipboard
 xdotool key --clearmodifiers ctrl+v
 sleep 2.4
-python3 - "$tmp/report.json" <<'PY'
-import json,os,sqlite3,sys
-r=json.load(open(sys.argv[1]))
-assert r["tests"]==2,r
-assert r["entered"]==len("little finches"),r
-assert r["correct"]==len("little finches"),r
-with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
-    rows=db.execute("SELECT entered,correct FROM sessions ORDER BY id").fetchall()
-assert len(rows)==2 and rows[1]==(len("little finches"),len("little finches")),rows
-print("Clipboard paste suppression PASS: synthetic paste was not counted")
-PY
+()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
 # Exercise a real corrected error to separate raw from final metrics.
 xdotool key --clearmodifiers F5
 sleep 0.3
@@ -108,21 +83,7 @@ xdotool type --clearmodifiers --delay 32 "little finchex"
 xdotool key --clearmodifiers BackSpace
 xdotool type --clearmodifiers --delay 35 "s"
 sleep 2.4
-python3 - "$tmp/report.json" <<'PY'
-import json,os,sqlite3,sys
-r=json.load(open(sys.argv[1]))
-assert r["state"]=="finished" and r["tests"]==3,r
-with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
-    version=db.execute("PRAGMA user_version").fetchone()[0]
-    rows=db.execute("SELECT entered, correct, attempts, mistakes, corrections, accuracy, raw_accuracy, wpm, raw_wpm FROM sessions ORDER BY id").fetchall()
-assert version==3,version
-assert len(rows)==3,rows
-entered,correct,attempts,mistakes,corrections,accuracy,raw_accuracy,wpm,raw_wpm=rows[2]
-assert entered==correct==len("little finches"),rows[2]
-assert attempts==entered+1 and mistakes==1 and corrections==1,rows[2]
-assert accuracy==100.0 and 0<raw_accuracy<100 and raw_wpm>wpm,rows[2]
-print("Corrected-error QA PASS: raw mistakes survive backspacing; SQLite v3 round-trips both scores")
-PY
+()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`
 xdotool key --clearmodifiers F6
 svg="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
 md="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"
@@ -130,19 +91,8 @@ for _ in $(seq 1 30); do
   if [[ -s "$svg" && -s "$md" ]]; then break; fi
   sleep 0.1
 done
-python3 - "$svg" "$md" <<'PY'
-from pathlib import Path
-from xml.etree import ElementTree
-import sys
-svg,md=map(Path,sys.argv[1:3])
-root=ElementTree.parse(svg).getroot()
-assert root.tag.endswith("svg"),root.tag
-assert "<script" not in svg.read_text(encoding="utf-8")
-assert "Finch" in svg.read_text(encoding="utf-8")
-content=md.read_text(encoding="utf-8")
-assert content.strip()=="![Typefinch typing profile](./typefinch-profile.svg)",content
-print("SVG/Markdown export PASS: well-formed local static card, correct relative image embed")
-PY
+xmllint --noout "$svg"
+lua5.4 tests/smoke_assert.lua export "$svg" "$md"
 
 # Validate *explicit* appearance overrides on real native rendered frames.
 # System-default screenshot above is still separately preserved.
@@ -150,13 +100,7 @@ kill "$app_pid" 2>/dev/null || true
 wait "$app_pid" 2>/dev/null || true
 app_pid=""
 for theme in light dark; do
-  python3 - "$XDG_CONFIG_HOME/typefinch/settings.json" "$theme" <<'PY'
-import json,sys
-path=sys.argv[1]
-with open(path,encoding="utf-8") as f: data=json.load(f)
-data["theme"]=sys.argv[2]
-with open(path,"w",encoding="utf-8") as f: json.dump(data,f)
-PY
+  lua5.4 tests/smoke_assert.lua set-theme "$XDG_CONFIG_HOME/typefinch/settings.json" "$theme"
   ./target/debug/typefinch >"$tmp/app-$theme.log" 2>&1 &
   app_pid=$!
   window=""
@@ -177,23 +121,10 @@ PY
 done
 light_luma="$(identify -format '%[fx:mean]' "$tmp/typefinch-light.png")"
 dark_luma="$(identify -format '%[fx:mean]' "$tmp/typefinch-dark.png")"
-python3 - "$light_luma" "$dark_luma" <<'PY'
-import sys
-light,dark=map(float,sys.argv[1:3])
-assert light > dark + 0.25,(light,dark)
-print(f"Theme render PASS: light luminance={light:.3f}, dark={dark:.3f}")
-PY
+lua5.4 tests/smoke_assert.lua theme "$light_luma" "$dark_luma"
 
 # Complete a native untimed practice lesson; duration zero must not finish early.
-python3 - "$XDG_CONFIG_HOME/typefinch/settings.json" <<'PY'
-import json,sys
-path=sys.argv[1]
-with open(path,encoding="utf-8") as f: data=json.load(f)
-data["test_mode"]="lesson"
-data["lesson_id"]="home"
-data["theme"]="dark"
-with open(path,"w",encoding="utf-8") as f: json.dump(data,f)
-PY
+lua5.4 tests/smoke_assert.lua prepare-lesson "$XDG_CONFIG_HOME/typefinch/settings.json"
 rm -f "$tmp/report.json"
 ./target/debug/typefinch >"$tmp/app-lesson.log" 2>&1 &
 app_pid=$!
@@ -210,16 +141,4 @@ xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool type --clearmodifiers --delay 27 "asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
 sleep 0.7
-python3 - "$tmp/report.json" <<'PY'
-import json,os,sqlite3,sys
-report=json.load(open(sys.argv[1]))
-assert report["state"]=="finished" and report["tests"]==4,report
-expected="asdf jkl; asdf jkl; fj dk sl a; sad flask; jill asks; asdf jkl;"
-with sqlite3.connect(os.path.join(os.environ["XDG_CONFIG_HOME"],"typefinch","sessions.sqlite3")) as db:
-    row=db.execute("SELECT test_mode,duration_ms,elapsed_ms,entered,correct FROM sessions ORDER BY id DESC LIMIT 1").fetchone()
-assert row is not None
-mode,duration,elapsed,entered,correct=row
-assert mode=="lesson/home" and duration==0 and elapsed>0,row
-assert entered==correct==len(expected),row
-print("Untimed practice PASS: native typing finished on last lesson character and persisted with distinct tag")
-PY
+()=>`lua5.4 tests/smoke_assert.lua ${arr[i++]} "$tmp/report.json"`

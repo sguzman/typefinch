@@ -478,7 +478,7 @@
               "id": "T305",
               "emoji": "🌍",
               "name": "ANSI, ISO, JIS and split geometries",
-              "progress": 33,
+              "progress": 50,
               "checks": [
                 {
                   "text": "Geometry definitions",
@@ -490,7 +490,12 @@
                   "passed": false
                 },
                 {
-                  "text": "Per-key rendering",
+                  "text": "Per-key rendering for modeled main typing-block positions",
+                  "passed": true,
+                  "evidence": "src/app.rs and src/geometry.rs: XKB key symbols, named dead-key positions, extra-key placeholders and four layouts; 1100×850 ISO/JIS/split native screenshots inspected from Actions 39997672154 (113 Rust tests + X11 smoke pass), including full five-row visibility and unclipped split final key. Main-block preview only."
+                },
+                {
+                  "text": "Complete control/modifier and edge-key geometry",
                   "passed": false
                 }
               ]

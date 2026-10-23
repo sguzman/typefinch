@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `███████░░░ 70%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `███████░░░ 71%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -149,3 +149,5 @@ The guarded startup path also avoids opening or migrating the saved SQLite datab
 **Recovery and focus QA:** [102 passing Rust tests plus native recovery staging, corrupt/orphaned settings protection, and two-window focus-loss cancellation](https://github.com/sguzman/typefinch/actions/runs/39967868689). Real Hyprland hardware acceptance and full IME handling remain open.
 
 **Keyboard shape explorer:** The keyboard preview now includes selectable ANSI, ISO, JIS and split **main-block illustrations** with XKB symbol inspection where installed. Unattributed ISO/JIS extras are visibly distinct from regular egui physical-key input, and a split layout does not double-count Space. This is not a physical-keyboard detector, complete numeric-keypad model, or extra-key emulation. [111 Rust tests and native CI passed for the geometry model](https://github.com/sguzman/typefinch/actions/runs/39992682545).
+
+**Verified keyboard geometry visualization:** [CI 39997672154](https://github.com/sguzman/typefinch/actions/runs/39997672154) passed 113 Rust tests and produced native ISO/JIS/split screenshots. The main typing-block keycaps were visually inspected after correcting accumulated spacing and scroll clipping. The model is not a full 104/105/109-key hardware map and cannot route extra ISO/JIS physical-key events. F4 cycles the displayed keyboard family without changing the OS layout.

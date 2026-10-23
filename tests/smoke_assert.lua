@@ -223,7 +223,7 @@ elseif mode == "geometry-preview" then
     local shape=assert(arg[3])
     local expected={
         iso={name="ISO main block",slots=61,unattributed=1,visual_only=0,controls=3,modifiers=9},
-        jis={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=3,modifiers=7},
+        jis={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=4,modifiers=7},
         split={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9},
     }
     local v=assert(expected[shape],"unknown geometry")

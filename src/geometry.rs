@@ -113,7 +113,15 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
     ] {
         for (i, &(key,evdev,name)) in keys.iter().enumerate() {
             let gap = if shape==Shape::Split && row>0 && i>=5 {28} else {0};
-            result.push(position(name,evdev,Some(key),row,offset + i as u16*10+gap,10));
+            let x=offset + i as u16*10+gap;
+            if shape==Shape::Jis && evdev==41 {
+                // Japanese 109-key references use KEY_ZENKAKUHANKAKU (85)
+                // in the top-left ANSI-Grave position. It is a mode key,
+                // never a guessed printable backtick or scored text event.
+                result.push(special("Zenkaku/Hankaku","Zen",85,row,x,10,false));
+            } else {
+                result.push(position(name,evdev,Some(key),row,x,10));
+            }
         }
     }
     if shape==Shape::Iso {
@@ -324,6 +332,18 @@ mod tests {
             assert_eq!(slots.iter().filter(|s|s.kind==SlotKind::Extra).count(),
                 match shape { Shape::Iso=>1,Shape::Jis=>5,_=>0 });
         }
+    }
+    #[test] fn japanese_top_left_is_zenkaku_not_fake_ansi_grave() {
+        let jis=slots(Shape::Jis);
+        let zen=jis.iter().find(|s|s.evdev==85).expect("missing Zenkaku/Hankaku");
+        assert_eq!(zen.kind,SlotKind::Control);
+        assert_eq!(zen.caption,"Zen");
+        assert!(zen.egui_key.is_none());
+        assert_eq!(zen.row,0);
+        assert_eq!(zen.x,0);
+        assert!(!jis.iter().any(|s|s.evdev==41));
+        let ansi=slots(Shape::Ansi);
+        assert_eq!(ansi.iter().find(|s|s.evdev==41).unwrap().egui_key,Some(Key::Backtick));
     }
     #[test] fn iso_and_jis_extras_do_not_fake_egui_key_events() {
         let ansi=slots(Shape::Ansi);

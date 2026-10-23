@@ -388,3 +388,40 @@ if compgen -G "$recover_root/typefinch/exports/typefinch-backup-*" >/dev/null; t
   echo "Corrupt-settings fallback must not create a misleading full backup"
   exit 1
 fi
+
+# A missing settings.json is *not* a new profile when an older SQLite file
+# survives. Verify using the native GUI, not only isolated Rust unit tests.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+orphan_root="$tmp/orphan-config"
+mkdir -p "$orphan_root/typefinch"
+cp "$backup_db" "$orphan_root/typefinch/sessions.sqlite3"
+cp "$orphan_root/typefinch/sessions.sqlite3" "$tmp/orphan-original.sqlite3"
+XDG_CONFIG_HOME="$orphan_root" TYPEFINCH_QA_REPORT="$tmp/orphan-report.json" \
+  ./target/debug/typefinch >"$tmp/app-orphan.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-orphan.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No orphan-history recovery window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 35 "little finches practice"
+sleep 2.5
+xdotool key --clearmodifiers F8
+sleep 0.3
+lua5.4 tests/smoke_assert.lua orphan "$tmp/orphan-report.json"
+[[ ! -e "$orphan_root/typefinch/settings.json" ]] || { echo "Recreated missing identity!"; exit 1; }
+cmp "$orphan_root/typefinch/sessions.sqlite3" "$tmp/orphan-original.sqlite3"
+if compgen -G "$orphan_root/typefinch/exports/typefinch-backup-*" >/dev/null; then
+  echo "Orphan-history guard must not generate fallback profile backup"
+  exit 1
+fi

@@ -90,6 +90,11 @@ elseif mode == "stats" then
         assert(item.typed==nil and item.raw_text==nil)
     end
     print("Full JSON history export PASS: three records, versioned aggregate-only payload")
+elseif mode == "orphan" then
+    local r=report(assert(arg[2]))
+    equals(r.state,"blocked")
+    assert(r.synthetic)
+    print("Orphaned-history GUI guard PASS: session rejected without replacement settings")
 elseif mode == "backup" then
     local database=assert(arg[2])
     local settings=assert(json.decode(read(assert(arg[3]))))

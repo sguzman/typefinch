@@ -38,6 +38,7 @@ pub fn verify(settings:&Path,database:&Path)->Result<BackupSummary,String>{
     }
     // Deserializing is validation only; do not use auto-migration, create a
     // fallback identity or write a normalized copy to the backup.
+    let profile_count=profiles.len();
     serde_json::from_value::<crate::preferences::Preferences>(json)
         .map_err(|e|format!("Invalid settings structure: {e}"))?;
     let db=Connection::open_with_flags(database,OpenFlags::SQLITE_OPEN_READ_ONLY)
@@ -62,7 +63,7 @@ pub fn verify(settings:&Path,database:&Path)->Result<BackupSummary,String>{
             return Err("SQLite backup contains sessions for an absent profile".into());
         }
     }
-    Ok(BackupSummary{profiles:profiles.len(),sessions,schema})
+    Ok(BackupSummary{profiles:profile_count,sessions,schema})
 }
 
 #[cfg(test)]

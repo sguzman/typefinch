@@ -433,9 +433,15 @@ impl Typefinch {
         if import_requested {
             match goal_transfer::import(std::path::Path::new(self.goal_import_path.trim())) {
                 Ok(goals)=>{
-                    self.prefs.profiles[self.prefs.active_profile].goals=goals;
-                    self.save();
-                    self.message="Goals imported into the selected local profile; history and identity unchanged.".into();
+                    let index=self.prefs.active_profile;
+                    let previous=std::mem::replace(&mut self.prefs.profiles[index].goals,goals);
+                    match self.prefs.save() {
+                        Ok(())=>self.message="Goals imported into the selected local profile; history and identity unchanged.".into(),
+                        Err(e)=>{
+                            self.prefs.profiles[index].goals=previous;
+                            self.message=format!("Goals import was not saved; previous targets preserved: {e}");
+                        },
+                    }
                 },
                 Err(e)=>self.message=format!("Goals import failed: {e}"),
             }

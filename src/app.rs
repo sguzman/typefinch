@@ -36,8 +36,8 @@ impl PreviewLayer {
 }
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
-fn should_poll_devices(hyprland:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
-    hyprland && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
+fn should_poll_devices(can_poll:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
+    can_poll && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
 }
 // Manual requests and the focus/hotplug watcher share one bounded inspector.
 // A slow external compositor command must not block typing or allow repeated
@@ -379,11 +379,9 @@ impl Typefinch {
                 self.apply_device_result(result,focused);
             }
         }
-        let inspectable_wayland=std::env::var("XDG_SESSION_TYPE").as_deref()==Ok("wayland")
-            && (std::env::var_os("WAYLAND_DISPLAY").is_some()
-                || std::env::var_os("WAYLAND_SOCKET").is_some());
-        let can_poll=std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some()
-            || inspectable_wayland;
+        // Poll exactly the backends that inspect() can select; a stale
+        // Hyprland signature in X11 must not activate a Wayland poll loop.
+        let can_poll=devices::supports_polling();
         let focus_gained=focused && !self.last_window_focused;
         if should_poll_devices(can_poll,focused,focus_gained,self.device_poll_started.elapsed())
             && self.pending_device_query.is_none() {

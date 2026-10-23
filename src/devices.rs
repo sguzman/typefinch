@@ -359,6 +359,34 @@ mod tests {
             && seat.layout.is_empty()
             && seat.variant.is_empty()));
     }
+    #[test] fn synthetic_wayland_probe_subprocess_is_bounded_and_rejects_untrusted_output() {
+        let Ok(exe)=std::env::var("TYPEFINCH_QA_WAYLAND_FIXTURE") else {return;};
+        let scenario=std::env::var("TYPEFINCH_QA_WAYLAND_CASE")
+            .expect("fixture scenario required");
+        let started=Instant::now();
+        let result=inspect_wayland_seats_from_executable(&exe);
+        match scenario.as_str() {
+            "two_seats"|"reordered"=>{
+                let found=result.expect("valid seats must survive subprocess parsing");
+                assert_eq!(found.len(),2);
+                assert_eq!(found[0].address,
+                    if scenario=="two_seats" {"wayland:seat:10"} else {"wayland:seat:11"});
+                assert_eq!(preserve_selection(Some("wayland:seat:11"),&found),
+                    if scenario=="two_seats" {1} else {0});
+                assert!(found.iter().all(|k|
+                    k.active_keymap.is_empty() && k.layout.is_empty() && k.variant.is_empty()));
+            },
+            "no_keyboard"=>assert!(result.unwrap().is_empty()),
+            "duplicate_id"=>assert!(result.unwrap_err().contains("duplicate registry seat ID")),
+            "malformed"=>assert!(result.unwrap_err().contains("Invalid Wayland seat metadata")),
+            "oversized"=>assert!(result.unwrap_err().contains("safe size")),
+            "command_failed"=>assert!(result.unwrap_err().contains("inspection command failed")),
+            "hung"=>assert!(result.unwrap_err().contains("timed out")),
+            _=>panic!("unrecognized synthetic Wayland QA scenario"),
+        }
+        assert!(started.elapsed()<Duration::from_secs(5),
+            "an inspection child must not monopolize the only GUI worker");
+    }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";
         let found=parse_x11_query(raw).unwrap();

@@ -962,7 +962,7 @@ impl Typefinch {
                     ui.small("No unique installed XKB match for this device's active map.");
                 }
             } else {
-                ui.label(self.device_error.as_deref().unwrap_or("No keyboards listed by Hyprland."));
+                ui.label(self.device_error.as_deref().unwrap_or("No inspected keyboard seats available."));
             }
         });
         ui.small("This selector inspects keyboard metadata. Ordinary Wayland typing events are seat-level: this is not yet a per-device input filter.");

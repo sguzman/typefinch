@@ -170,6 +170,23 @@ elseif mode == "xkb-compose" then
     equals(x.attempts,12,"dead key must not create an extra attempt")
     equals(x.accuracy,100)
     print("Real X11 Spanish XKB dead-key Compose + Backspace cancellation PASS: 12 correct graphemes, 12 scored attempts")
+elseif mode == "reference-section" then
+    local r=report(assert(arg[2]))
+    local section=assert(arg[3])
+    local expected={
+        navigation={name="Function / navigation",count=26},
+        keypad={name="Numeric keypad",count=17},
+    }
+    local v=assert(expected[section],"unsupported reference section")
+    assert(r.synthetic and r.state=="geometry-preview")
+    equals(r.section,v.name)
+    equals(r.slots,v.count)
+    equals(r.unattributed,0)
+    equals(r.controls,v.count)
+    equals(r.modifiers,0)
+    equals(r.visual_only,0)
+    equals(r.target,"us")
+    print("Native reference section PASS: "..r.section.." ("..r.slots.." unscored keys)")
 elseif mode == "geometry-cycled" then
     local r=report(assert(arg[2]))
     local initial=assert(arg[3])
@@ -181,6 +198,7 @@ elseif mode == "geometry-cycled" then
     local v=assert(expected[initial],"unknown source shape")
     assert(r.synthetic and r.state=="geometry-preview")
     equals(r.shape,v.name)
+    equals(r.section,"Typing block")
     equals(r.target,v.target)
     equals(r.slots,v.slots)
     equals(r.unattributed,v.unattributed)
@@ -192,6 +210,7 @@ elseif mode == "spanish-geometry" then
     local r=report(assert(arg[2]))
     assert(r.synthetic and r.state=="geometry-preview")
     equals(r.shape,"ISO main block")
+    equals(r.section,"Typing block")
     equals(r.target,"es")
     equals(r.slots,61)
     equals(r.unattributed,1)
@@ -210,6 +229,7 @@ elseif mode == "geometry-preview" then
     local v=assert(expected[shape],"unknown geometry")
     assert(r.synthetic and r.state=="geometry-preview")
     equals(r.shape,v.name)
+    equals(r.section,"Typing block")
     equals(r.target,shape=="jis" and "jp" or "us")
     equals(r.slots,v.slots)
     equals(r.unattributed,v.unattributed)

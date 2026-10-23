@@ -7,7 +7,7 @@ use crate::{
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
-    geometry::{self, Shape, Slot, SlotKind},
+    geometry::{self, Shape, Section, Slot, SlotKind},
     history::{self, Record},
     lesson,
     layouts::{self, Mode},
@@ -139,6 +139,7 @@ pub struct Typefinch {
     backup_check_result:String,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
+    preview_section:Section,
     message: String,
 }
 impl Typefinch {
@@ -212,16 +213,26 @@ impl Typefinch {
                 Ok("split")=>Shape::Split, _=>Shape::Ansi,
             }
         } else {Shape::Ansi};
+        let preview_section=if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+            && std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some() {
+            match std::env::var("TYPEFINCH_QA_PREVIEW_SECTION").as_deref() {
+                Ok("navigation")=>Section::Navigation,
+                Ok("keypad")=>Section::Keypad,
+                _=>Section::Typing,
+            }
+        } else {Section::Typing};
         if std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some()
             && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
             let _=crate::qa::write_geometry_report(
-                preview_shape.label(),&prefs.layout,&geometry::slots(preview_shape));
+                preview_shape.label(),&prefs.layout,preview_section.label(),
+                &geometry::section_slots(preview_shape,preview_section));
         }
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query:None, new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
-            backup_check_result:String::new(), preview_layer:PreviewLayer::Base, preview_shape, message: startup_warning }
+            backup_check_result:String::new(), preview_layer:PreviewLayer::Base,
+            preview_shape, preview_section, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>) {
         let selected=self.keyboards.get(self.device_index).map(|k|k.address.clone());
@@ -1143,20 +1154,32 @@ impl Typefinch {
                         ui.selectable_value(&mut self.preview_layer,layer,layer.label());
                     }
                 });
-            ui.label("Geometry (F4 cycles)");
+            ui.label("Geometry (F4)");
             egui::ComboBox::from_id_salt("preview-keyboard-shape")
                 .selected_text(self.preview_shape.label()).show_ui(ui,|ui|{
                     for shape in Shape::ALL {
                         ui.selectable_value(&mut self.preview_shape,shape,shape.label());
                     }
                 });
+            ui.label("Keys (F10)");
+            egui::ComboBox::from_id_salt("preview-keyboard-section")
+                .selected_text(self.preview_section.label()).show_ui(ui,|ui|{
+                    for section in Section::ALL {
+                        ui.selectable_value(&mut self.preview_section,section,section.label());
+                    }
+                });
         });
         let shift=self.preview_layer.shift();
         let alt_gr=self.preview_layer.alt_gr();
-        ui.small(format!("Selected XKB target: {} · {}. {}",
-            self.prefs.layout,self.preview_shape.label(),self.preview_shape.note()));
+        ui.small(format!("Selected XKB target: {} · {} · {}",
+            self.prefs.layout,self.preview_shape.label(),
+            if self.preview_section==Section::Typing {
+                self.preview_shape.note()
+            } else {
+                "generic Linux reference positions; not detected or routed input"
+            }));
         ui.add_space(6.0);
-        let slots=geometry::slots(self.preview_shape);
+        let slots=geometry::section_slots(self.preview_shape,self.preview_section);
         // Each row is positioned in tenth-key units without inserting
         // per-key item gaps. A horizontal scroll retains full geometry at
         // narrow viewport widths rather than silently compressing keycaps.
@@ -1185,7 +1208,7 @@ impl Typefinch {
                 ui.add_space(2.0);
             }
         });
-        ui.small("Control and modifier positions are illustrations, not separately captured physical events. ISO/JIS extras are unattributed. Split geometry never duplicates scored Space.");
+        ui.small("Main typing keys show XKB symbols; function/navigation and keypad keys show Linux reference labels only. None are independently captured hardware events.");
         ui.small("dk = XKB dead key (hover for accent name); – = unknown/unmapped. Space and modifier captions are readable text. AltGr inspection is not physical AltGr attribution.");
         let slow=self.session.slowest_keys();
         if !slow.is_empty(){
@@ -1523,7 +1546,20 @@ impl eframe::App for Typefinch {
                 && std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some() {
                 let _=crate::qa::write_geometry_report(
                     self.preview_shape.label(),&self.prefs.layout,
-                    &geometry::slots(self.preview_shape));
+                    self.preview_section.label(),
+                    &geometry::section_slots(self.preview_shape,self.preview_section));
+            }
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::F10)) {
+            // Presentation-only section switching. No event capture,
+            // input-mode change, or saved user preference.
+            self.preview_section=self.preview_section.next();
+            if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+                && std::env::var_os("TYPEFINCH_QA_PREVIEW_SHAPE").is_some() {
+                let _=crate::qa::write_geometry_report(
+                    self.preview_shape.label(),&self.prefs.layout,
+                    self.preview_section.label(),
+                    &geometry::section_slots(self.preview_shape,self.preview_section));
             }
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
@@ -1636,7 +1672,7 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
-                            ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG.");
+                            ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");
                         });

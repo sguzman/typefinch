@@ -569,6 +569,23 @@ for shape in iso jis split; do
   xdotool key --clearmodifiers F4
   sleep 0.4
   lua5.4 tests/smoke_assert.lua geometry-cycled "$tmp/geometry-$shape.json" "$shape"
+  # One real X11 keyboard cycle through the additional reference sections.
+  # An input key is never scored; these are preview-only positions.
+  if [[ "$shape" == "iso" ]]; then
+    for section in navigation keypad; do
+      xdotool windowactivate --sync "$window" 2>/dev/null || true
+      xdotool windowfocus --sync "$window"
+      sleep 0.2
+      xdotool key --clearmodifiers F10
+      sleep 0.4
+      lua5.4 tests/smoke_assert.lua reference-section "$tmp/geometry-$shape.json" "$section"
+      import -window "$window" "$tmp/typefinch-reference-$section.png"
+      [[ -s "$tmp/typefinch-reference-$section.png" ]] || {
+        echo "Missing $section preview screenshot" >&2; exit 1;
+      }
+      echo "Native $section reference screenshot PASS"
+    done
+  fi
   kill "$app_pid" 2>/dev/null || true
   wait "$app_pid" 2>/dev/null || true
   app_pid=""

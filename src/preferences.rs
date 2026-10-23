@@ -209,6 +209,17 @@ mod tests {
         assert_eq!(older.card_font,CardFont::Sans);
         assert_eq!(older.card_template,CardTemplate::Classic);
     }
+    #[test] fn personal_layouts_survive_settings_roundtrip_and_default_empty() {
+        let mut p=Preferences::default();
+        assert!(p.custom_layouts.is_empty());
+        let custom=CustomLayout::starter();
+        p.layout=custom.id.clone();
+        p.custom_layouts.push(custom.clone());
+        let encoded=serde_json::to_vec(&p).unwrap();
+        let q:Preferences=serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(q.custom_layouts,vec![custom]);
+        assert_eq!(q.layout,p.layout);
+    }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {
         let p=Preferences::default();

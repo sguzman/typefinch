@@ -45,3 +45,7 @@ Typefinch records the emulated target identity for software-emulated sessions. O
 ## Refresh after hardware changes
 
 Typefinch re-enumerates the compositor's read-only keyboard inventory when its window regains focus. The selected inspection device is preserved by exact Hyprland address when still present; otherwise selection falls back to the first available device (or none). This does not subscribe to device events while the app is unfocused, and it does not tie scored keyboard events to a selected physical device. There is no privileged global key capture.
+
+## Personal ANSI layouts
+
+The built-in editor creates version-1 JSON keymaps with a UUID-based `custom/<uuid>` identity, a 1–32-grapheme name, and exactly three rows of ten graphemes each for both base and Shift layers. Each physical ANSI key produces the corresponding mapped grapheme during *in-app emulation only*; Space remains Space, and Backspace remains the session's correction action. Editing is draft-based and validated before saving. Imports are explicitly selected local files (≤16 KiB); duplicate IDs get a fresh UUID and never overwrite existing mappings. Exported JSON is local and no external services are involved. This is not full ISO/JIS geometry, AltGr/Compose, or a system-level keyboard remapper.

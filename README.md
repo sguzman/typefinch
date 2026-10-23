@@ -105,3 +105,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Ephemeral key timing:** The keyboard preview reports slower characters after at least two valid correctly typed single-key intervals (25–2000 ms). It excludes batch/composition commits and resets when starting a new session. No per-character timing or typed contents are stored or exported.
 
 **Latest academy validation:** [73 passing tests, contrast-checked graded in-memory keyboard heatmap and timing summaries](https://github.com/sguzman/typefinch/actions/runs/39950437760). Full physical-key analytics and Hyprland hardware QA are still outstanding.
+
+**Personal ANSI layouts:** Create and edit three ten-key rows (base and Shift) within Typefinch, using a validated v1 JSON schema. Custom keymaps are saved in local settings, selectable as software-emulated targets, and never modify the OS or capture global input. Explicit JSON import is limited to 16 KiB and refuses invalid mappings; export writes to the local `exports/` folder.

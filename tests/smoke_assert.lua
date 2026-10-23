@@ -174,9 +174,9 @@ elseif mode == "geometry-preview" then
     local r=report(assert(arg[2]))
     local shape=assert(arg[3])
     local expected={
-        iso={name="ISO 105",slots=49,unattributed=1,visual_only=0},
-        jis={name="JIS 109",slots=53,unattributed=5,visual_only=0},
-        split={name="Split ANSI",slots=49,unattributed=0,visual_only=1},
+        iso={name="ISO main block",slots=49,unattributed=1,visual_only=0},
+        jis={name="JIS main block",slots=53,unattributed=5,visual_only=0},
+        split={name="Split main block",slots=49,unattributed=0,visual_only=1},
     }
     local v=assert(expected[shape],"unknown geometry")
     assert(r.synthetic and r.state=="geometry-preview")

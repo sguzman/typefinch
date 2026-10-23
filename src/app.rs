@@ -1135,16 +1135,23 @@ impl Typefinch {
             self.prefs.layout,self.preview_shape.label(),self.preview_shape.note()));
         ui.add_space(6.0);
         let slots=geometry::slots(self.preview_shape);
-        // Each row is positioned in tenth-key units. A horizontal scroll
-        // preserves actual spacing even in a compact window.
+        // Each row is positioned in tenth-key units without inserting
+        // per-key item gaps. A horizontal scroll retains full geometry at
+        // narrow viewport widths rather than silently compressing keycaps.
         egui::ScrollArea::horizontal().id_salt("geometry-preview").show(ui,|ui|{
             for row in 0..=4_u8 {
                 ui.horizontal(|ui|{
+                    // Geometry uses absolute tenth-key units: do not add
+                    // egui's ordinary inter-widget spacing to every slot.
+                    // That padding previously accumulated across the row,
+                    // pushing ISO/JIS positions outside their model bounds.
+                    ui.spacing_mut().item_spacing.x=0.0;
+                    const UNIT:f32=4.2;
                     let mut prev_end=0_u16;
                     for slot in slots.iter().filter(|s|s.row==row) {
-                        let gap=slot.x.saturating_sub(prev_end) as f32*4.8;
+                        let gap=slot.x.saturating_sub(prev_end) as f32*UNIT;
                         if gap>0.0 {ui.add_space(gap);}
-                        let width=(slot.width as f32*4.8-14.0).max(30.0);
+                        let width=(slot.width as f32*UNIT-14.0).max(26.0);
                         if let Some(key)=slot.egui_key {
                             self.show_preview_key(ui,key,shift,alt_gr,width);
                         } else {

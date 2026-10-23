@@ -9,10 +9,10 @@ impl Shape {
     pub const ALL: [Self;4] = [Self::Ansi, Self::Iso, Self::Jis, Self::Split];
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Ansi => "ANSI 104",
-            Self::Iso => "ISO 105",
-            Self::Jis => "JIS 109",
-            Self::Split => "Split ANSI",
+            Self::Ansi => "ANSI main block",
+            Self::Iso => "ISO main block",
+            Self::Jis => "JIS main block",
+            Self::Split => "Split main block",
         }
     }
     pub const fn note(self) -> &'static str {

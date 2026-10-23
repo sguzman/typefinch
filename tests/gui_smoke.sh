@@ -551,7 +551,9 @@ for shape in iso jis split; do
   # The keyboard is below the initial typing passage. Scroll the CENTRAL
   # pane into view instead of saving an irrelevant top-of-page screenshot.
   xdotool mousemove --window "$window" 825 590
-  xdotool click --repeat 8 --delay 70 5
+  # Three wheel steps keep the heading and the entire five-row keyboard
+  # visible together at 1100x850; eight steps cropped its top rows.
+  xdotool click --repeat 3 --delay 70 5
   sleep 0.6
   lua5.4 tests/smoke_assert.lua geometry-preview "$tmp/geometry-$shape.json" "$shape"
   import -window "$window" "$tmp/typefinch-geometry-$shape.png"

@@ -88,7 +88,7 @@
               "id": "T004",
               "emoji": "🧭",
               "name": "Navigation and responsive egui shell",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Main panels and controls coded",
@@ -101,7 +101,8 @@
                 },
                 {
                   "text": "HiDPI/small-window screenshots",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface"
                 }
               ]
             }

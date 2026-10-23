@@ -2,13 +2,13 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `██████░░░░ 64%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `███████░░░ 65%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
+## 🐣 M0 — Native typing MVP — `███████░░░ 72%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
-### 🧱 P0 — Foundation and visual identity — `██████░░░░ 61%`
+### 🧱 P0 — Foundation and visual identity — `███████░░░ 69%`
 
 - 🦀 **T001** Rust/egui application — `███████░░░ 67%`
   - [x] Native shell committed — Cargo.toml; src/main.rs
@@ -23,10 +23,10 @@
   - [x] Preference persistence coded — src/preferences.rs
   - [x] Explicit Light and Dark rendered screenshots pass graphical CI — GitHub Actions 39872686067: light luminance 0.955 vs dark 0.125
   - [ ] Hyprland system theme transition verified
-- 🧭 **T004** Navigation and responsive egui shell — `███░░░░░░░ 33%`
+- 🧭 **T004** Navigation and responsive egui shell — `███████░░░ 67%`
   - [x] Main panels and controls coded — src/app.rs
   - [ ] Keyboard navigation audit
-  - [ ] HiDPI/small-window screenshots
+  - [x] HiDPI/small-window screenshots — CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface
 
 ### 🐦 P1 — Profiles and persistence — `████████░░ 78%`
 
@@ -76,7 +76,7 @@
 
 - ⌨️ Typing tests — `███████░░░ 72%`
 - 🐦 Local identity — `████████░░ 78%`
-- 🌗 Appearance — `██████░░░░ 58%`
+- 🌗 Appearance — `███████░░░ 70%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 49%`
 

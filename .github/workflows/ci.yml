@@ -41,6 +41,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/wayland_virtual_seat_smoke.sh
       - name: X11 aggregate seat fallback (read-only)
         run: xvfb-run -a -s "-screen 0 1280x900x24" env XDG_SESSION_TYPE=x11 TYPEFINCH_QA_X11_SEAT=1 cargo test devices::tests::native_x11_aggregate_seat_is_read_only -- --nocapture
+      - name: Read-only keyboard inspector CLI (X11 and disconnected session)
+        run: bash tests/inspector_cli_smoke.sh
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview

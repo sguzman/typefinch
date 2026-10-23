@@ -50,6 +50,20 @@ end
 assert(active>0,"Nested Weston did not advertise a keyboard-capable virtual seat")
 print("Native nested Weston PASS: "..active.." virtual keyboard-capable aggregate seat(s); no key capture")
 LUA
+./target/debug/typefinch --inspect-keyboards >"$tmp/seat-inventory.json"
+lua5.4 - "$tmp/seat-inventory.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local doc,_,err=json.decode(f:read("*a"));f:close()
+assert(not err and doc.schema==1 and doc.capture_policy=="inspection-only")
+assert(#doc.rows>0,"virtual keyboard-capable seat must be visible in public CLI")
+for _,row in ipairs(doc.rows) do
+  assert(row.inspection_id:match("^wayland:seat:%d+$"))
+  assert(row.reported_active_keymap==nil or row.reported_active_keymap==json.null)
+  assert(row.key_events==nil and row.physical_device==nil)
+end
+print("Wayland inspector CLI PASS: read-only virtual seat metadata, no keymap attribution")
+LUA
 TYPEFINCH_QA_WAYLAND_INSPECTOR="$PWD/target/debug/typefinch" \
   TYPEFINCH_QA_REQUIRE_KEYBOARD_SEAT=1 \
   cargo test devices::tests::native_wayland_child_inspector_is_bounded_and_unattributed -- --nocapture
@@ -93,6 +107,16 @@ for _,seat in ipairs(seats) do
   assert(seat.active_keymap==nil and seat.physical_device==nil)
 end
 print("Native nested Weston no-input PASS: "..#seats.." seat(s) with no keyboard capability")
+LUA
+./target/debug/typefinch --inspect-keyboards >"$tmp/no-input-inventory.json"
+lua5.4 - "$tmp/no-input-inventory.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local doc,_,err=json.decode(f:read("*a"));f:close()
+assert(not err and doc.schema==1 and doc.capture_policy=="inspection-only")
+assert(type(doc.rows)=="table" and #doc.rows==0,
+  "a no-input Wayland seat must not be presented as a keyboard")
+print("Wayland no-input inspector CLI PASS: empty keyboard inventory")
 LUA
 TYPEFINCH_QA_WAYLAND_INSPECTOR="$PWD/target/debug/typefinch" \
   TYPEFINCH_QA_EXPECT_NO_KEYBOARD_SEAT=1 \

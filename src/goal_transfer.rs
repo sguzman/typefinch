@@ -79,6 +79,46 @@ fn export_to_dir(goals:&Goals,dir:&Path)->Result<PathBuf,String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn goal_import_can_update_only_selected_profile_targets() {
+        use crate::preferences::Profile;
+        let mut profiles=vec![Profile::default(),Profile::default()];
+        profiles[0].name="First".into();
+        profiles[1].name="Second".into();
+        profiles[1].tests=37;
+        profiles[1].best_wpm=132.0;
+        profiles[1].best_accuracy=99.0;
+        let first=profiles[0].clone();
+        let second_id=profiles[1].id.clone();
+        let transferred=Goals{
+            target_wpm:100.0,target_accuracy:98.0,
+            daily_sessions:4,show_streak:false,
+        };
+        // The same parse result that the UI assigns is only a Goals value;
+        // no profile identity, session records or best scores are transferred.
+        let decoded=parse(&encode(&transferred).unwrap()).unwrap();
+        profiles[1].goals=decoded;
+        assert_eq!(profiles[0].id,first.id);
+        assert_eq!(profiles[0].goals,first.goals);
+        assert_eq!(profiles[1].id,second_id);
+        assert_eq!(profiles[1].tests,37);
+        assert_eq!(profiles[1].best_wpm,132.0);
+        assert_eq!(profiles[1].best_accuracy,99.0);
+        assert_eq!(profiles[1].goals,transferred);
+    }
+    #[test] fn goal_file_import_rejects_symbolic_links() {
+        #[cfg(unix)] {
+            use std::os::unix::fs::symlink;
+            let dir=std::env::temp_dir().join(format!("typefinch-goal-symlink-{}",uuid::Uuid::new_v4()));
+            fs::create_dir(&dir).unwrap();
+            let source=dir.join("goals.json");
+            let link=dir.join("external.json");
+            fs::write(&source,encode(&Goals::default()).unwrap()).unwrap();
+            symlink(&source,&link).unwrap();
+            assert!(import(&link).unwrap_err().contains("regular goal JSON"));
+            assert!(import(&source).is_ok());
+            fs::remove_dir_all(dir).unwrap();
+        }
+    }
     #[test] fn complete_goal_roundtrip_is_idempotent_and_profile_independent() {
         let goals=Goals{target_wpm:105.0,target_accuracy:99.0,daily_sessions:4,show_streak:true};
         let bytes=encode(&goals).unwrap();

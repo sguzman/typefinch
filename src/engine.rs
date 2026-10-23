@@ -433,6 +433,26 @@ mod tests {
         assert!(session.typed.is_empty());
         assert_eq!(session.corrections,1);
     }
+    #[test] fn local_custom_passage_rejects_links_and_preserves_unicode_clusters() {
+        #[cfg(unix)] {
+            use std::os::unix::fs::symlink;
+            let dir=std::env::temp_dir().join(format!("typefinch-custom-symlink-{}",uuid::Uuid::new_v4()));
+            std::fs::create_dir(&dir).unwrap();
+            let source=dir.join("passage.txt");
+            let link=dir.join("alias.txt");
+            std::fs::write(&source,"mañana café".as_bytes()).unwrap();
+            symlink(&source,&link).unwrap();
+            assert!(import_custom_file(&link).is_err());
+            assert_eq!(import_custom_file(&source).unwrap(),"mañana café");
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+        // Truncation is by extended grapheme, not byte or scalar; ZWJ
+        // emoji must remain intact and never become a broken partial glyph.
+        let text="👩‍💻".repeat(4100);
+        let truncated=import_custom_passage(text.as_bytes()).unwrap();
+        assert_eq!(truncated.graphemes(true).count(),4096);
+        assert_eq!(truncated,"👩‍💻".repeat(4096));
+    }
     #[test] fn keyboard_path_and_drop_import_share_a_bounded_file_reader() {
         let path=std::env::temp_dir().join(format!("typefinch-import-{}.txt",uuid::Uuid::new_v4()));
         {

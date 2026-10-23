@@ -25,6 +25,21 @@ jobs:
         run: cargo build
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
+      - name: Build optimized Linux preview
+        run: cargo build --release --locked
+      - name: Package versioned Linux archive
+        run: |
+          VERSION="$(sed -n 's/^version = "\\([^"]*\\)"/\\1/p' Cargo.toml | head -n1)"
+          lua5.4 tools/package_release.lua "$VERSION" "$GITHUB_SHA"
+      - name: Verify user-local install and rollback
+        run: bash tests/release_smoke.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typefinch-linux-preview
+          path: |
+            dist/typefinch-*.tar.gz
+            dist/typefinch-*.tar.gz.sha256
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

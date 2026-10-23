@@ -115,3 +115,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Responsive QA:** [80 passing Rust tests and native X11 screenshots](https://github.com/sguzman/typefinch/actions/runs/39955283848), including 740×590 compact and 150% scaled viewports. Both screenshots were inspected to confirm the typing exercise is visible on entry. Live Hyprland/HiDPI hardware and keyboard-only navigation remain unfinished.
 
 **Guaranteed PNG text:** The native PNG converter reuses the fonts already embedded in egui, without installing or exporting font files. PNG generation now refuses to save a card if the heading failed to render (for example on a fontless Linux CI image); the test suite checks actual glyph pixels, not only PNG dimensions.
+
+**Linux preview distribution:** Passing CI produces a checksum-protected x86_64 tarball, a user-local installer, and one-level rollback tested in a disposable prefix. This is not an MVP release. See [installation instructions](docs/RELEASE.md).

@@ -19,6 +19,7 @@ const MAX_SEATS:usize=128;
 struct State {
     seats:BTreeMap<u32,Seat>,
     overflow:bool,
+    invalid_name:bool,
 }
 impl State {
     fn add_seat(&mut self,id:u32)->bool {
@@ -36,7 +37,12 @@ impl State {
         if let Some(seat)=self.seats.get_mut(&id) {seat.keyboard=keyboard;}
     }
     fn update_name(&mut self,id:u32,name:&str){
+        if !self.seats.contains_key(&id) {return;}
         if name.is_empty() || name.len()>128 || name.chars().any(char::is_control) {
+            // Do not silently replace invalid protocol metadata with an
+            // apparently legitimate synthetic name. Version-1 unnamed seats
+            // still retain their explicit unnamed-{id} fallback.
+            self.invalid_name=true;
             return;
         }
         if let Some(seat)=self.seats.get_mut(&id) {seat.name=name.into();}
@@ -92,6 +98,9 @@ pub fn read_only_seats()->Result<Vec<Seat>,String>{
     if state.overflow {
         return Err("Wayland advertised more than 128 seat globals; refusing truncated inventory.".into());
     }
+    if state.invalid_name {
+        return Err("Wayland advertised malformed seat names; refusing synthetic identity substitution.".into());
+    }
     Ok(state.seats.into_values().collect())
 }
 #[cfg(test)]
@@ -106,12 +115,24 @@ mod tests {
         assert!(state.seats.get(&7).unwrap().keyboard);
         state.update_name(7,"bad\nname");
         assert_eq!(state.seats.get(&7).unwrap().name,"seat0");
+        assert!(state.invalid_name,"bad name must invalidate inventory");
         state.update_name(7,"");
         assert_eq!(state.seats.get(&7).unwrap().name,"seat0");
         state.update_capability(7,false);
         assert!(!state.seats.get(&7).unwrap().keyboard);
         assert_eq!(state.seats.get(&7).unwrap().id,7);
         assert!(!state.overflow);
+        assert!(state.invalid_name);
+    }
+    #[test] fn unnamed_v1_seat_is_distinct_from_invalid_name_event() {
+        let mut state=State::default();
+        assert!(state.add_seat(10));
+        assert_eq!(state.seats.get(&10).unwrap().name,"unnamed-10");
+        assert!(!state.invalid_name,"absence of wl_seat v2 name is legal");
+        state.update_name(999,"bad\nname");
+        assert!(!state.invalid_name,"unbound or removed seat is ignored");
+        state.update_name(10,&"a".repeat(129));
+        assert!(state.invalid_name,"oversized names must fail closed");
     }
     #[test] fn oversized_wayland_registry_fails_closed() {
         let mut state=State::default();

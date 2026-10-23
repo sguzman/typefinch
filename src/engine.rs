@@ -4,6 +4,11 @@ use serde::{Serialize, Deserialize};
 use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
 use unicode_segmentation::UnicodeSegmentation;
 
+// A standard typing WPM unit is five extended grapheme clusters, not a
+// natural-language lexical word. Apply this identically to en and es-MX,
+// and partition benchmark histories by language/mode instead of mixing them.
+pub const STANDARD_GRAPHEMES_PER_WORD:f64=5.0;
+
 /// Compare extended grapheme clusters after Unicode canonical normalization.
 pub fn canonically_equal(a:&str,b:&str)->bool {a.nfc().eq(b.nfc())}
 fn canonical_prefix(expected:&str,entered:&str)->bool {
@@ -357,7 +362,7 @@ impl Session {
         let minutes=self.elapsed.as_secs_f64() / 60.0;
         result.attempts=self.attempts as usize;
         result.mistakes=self.mistakes as usize;
-        result.raw_wpm=if minutes>0.0 {self.attempts as f64 / 5.0 / minutes} else {0.0};
+        result.raw_wpm=if minutes>0.0 {self.attempts as f64 / STANDARD_GRAPHEMES_PER_WORD / minutes} else {0.0};
         result.raw_accuracy=if self.attempts>0 {
             100.0*(self.attempts-self.mistakes) as f64 / self.attempts as f64
         } else {0.0};
@@ -390,8 +395,8 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
     let correct = entered.iter().zip(expected.iter()).filter(|(a,b)|canonically_equal(a,b)).count();
     let accuracy = if entered.is_empty() { 0.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
     let minutes = elapsed.as_secs_f64() / 60.0;
-    let wpm=if minutes>0.0 {correct as f64 / 5.0 / minutes} else {0.0};
-    let raw_wpm=if minutes>0.0 {entered.len() as f64 / 5.0 / minutes} else {0.0};
+    let wpm=if minutes>0.0 {correct as f64 / STANDARD_GRAPHEMES_PER_WORD / minutes} else {0.0};
+    let raw_wpm=if minutes>0.0 {entered.len() as f64 / STANDARD_GRAPHEMES_PER_WORD / minutes} else {0.0};
     Score { wpm, accuracy, raw_wpm, raw_accuracy:accuracy, attempts:entered.len(),
         mistakes:entered.len().saturating_sub(correct), correct, entered:entered.len(), elapsed }
 }
@@ -516,6 +521,37 @@ mod tests {
         assert_eq!(en.history_mode(),"words");
         assert_eq!(es.history_mode(),"words/es-MX");
         assert_eq!(serde_json::to_string(&Language::MexicanSpanish).unwrap(),"\"es-MX\"");
+    }
+    #[test] fn english_and_mexican_spanish_share_explicit_five_grapheme_wpm_units() {
+        assert_eq!(STANDARD_GRAPHEMES_PER_WORD,5.0);
+        let en="a".repeat(10);
+        let es="á".repeat(10);
+        let decomposed="a\u{301}".repeat(10);
+        for typed in [&en,&es,&decomposed] {
+            let result=score(typed,typed,Duration::from_secs(60));
+            assert_eq!(result.correct,10,"combining marks cannot inflate corrected WPM");
+            assert_eq!(result.wpm,2.0,"ten correct graphemes per minute is two standard words");
+            assert_eq!(result.accuracy,100.0);
+        }
+        let english=Session::new_with_language(60,TestMode::Words,"",Language::English);
+        let mexican=Session::new_with_language(60,TestMode::Words,"",Language::MexicanSpanish);
+        assert_eq!(english.history_mode(),"words");
+        assert_eq!(mexican.history_mode(),"words/es-MX",
+            "benchmark histories must remain separate by supported language");
+    }
+    #[test] fn raw_attempt_speed_is_diagnostic_not_equivalent_to_corrected_graphemes() {
+        let mut s=Session::new_with_custom(60,TestMode::Custom,"é");
+        s.begin();
+        s.type_text("e");
+        s.type_text("\u{301}");
+        s.elapsed=Duration::from_secs(60);
+        let score=s.score();
+        assert_eq!(score.correct,1);
+        assert_eq!(score.entered,1);
+        assert_eq!(score.attempts,2,"two Unicode scalar input attempts");
+        assert_eq!(score.wpm,1.0/5.0);
+        assert_eq!(score.raw_wpm,2.0/5.0,
+            "raw attempt rate must not be compared directly between input methods");
     }
     #[test] fn benchmark_languages_are_not_merged_in_history() {
         for mode in [TestMode::Words,TestMode::Quotes,TestMode::Punctuation,TestMode::Paragraphs,TestMode::Numbers] {

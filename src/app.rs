@@ -1198,9 +1198,11 @@ impl Typefinch {
         }
         let score = self.session.score();
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(accent_ink(ui.visuals().dark_mode)).strong());
+            ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(accent_ink(ui.visuals().dark_mode)).strong())
+                .on_hover_text("Standard WPM = correct extended grapheme clusters / 5 / elapsed minutes. English and Mexican Spanish benchmarks remain separate.");
             ui.label(format!("{:.1}% accuracy", score.accuracy));
-            ui.label(format!("{:.0} raw WPM", score.raw_wpm));
+            ui.label(format!("{:.0} raw WPM", score.raw_wpm))
+                .on_hover_text("Raw WPM = attempted Unicode scalars / 5 / elapsed minutes. It is diagnostic, not a cross-language or cross-input-method benchmark.");
             ui.label(format!("{:.1}% raw accuracy", score.raw_accuracy));
             ui.label(format!("{} mistakes · {} corrections", score.mistakes, self.session.corrections));
             ui.label(format!("{} chars · {:.1} s elapsed", score.entered, score.elapsed.as_secs_f64()));

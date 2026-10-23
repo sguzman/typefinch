@@ -643,7 +643,7 @@
               "id": "T502",
               "emoji": "🎯",
               "name": "Character and n-gram drills",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Per-key timing metrics",
@@ -651,7 +651,8 @@
                 },
                 {
                   "text": "Adaptive drill generation",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: ephemeral missed-key drill generation and deterministic tests; Actions 39896389227"
                 },
                 {
                   "text": "Training efficacy tests",
@@ -663,11 +664,12 @@
               "id": "T503",
               "emoji": "🖐️",
               "name": "Finger assignments and visual guidance",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Finger models",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/layouts.rs and src/app.rs: tested ANSI positional finger assignments and keycap guide; Actions 39896389227"
                 },
                 {
                   "text": "Heatmaps",
@@ -737,7 +739,7 @@
               "id": "T601",
               "emoji": "🏅",
               "name": "Records by layout and test mode",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Basic profile bests tracked",
@@ -751,7 +753,8 @@
                 },
                 {
                   "text": "Versioned scoring policies",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/history.rs: SCORING_VERSION 2 preserves v1 data and excludes cross-version trends; Actions 39896389227"
                 }
               ]
             },
@@ -999,19 +1002,22 @@
               "id": "T802",
               "emoji": "🔤",
               "name": "Grapheme and normalization scoring",
-              "progress": 0,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Grapheme segmentation",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs and src/app.rs: unicode-segmentation counts/display/Backspace; Actions 39896389227 (59 tests)"
                 },
                 {
                   "text": "Normalization rules",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: NFC canonical comparison, combining-accent completion; Actions 39896389227"
                 },
                 {
                   "text": "Regression tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs: decomposed accent, joined emoji, flag and whole-grapheme Backspace regressions; Actions 39896389227"
                 }
               ]
             },

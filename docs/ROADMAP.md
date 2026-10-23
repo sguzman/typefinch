@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████░░░░░░ 44%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████░░░░░ 49%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `███████░░░ 70%`
 
@@ -131,22 +131,22 @@
 - 🔀 Software layout emulation — `██░░░░░░░░ 21%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
-## 🎓 M2 — Typing academy — `███░░░░░░░ 33%`
+## 🎓 M2 — Typing academy — `█████░░░░░ 50%`
 
 **Acceptance gate:** Adaptive lessons, weak-key drills, and course progression.
 
-### 🧠 P5 — Practice and learning — `███░░░░░░░ 33%`
+### 🧠 P5 — Practice and learning — `█████░░░░░ 50%`
 
 - 📚 **T501** Courses and lessons — `██████████ 100%`
   - [x] Lesson content schema — src/lesson.rs: five original licensed-by-author lesson definitions; Actions 39888678045
   - [x] Progression UI — src/app.rs: lesson picker, completion labels and course progress; Actions 39888678045
   - [x] Course completion tests — src/history.rs: full-accuracy mastery rules and profile isolation; GitHub Actions 39888678045, 46 Rust tests and native untimed lesson
-- 🎯 **T502** Character and n-gram drills — `░░░░░░░░░░ 0%`
+- 🎯 **T502** Character and n-gram drills — `███░░░░░░░ 33%`
   - [ ] Per-key timing metrics
-  - [ ] Adaptive drill generation
+  - [x] Adaptive drill generation — src/engine.rs: ephemeral missed-key drill generation and deterministic tests; Actions 39896389227
   - [ ] Training efficacy tests
-- 🖐️ **T503** Finger assignments and visual guidance — `░░░░░░░░░░ 0%`
-  - [ ] Finger models
+- 🖐️ **T503** Finger assignments and visual guidance — `███░░░░░░░ 33%`
+  - [x] Finger models — src/layouts.rs and src/app.rs: tested ANSI positional finger assignments and keycap guide; Actions 39896389227
   - [ ] Heatmaps
   - [ ] Accessibility tests
 - 🌱 **T504** Daily targets and accuracy-first practice — `███░░░░░░░ 33%`
@@ -157,18 +157,18 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🎓 Structured curriculum — `███████░░░ 67%`
-- 🧠 Adaptive exercises — `░░░░░░░░░░ 0%`
+- 🧠 Adaptive exercises — `███░░░░░░░ 33%`
 
-## 📊 M3 — Statistics and achievements — `███░░░░░░░ 34%`
+## 📊 M3 — Statistics and achievements — `████░░░░░░ 42%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `███░░░░░░░ 34%`
+### 📈 P6 — Analytics and progression — `████░░░░░░ 42%`
 
-- 🏅 **T601** Records by layout and test mode — `███████░░░ 67%`
+- 🏅 **T601** Records by layout and test mode — `██████████ 100%`
   - [x] Basic profile bests tracked — src/app.rs
   - [x] Segmented history — src/history.rs: context-specific comparisons and per-profile recent history; Actions 39888678045
-  - [ ] Versioned scoring policies
+  - [x] Versioned scoring policies — src/history.rs: SCORING_VERSION 2 preserves v1 data and excludes cross-version trends; Actions 39896389227
 - 📉 **T602** Progress charts and consistency — `███████░░░ 67%`
   - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
   - [ ] Graphs and filters
@@ -184,7 +184,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `█████░░░░░ 45%`
+- 📊 Statistics — `██████░░░░ 56%`
 - 🏆 Achievements — `░░░░░░░░░░ 0%`
 
 ## 🎨 M4 — Profile card studio — `████░░░░░░ 36%`
@@ -216,20 +216,20 @@
 - 🐤 GitHub widget — `█████░░░░░ 47%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
-## 🌎 M5 — Multilingual typing — `███░░░░░░░ 25%`
+## 🌎 M5 — Multilingual typing — `█████░░░░░ 50%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `███░░░░░░░ 25%`
+### 🗣️ P8 — Languages and input methods — `█████░░░░░ 50%`
 
 - 🧾 **T801** Language packs and corpora — `██████████ 100%`
   - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
   - [x] Corpus provenance and license — docs/LANGUAGES.md: original Typefinch-authored passages with provenance/license description, CI 39895462191
   - [x] Difficulty grading — src/engine.rs: heuristic Easy/Standard/Challenge word tiers and history isolation, CI 39895462191
-- 🔤 **T802** Grapheme and normalization scoring — `░░░░░░░░░░ 0%`
-  - [ ] Grapheme segmentation
-  - [ ] Normalization rules
-  - [ ] Regression tests
+- 🔤 **T802** Grapheme and normalization scoring — `██████████ 100%`
+  - [x] Grapheme segmentation — src/engine.rs and src/app.rs: unicode-segmentation counts/display/Backspace; Actions 39896389227 (59 tests)
+  - [x] Normalization rules — src/engine.rs: NFC canonical comparison, combining-accent completion; Actions 39896389227
+  - [x] Regression tests — src/engine.rs: decomposed accent, joined emoji, flag and whole-grapheme Backspace regressions; Actions 39896389227
 - ㊙️ **T803** CJK IME composition — `░░░░░░░░░░ 0%`
   - [ ] Committed text semantics
   - [ ] CJK integration tests
@@ -242,7 +242,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🌏 Languages — `███░░░░░░░ 33%`
-- 🔤 Unicode correctness — `░░░░░░░░░░ 0%`
+- 🔤 Unicode correctness — `██████████ 100%`
 
 ## 📦 M6 — Release quality — `███░░░░░░░ 33%`
 

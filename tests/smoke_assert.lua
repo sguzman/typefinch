@@ -107,6 +107,18 @@ elseif mode == "backup" then
     assert(p:close())
     equals(versions[1].user_version,3)
     print("Private backup PASS: paired JSON settings and complete consistent SQLite snapshot")
+elseif mode == "prepare-card-theme" then
+    local path=assert(arg[2])
+    local config=assert(json.decode(read(path)))
+    config.card_theme="daybreak"
+    config.card_font="mono"
+    save(path,json.encode(config))
+elseif mode == "card-theme" then
+    local data=read(assert(arg[2]))
+    assert(data:find('fill="#F5F6FF"',1,true),"Daybreak background missing")
+    assert(data:find('font-family="monospace"',1,true),"Monospaced typography missing")
+    assert(not data:find("<script",1,true),"Unsafe SVG script")
+    print("Profile card studio PASS: native Daybreak and mono settings reflected in SVG")
 elseif mode == "set-theme" then
     local path, theme=assert(arg[2]),assert(arg[3])
     assert(theme=="light" or theme=="dark")

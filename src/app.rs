@@ -354,7 +354,9 @@ impl Typefinch {
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(PERIWINKLE).strong());
             ui.label(format!("{:.1}% accuracy", score.accuracy));
-            ui.label(format!("{} corrections", self.session.corrections));
+            ui.label(format!("{:.0} raw WPM", score.raw_wpm));
+            ui.label(format!("{:.1}% raw accuracy", score.raw_accuracy));
+            ui.label(format!("{} mistakes · {} corrections", score.mistakes, self.session.corrections));
             ui.label(format!("{} chars · {:.1} s elapsed", score.entered, score.elapsed.as_secs_f64()));
             ui.label(format!("{:.1} s left", self.session.seconds_left()));
         });
@@ -407,6 +409,7 @@ impl Typefinch {
         }
         egui::Grid::new("recent-tests").striped(true).min_col_width(75.0).show(ui, |ui| {
             ui.strong("WPM");
+            ui.strong("Raw WPM");
             ui.strong("Content");
             ui.strong("Accuracy");
             ui.strong("Duration");
@@ -415,6 +418,7 @@ impl Typefinch {
             ui.end_row();
             for r in &self.history {
                 ui.label(format!("{:.1}", r.wpm));
+                ui.label(format!("{:.1}", r.raw_wpm));
                 ui.label(&r.test_mode);
                 ui.label(format!("{:.1}%", r.accuracy));
                 ui.label(format!("{}s", r.duration_ms / 1000));

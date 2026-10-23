@@ -11,3 +11,5 @@
 The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.config/typefinch`. Keep it out of the public source repository.
 
 - **Custom test text:** User-provided passages remain in process memory while the window is open. Their text is not written to profile settings, SQLite history, exports, or CI reports. Scored custom-mode sessions store only aggregate metrics and the mode identifier. Closing Typefinch discards the custom passage.
+
+- **Raw speed/accuracy:** The additional stored raw metrics count attempts and mistakes, not the characters themselves. Corrected mistakes stay reflected in raw speed and raw accuracy without saving the original mistyped strings.

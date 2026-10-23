@@ -39,11 +39,17 @@ pub struct Session {
     started: Option<Instant>,
     elapsed: Duration,
     pub corrections: u32,
+    pub attempts: u32,
+    pub mistakes: u32,
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Score {
     pub wpm: f64,
     pub accuracy: f64,
+    pub raw_wpm: f64,
+    pub raw_accuracy: f64,
+    pub attempts: usize,
+    pub mistakes: usize,
     pub correct: usize,
     pub entered: usize,
     pub elapsed: Duration,
@@ -61,20 +67,29 @@ impl Session {
         let target = source.chars().take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, target, typed:String::new(), duration:Duration::from_secs(seconds),
-            state:State::Ready, started:None, elapsed:Duration::ZERO, corrections:0 }
+            state:State::Ready, started:None, elapsed:Duration::ZERO, corrections:0, attempts:0, mistakes:0 }
     }
     pub fn begin(&mut self) {
         self.typed.clear();
         self.corrections = 0;
+        self.attempts = 0;
+        self.mistakes = 0;
         self.elapsed = Duration::ZERO;
         self.started = Some(Instant::now());
         self.state = State::Running;
     }
     pub fn type_text(&mut self, text: &str) {
         if self.state != State::Running { return; }
+        let total = self.target.chars().count();
+        let mut cursor = self.typed.chars().count();
         for ch in text.chars().filter(|c| !c.is_control()) {
-            if self.typed.chars().count() >= self.target.chars().count() { break; }
+            if cursor >= total { break; }
+            self.attempts = self.attempts.saturating_add(1);
+            if self.target.chars().nth(cursor) != Some(ch) {
+                self.mistakes = self.mistakes.saturating_add(1);
+            }
             self.typed.push(ch);
+            cursor += 1;
         }
         if self.typed.chars().count() >= self.target.chars().count() { self.finish(); }
     }
@@ -95,7 +110,17 @@ impl Session {
         self.elapsed = self.started.map_or(Duration::ZERO, |t| t.elapsed()).min(self.duration);
         self.state = State::Finished;
     }
-    pub fn score(&self) -> Score { score(&self.target, &self.typed, self.elapsed) }
+    pub fn score(&self) -> Score {
+        let mut result=score(&self.target, &self.typed, self.elapsed);
+        let minutes=self.elapsed.as_secs_f64() / 60.0;
+        result.attempts=self.attempts as usize;
+        result.mistakes=self.mistakes as usize;
+        result.raw_wpm=if minutes>0.0 {self.attempts as f64 / 5.0 / minutes} else {0.0};
+        result.raw_accuracy=if self.attempts>0 {
+            100.0*(self.attempts-self.mistakes) as f64 / self.attempts as f64
+        } else {0.0};
+        result
+    }
     pub fn seconds_left(&self) -> f64 { self.duration.saturating_sub(self.elapsed).as_secs_f64() }
 }
 
@@ -123,7 +148,10 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
     let correct = entered.iter().zip(expected.iter()).filter(|(a,b)| a==b).count();
     let accuracy = if entered.is_empty() { 0.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
     let minutes = elapsed.as_secs_f64() / 60.0;
-    Score { wpm: if minutes > 0.0 { correct as f64 / 5.0 / minutes } else { 0.0 }, accuracy, correct, entered: entered.len(), elapsed }
+    let wpm=if minutes>0.0 {correct as f64 / 5.0 / minutes} else {0.0};
+    let raw_wpm=if minutes>0.0 {entered.len() as f64 / 5.0 / minutes} else {0.0};
+    Score { wpm, accuracy, raw_wpm, raw_accuracy:accuracy, attempts:entered.len(),
+        mistakes:entered.len().saturating_sub(correct), correct, entered:entered.len(), elapsed }
 }
 
 #[cfg(test)]
@@ -169,6 +197,24 @@ mod tests {
         assert_eq!(a.accuracy,0.0);
         assert_eq!(a.wpm,0.0);
         assert_eq!(a.entered,0);
+    }
+    #[test] fn raw_metrics_preserve_corrected_mistakes() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");
+        s.begin();
+        s.type_text("cx");
+        s.backspace();
+        s.type_text("at");
+        let r=s.score();
+        assert_eq!(r.entered,3);
+        assert_eq!(r.correct,3);
+        assert_eq!(r.attempts,4);
+        assert_eq!(r.mistakes,1);
+        assert!((r.raw_accuracy-75.0).abs()<0.01);
+        assert_eq!(r.accuracy,100.0);
+        s.begin();
+        let again=s.score();
+        assert_eq!(again.attempts,0);
+        assert_eq!(again.mistakes,0);
     }
     #[test] fn zero_duration_is_safe() {
         assert_eq!(score("abc", "abc", Duration::ZERO).wpm, 0.0);

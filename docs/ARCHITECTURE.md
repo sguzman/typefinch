@@ -26,7 +26,7 @@ The current scoring version is `1`: correct-position Unicode *scalar values* div
 
 `$XDG_CONFIG_HOME/typefinch/settings.json` (or `~/.config/typefinch/settings.json`) stores local profiles, UUID identities, layout and theme preferences. It is written through a temporary file and rename.
 
-`$XDG_CONFIG_HOME/typefinch/sessions.sqlite3` stores records with a versioned schema (`PRAGMA user_version=2`). Columns include UUID-scoped profile ID, completion timestamp, layout, input mode, content type, test and elapsed duration, entered/correct counts, WPM, accuracy, corrections and scoring version. It stores **no raw text**, keystroke contents, profile nickname or keyboard hardware address. Database schema and migration paths have unit tests; backup/retention and recovery are still work in progress.
+`$XDG_CONFIG_HOME/typefinch/sessions.sqlite3` stores records with a versioned schema (`PRAGMA user_version=3`). Columns include UUID-scoped profile ID, completion timestamp, layout, input mode, content type, test and elapsed duration, entered/correct counts, WPM, raw WPM, final and raw accuracy, total attempts, mistakes, corrections and scoring version. It stores **no raw text**, keystroke contents, profile nickname or keyboard hardware address. Database schema and migration paths have unit tests; backup/retention and recovery are still work in progress.
 
 SVG export is explicit and writes to the local `exports/typefinch-profile.svg`; the user decides whether to publish it. Never put local settings or session databases into Git history.
 

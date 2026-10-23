@@ -19,6 +19,10 @@ pub struct Record {
     pub correct: i64,
     pub wpm: f64,
     pub accuracy: f64,
+    pub raw_wpm: f64,
+    pub raw_accuracy: f64,
+    pub attempts: i64,
+    pub mistakes: i64,
     pub corrections: i64,
     pub scoring_version: i64,
 }
@@ -32,7 +36,9 @@ impl Record {
             duration_ms:session.duration.as_millis() as i64,
             elapsed_ms:score.elapsed.as_millis() as i64,
             entered:score.entered as i64, correct:score.correct as i64,
-            wpm:score.wpm, accuracy:score.accuracy, corrections:session.corrections as i64,
+            wpm:score.wpm, accuracy:score.accuracy, raw_wpm:score.raw_wpm,
+            raw_accuracy:score.raw_accuracy, attempts:score.attempts as i64,
+            mistakes:score.mistakes as i64, corrections:session.corrections as i64,
             scoring_version:SCORING_VERSION,
         }
     }
@@ -50,6 +56,10 @@ fn init(db: &Connection) -> Result<(), rusqlite::Error> {
                layout TEXT NOT NULL,
                input_mode TEXT NOT NULL,
                test_mode TEXT NOT NULL DEFAULT 'words',
+               raw_wpm REAL NOT NULL DEFAULT 0,
+               raw_accuracy REAL NOT NULL DEFAULT 0,
+               attempts INTEGER NOT NULL DEFAULT 0,
+               mistakes INTEGER NOT NULL DEFAULT 0,
                duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
                elapsed_ms INTEGER NOT NULL CHECK (elapsed_ms >= 0),
                entered INTEGER NOT NULL CHECK (entered >= 0),
@@ -61,11 +71,20 @@ fn init(db: &Connection) -> Result<(), rusqlite::Error> {
              );
              CREATE INDEX IF NOT EXISTS sessions_profile_time
                ON sessions(profile_id, finished_at_ms DESC, id DESC);
-             PRAGMA user_version=2;
+             PRAGMA user_version=3;
              COMMIT;"
         ),
-        1 => db.execute_batch("BEGIN IMMEDIATE; ALTER TABLE sessions ADD COLUMN test_mode TEXT NOT NULL DEFAULT 'words'; PRAGMA user_version=2; COMMIT;"),
-        2 => Ok(()),
+        1 => {
+            db.execute_batch("BEGIN IMMEDIATE; ALTER TABLE sessions ADD COLUMN test_mode TEXT NOT NULL DEFAULT 'words'; PRAGMA user_version=2; COMMIT;")?;
+            init(db)
+        },
+        2 => db.execute_batch("BEGIN IMMEDIATE;
+            ALTER TABLE sessions ADD COLUMN raw_wpm REAL NOT NULL DEFAULT 0;
+            ALTER TABLE sessions ADD COLUMN raw_accuracy REAL NOT NULL DEFAULT 0;
+            ALTER TABLE sessions ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE sessions ADD COLUMN mistakes INTEGER NOT NULL DEFAULT 0;
+            PRAGMA user_version=3; COMMIT;"),
+        3 => Ok(()),
         _ => Err(rusqlite::Error::InvalidQuery),
     }
 }
@@ -79,24 +98,28 @@ fn connect() -> Result<Connection, String> {
 fn insert_with(db: &Connection, item: &Record) -> Result<i64, rusqlite::Error> {
     db.execute("INSERT INTO sessions
        (profile_id, finished_at_ms, layout, input_mode, duration_ms, elapsed_ms,
-        entered, correct, wpm, accuracy, corrections, scoring_version, test_mode)
-       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
+        entered, correct, wpm, accuracy, corrections, scoring_version, test_mode,
+        raw_wpm, raw_accuracy, attempts, mistakes)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
        params![item.profile_id, item.finished_at_ms, item.layout, item.input_mode,
        item.duration_ms, item.elapsed_ms, item.entered, item.correct, item.wpm,
-       item.accuracy, item.corrections, item.scoring_version, item.test_mode])?;
+       item.accuracy, item.corrections, item.scoring_version, item.test_mode,
+       item.raw_wpm, item.raw_accuracy, item.attempts, item.mistakes])?;
     Ok(db.last_insert_rowid())
 }
 fn recent_with(db: &Connection, profile_id: &str, limit: usize) -> Result<Vec<Record>, rusqlite::Error> {
     let mut stmt = db.prepare(
         "SELECT id, profile_id, finished_at_ms, layout, input_mode, duration_ms, elapsed_ms,
-          entered, correct, wpm, accuracy, corrections, scoring_version, test_mode
+          entered, correct, wpm, accuracy, corrections, scoring_version, test_mode,
+          raw_wpm, raw_accuracy, attempts, mistakes
          FROM sessions WHERE profile_id = ?1 ORDER BY finished_at_ms DESC, id DESC LIMIT ?2"
     )?;
     stmt.query_map(params![profile_id, limit.min(100) as i64], |row| Ok(Record {
         id:row.get(0)?, profile_id:row.get(1)?, finished_at_ms:row.get(2)?,
         layout:row.get(3)?, input_mode:row.get(4)?, test_mode:row.get(13)?, duration_ms:row.get(5)?,
         elapsed_ms:row.get(6)?, entered:row.get(7)?, correct:row.get(8)?,
-        wpm:row.get(9)?, accuracy:row.get(10)?, corrections:row.get(11)?,
+        wpm:row.get(9)?, accuracy:row.get(10)?, raw_wpm:row.get(14)?,
+        raw_accuracy:row.get(15)?, attempts:row.get(16)?, mistakes:row.get(17)?, corrections:row.get(11)?,
         scoring_version:row.get(12)?,
     }))?.collect()
 }
@@ -116,7 +139,8 @@ mod tests {
             id:0, profile_id:id.into(), finished_at_ms:123456789,
             layout:"us(colemak)".into(), input_mode:"Emulated".into(), test_mode:"words".into(),
             duration_ms:30000, elapsed_ms:30000, entered:120,
-            correct:114, wpm:45.6, accuracy:95.0, corrections:3, scoring_version:1
+            correct:114, wpm:45.6, accuracy:95.0, raw_wpm:51.2,
+            raw_accuracy:90.0, attempts:130, mistakes:13, corrections:3, scoring_version:1
         }
     }
     #[test] fn history_is_profile_isolated_and_ordered() {
@@ -147,6 +171,25 @@ mod tests {
         let found=recent_with(&db,"legacy",8).unwrap();
         assert_eq!(found.len(),1);
         assert_eq!(found[0].test_mode,"words");
+        assert_eq!(found[0].attempts,0);
+        init(&db).unwrap();
+    }
+    #[test] fn v2_session_metrics_migrate_without_data_loss() {
+        let db=Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY, profile_id TEXT NOT NULL, finished_at_ms INTEGER NOT NULL,
+            layout TEXT NOT NULL, input_mode TEXT NOT NULL, test_mode TEXT NOT NULL,
+            duration_ms INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL, entered INTEGER NOT NULL,
+            correct INTEGER NOT NULL, wpm REAL NOT NULL, accuracy REAL NOT NULL,
+            corrections INTEGER NOT NULL, scoring_version INTEGER NOT NULL);
+            INSERT INTO sessions (profile_id,finished_at_ms,layout,input_mode,test_mode,duration_ms,elapsed_ms,entered,correct,wpm,accuracy,corrections,scoring_version)
+            VALUES ('legacy',1,'us','OS','words',30000,30000,10,9,3.6,90.0,1,1);
+            PRAGMA user_version=2;").unwrap();
+        init(&db).unwrap();
+        let recent=recent_with(&db,"legacy",8).unwrap();
+        assert_eq!(recent.len(),1);
+        assert_eq!(recent[0].wpm,3.6);
+        assert_eq!(recent[0].attempts,0);
         init(&db).unwrap();
     }
     #[test] fn migration_is_idempotent_and_detects_future_schema() {

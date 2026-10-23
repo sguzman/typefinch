@@ -304,11 +304,13 @@ elseif mode == "theme" then
 elseif mode == "native-file-import" then
     local r=report(assert(arg[2]))
     assert(r.synthetic and r.state=="finished")
-    equals(r.entered,#"cat dog sun moon")
-    equals(r.correct,r.entered)
     local rows=dbquery("SELECT entered,correct,test_mode FROM sessions ORDER BY id")
+    print(string.format("Native import diagnostics: mode=%s entered=%d correct=%d elapsed_ms=%d",
+        rows[1] and rows[1].test_mode or "missing",r.entered,r.correct,r.elapsed_ms))
     equals(#rows,1)
     equals(rows[1].test_mode,"custom")
+    equals(r.entered,#"cat dog sun moon")
+    equals(r.correct,r.entered)
     equals(rows[1].entered,#"cat dog sun moon")
     equals(rows[1].correct,rows[1].entered)
     local settings=read(assert(arg[3]))

@@ -50,6 +50,10 @@ keyboard_import() {
   xdotool key --clearmodifiers Return
   sleep 0.5
   xdotool key --clearmodifiers F5
+  sleep 0.4
+  # Explicitly assert typed-event focus; the import field may still own
+  # editor focus after Return in some native egui/X11 frame sequences.
+  xdotool key --clearmodifiers F2
   sleep 0.3
   xdotool type --clearmodifiers --delay 35 "cat dog sun moon"
   sleep 2.5

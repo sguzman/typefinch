@@ -13,5 +13,6 @@ serde_json = "1"
 xkbcommon = "0.9"
 rusqlite = { version = "0.37", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = true }
 unicode-normalization = "0.1"
 unicode-segmentation = "1.12"

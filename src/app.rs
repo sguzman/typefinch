@@ -1,5 +1,6 @@
 use crate::{
     achievements,
+    daily,
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
@@ -63,6 +64,7 @@ pub struct Typefinch {
     layout_search: String,
     history: Vec<Record>,
     earned_badges: Vec<achievements::Achievement>,
+    all_history:Vec<Record>,
     history_only_matching: bool,
     history_metric: history::HistoryMetric,
     completed_lessons: std::collections::HashSet<String>,
@@ -99,10 +101,10 @@ impl Typefinch {
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
         let completed_lessons = history::completed_lessons(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
-        let earned_badges=achievements::earned(
-            &history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default());
+        let all_history=history::all_for_profile(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
+        let earned_badges=achievements::earned(&all_history);
         Self { prefs, session, mode: Mode::System, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, installed_layouts, layout_search: String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
-            earned_badges, completed_lessons, keyboards, device_error,
+            earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, new_profile: String::new(), custom_text: String::new(), message: String::new() }
     }
     fn query_devices() -> (Vec<Keyboard>, Option<String>) {
@@ -152,7 +154,8 @@ impl Typefinch {
         let completed_tests = profile.tests;
         let prior=self.earned_badges.clone();
         if let Ok(records)=history::all_for_profile(&identity) {
-            self.earned_badges=achievements::earned(&records);
+            self.all_history=records;
+            self.earned_badges=achievements::earned(&self.all_history);
             if let Some(new_badge)=self.earned_badges.iter().find(|a|!prior.contains(a)) {
                 self.message=format!("{} New achievement: {}! {}",new_badge.emoji,new_badge.title,new_badge.reason);
             }
@@ -280,7 +283,8 @@ impl Typefinch {
             let id = self.prefs.profiles[self.prefs.active_profile].id.clone();
             self.history = history::recent(&id).unwrap_or_default();
             self.completed_lessons = history::completed_lessons(&id).unwrap_or_default();
-            self.earned_badges=achievements::earned(&history::all_for_profile(&id).unwrap_or_default());
+            self.all_history=history::all_for_profile(&id).unwrap_or_default();
+            self.earned_badges=achievements::earned(&self.all_history);
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
@@ -295,6 +299,8 @@ impl Typefinch {
                 .text("WPM target")).changed();
             changed |= ui.add(egui::Slider::new(&mut goals.target_accuracy,70.0..=100.0)
                 .text("Accuracy target")).changed();
+            changed |= ui.add(egui::Slider::new(&mut goals.daily_sessions,1..=10)
+                .text("Daily benchmark goal")).changed();
         });
         if changed { self.save(); }
         let current=&self.prefs.profiles[self.prefs.active_profile];
@@ -303,6 +309,16 @@ impl Typefinch {
         ui.add(egui::ProgressBar::new(goals.wpm_progress(current.best_wpm)).show_percentage());
         ui.label(format!("Accuracy: {:.1}% / {:.1}%",current.best_accuracy,goals.target_accuracy));
         ui.add(egui::ProgressBar::new(goals.accuracy_progress(current.best_accuracy)).show_percentage());
+        let now=chrono::Local::now();
+        let today=daily::summary(&self.all_history,now.date_naive(),&chrono::Local);
+        ui.add_space(8.0);
+        ui.label(RichText::new(format!("Today: {} / {} benchmark sessions",today.sessions,goals.daily_sessions)).strong());
+        ui.add(egui::ProgressBar::new(
+            (today.sessions as f32/goals.daily_sessions.max(1) as f32).clamp(0.0,1.0)
+        ).show_percentage());
+        ui.small(format!("{} typed graphemes · {:.1}% weighted accuracy · Local calendar date",
+            today.graphemes,today.weighted_accuracy));
+        ui.small("Only timed benchmarks of at least 15 s and 20 graphemes count. Practice and custom text are excluded.");
         ui.small("Goals and progress belong to the selected local profile.");
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {

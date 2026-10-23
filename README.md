@@ -83,3 +83,5 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **History explorer:** Filter the recent-session table to the currently comparable test configuration and switch the trend between corrected/raw WPM and final/raw accuracy. Older results without recorded raw attempts display a dash, not a fabricated zero. Charts exclude incompatible scoring versions, layouts, durations and content/language tiers.
 
 **Offline achievements:** Six initial badges are derived from saved per-profile history (first benchmark, sustained practice, precision, speed, two languages and academy completion). Legitimate thresholds prevent tiny/custom sessions from earning benchmark skill badges. Awards are recalculated locally and never uploaded; optional streaks remain a future feature.
+
+**Daily practice goal:** Each local profile can configure a target number of qualifying timed benchmark sessions per calendar day. The progress bar derives counts and weighted accuracy from saved aggregate history using the computer's local timezone, excluding private passages and short practice runs. No calendar service, reminders, or background tracking is involved.

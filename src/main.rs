@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod achievements;
+mod daily;
 mod app;
 mod devices;
 mod engine;

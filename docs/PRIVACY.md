@@ -23,3 +23,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **Explicit full backup (F8):** The two private backup files include readable settings/profile nicknames and a consistent full SQLite snapshot. The files are unique, written into the local exports directory and never automatically uploaded. On Linux, new backup files are permission-restricted to their owner (0600). The application does not yet offer automated restore; retain both companion files for recovery.
 
 - **Achievements:** The badge panel computes earned status entirely from locally stored aggregate session records, with no online accounts, tracking, additional per-key storage, or publication. Badges are recalculated from history rather than written into a new identity database.
+
+- **Daily target:** Uses the device's local date and existing stored aggregate session timestamps. It does not create a separate activity log, communicate with a calendar service, or require any account. Today's totals are recomputed from the active profile's history.

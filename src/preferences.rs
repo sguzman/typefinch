@@ -11,9 +11,12 @@ pub enum Theme { #[default] System, Light, Dark }
 pub struct Goals {
     pub target_wpm: f64,
     pub target_accuracy: f64,
+    #[serde(default = "default_daily_target")]
+    pub daily_sessions:u32,
 }
+fn default_daily_target()->u32 {3}
 impl Default for Goals {
-    fn default() -> Self { Self { target_wpm:60.0, target_accuracy:95.0 } }
+    fn default() -> Self { Self { target_wpm:60.0, target_accuracy:95.0, daily_sessions:default_daily_target() } }
 }
 impl Goals {
     pub fn wpm_progress(&self, best:f64)->f32 {
@@ -143,6 +146,7 @@ mod tests {
         assert_eq!(loaded.profiles[0].goals.target_wpm,60.0);
         assert_eq!(loaded.profiles[1].goals.target_wpm,110.0);
         assert_eq!(loaded.profiles[1].goals.target_accuracy,95.0);
+        assert_eq!(loaded.profiles[1].goals.daily_sessions,3);
         assert_eq!(loaded.profiles[0].goals.wpm_progress(30.0),0.5);
         assert_eq!(loaded.profiles[1].goals.wpm_progress(120.0),1.0);
     }
@@ -157,6 +161,11 @@ mod tests {
         data.as_object_mut().unwrap().remove("word_difficulty");
         let loaded:Preferences=serde_json::from_value(data).unwrap();
         assert_eq!(loaded.word_difficulty,WordDifficulty::Standard);
+    }
+    #[test] fn old_profile_goals_keep_a_safe_daily_default() {
+        let old=r#"{"target_wpm":70,"target_accuracy":96}"#;
+        let goals:Goals=serde_json::from_str(old).unwrap();
+        assert_eq!(goals.daily_sessions,3);
     }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {

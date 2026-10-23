@@ -561,8 +561,13 @@ for shape in iso jis split; do
     echo "Missing $shape native preview screenshot" >&2; exit 1;
   }
   identify -format "$shape geometry screenshot: %wx%h pixels\n" "$tmp/typefinch-geometry-$shape.png"
-  xdotool key --clearmodifiers F4
+  # ImageMagick's X11 grab may disturb focus. Send F4 only after explicit
+  # window reactivation, as the regular typing smoke tests also do.
+  xdotool windowactivate --sync "$window" 2>/dev/null || true
+  xdotool windowfocus --sync "$window"
   sleep 0.3
+  xdotool key --clearmodifiers F4
+  sleep 0.4
   lua5.4 tests/smoke_assert.lua geometry-cycled "$tmp/geometry-$shape.json" "$shape"
   kill "$app_pid" 2>/dev/null || true
   wait "$app_pid" 2>/dev/null || true

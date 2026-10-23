@@ -565,12 +565,17 @@
               "id": "T403",
               "emoji": "🪟",
               "name": "Generic compositor fallback",
-              "progress": 67,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Safe Hyprland-unavailable state coded",
                   "passed": true,
                   "evidence": "src/devices.rs"
+                },
+                {
+                  "text": "Read-only standard Wayland seat capability query",
+                  "passed": true,
+                  "evidence": "src/wayland_seat.rs and src/devices.rs: wl_registry/wl_seat metadata only, no wl_keyboard or raw key events, timeout-bounded subprocess, unit tests for missing/duplicate/multi-seat identities, and native Weston headless protocol connection (0 seats) in CI 40023774467, 136 Rust tests and full X11 GUI pass. Seat-capable hardware not verified."
                 },
                 {
                   "text": "Generic XKB seat detection",

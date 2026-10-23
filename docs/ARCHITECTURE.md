@@ -61,3 +61,7 @@ The `geometry` module defines non-authoritative ANSI/ISO/JIS/split main typing-b
 ## Safe keyboard-inspector lifecycle
 
 The GUI initializes without waiting for `hyprctl` or `setxkbmap`. A single-flight worker reads bounded compositor metadata and requests a repaint upon completion. The inspector process is terminated on timeout, reports no raw input stream, and keeps no persistent hardware identifiers. Focus loss invalidates active OS-input provenance and any pending result issued before the focus transition; a subsequent focused inspection is required before attributing a new OS-input session to a recognized compositor layout. See [KEYBOARDS.md](KEYBOARDS.md) and [CI 40020631995](https://github.com/sguzman/typefinch/actions/runs/40020631995).
+
+## Generic Wayland seat metadata
+
+`src/wayland_seat.rs` uses the read-only core `wl_registry`/`wl_seat` protocol to enumerate aggregate seats and keyboard capability. It deliberately binds no `wl_keyboard` object and observes no key presses or keymap content. `src/devices.rs` chooses this fallback only on a declared Wayland session without Hyprland, parses the small JSON result from an internal bounded subprocess, and displays seats as **aggregate capability references**, never individual physical devices or detected XKB layouts. The helper exists in the Typefinch executable itself, without a background daemon. See [CI 40023774467](https://github.com/sguzman/typefinch/actions/runs/40023774467) for a successful Weston protocol probe with zero advertised seats.

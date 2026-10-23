@@ -239,6 +239,15 @@ backup_db="${backups[0]}"
 backup_settings="${backup_db%-sessions.sqlite3}-settings.json"
 [[ -s "$backup_settings" ]] || { echo "Full backup settings are missing"; exit 1; }
 lua5.4 tests/smoke_assert.lua backup "$backup_db" "$backup_settings"
+./target/debug/typefinch --verify-backup "$backup_settings" "$backup_db"
+# Rejected inputs must not be changed by the validator.
+cp "$backup_settings" "$tmp/bad-backup-settings.json"
+printf 'not-json' >"$tmp/bad-backup-settings.json"
+if ./target/debug/typefinch --verify-backup "$tmp/bad-backup-settings.json" "$backup_db"; then
+  echo "Backup validator accepted malformed settings" >&2
+  exit 1
+fi
+echo "Read-only backup verification PASS"
 
 # Native SVG profile designer: verify selected palette and font are honored.
 kill "$app_pid" 2>/dev/null || true

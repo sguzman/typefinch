@@ -22,6 +22,16 @@ A newer extracted archive can replace the managed executable. Run
 previous installed executable and version marker. Only one prior binary is
 retained; no rollback is available before the first upgrade.
 
+### Check a private backup before recovery
+
+Use `typefinch --verify-backup SETTINGS.json SESSIONS.sqlite3` with the two
+files generated together by F8. This checks that the settings contain persistent
+profile IDs, that the SQLite snapshot passes an integrity check, that its schema
+is supported and that stored sessions reference profiles included in the settings.
+The command never opens the live profile or replaces either file. It rejects
+corrupt settings and mismatched backup pairs. A successful validation does
+**not** perform a restore; preserve the original files while planning recovery.
+
 An existing unmanaged `bin/typefinch` is never overwritten. App settings
 and the SQLite database are **not** rolled back with the binary: use the in-app
 F8 full backup before experimenting with newer builds.

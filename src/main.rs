@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod achievements;
+mod backup_verify;
 mod daily;
 mod goal_transfer;
 mod custom_layout;
@@ -16,14 +17,17 @@ mod qa;
 mod xkb;
 
 use eframe::egui;
+use std::path::PathBuf;
 
 #[derive(Debug,PartialEq,Eq)]
-enum LaunchIntent {Gui,Version,Help,Invalid}
+enum LaunchIntent {Gui,Version,Help,VerifyBackup(PathBuf,PathBuf),Invalid}
 fn intent(args:&[String])->LaunchIntent {
     match args {
         []=>LaunchIntent::Gui,
         [flag] if flag=="--version" || flag=="-V"=>LaunchIntent::Version,
         [flag] if flag=="--help" || flag=="-h"=>LaunchIntent::Help,
+        [flag,settings,database] if flag=="--verify-backup"=>
+            LaunchIntent::VerifyBackup(PathBuf::from(settings),PathBuf::from(database)),
         _=>LaunchIntent::Invalid,
     }
 }
@@ -38,7 +42,20 @@ fn main() -> eframe::Result {
         LaunchIntent::Help=>{
             println!("Typefinch {} · local-first typing trainer",env!("CARGO_PKG_VERSION"));
             println!("Usage: typefinch [--version|--help]");
+            println!("       typefinch --verify-backup SETTINGS.json SESSIONS.sqlite3");
+            println!("Backup verification is read-only and never restores or replaces user data.");
             println!("GUI shortcuts: F1 guide · F2 focus typing · F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG");
+            return Ok(());
+        },
+        LaunchIntent::VerifyBackup(settings,database)=>{
+            match backup_verify::verify(&settings,&database) {
+                Ok(result)=>println!("Backup verified: {} profiles, {} sessions, SQLite schema {}. No files changed.",
+                    result.profiles,result.sessions,result.schema),
+                Err(problem)=>{
+                    eprintln!("Backup verification failed: {problem}");
+                    std::process::exit(2);
+                }
+            }
             return Ok(());
         },
         LaunchIntent::Invalid=>{
@@ -73,5 +90,8 @@ mod cli_tests {
         }
         assert_eq!(intent(&["--unsupported".into()]),LaunchIntent::Invalid);
         assert_eq!(intent(&["--version".into(),"junk".into()]),LaunchIntent::Invalid);
+        let expected=LaunchIntent::VerifyBackup(PathBuf::from("a.json"),PathBuf::from("b.sqlite3"));
+        assert_eq!(intent(&["--verify-backup".into(),"a.json".into(),"b.sqlite3".into()]),expected);
+        assert_eq!(intent(&["--verify-backup".into(),"a.json".into()]),LaunchIntent::Invalid);
     }
 }

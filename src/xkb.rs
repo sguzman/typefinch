@@ -43,10 +43,7 @@ impl Emulator {
         &self, physical: Key, shift: bool, compose: &mut xkb::compose::State,
     ) -> Option<String> {
         let evdev = evdev_code(physical)?;
-        let mut state = xkb::State::new(&self.keymap);
-        if shift {
-            state.update_key(xkb::Keycode::new(42 + 8), xkb::KeyDirection::Down);
-        }
+        let state = self.layer_state(shift, false);
         let code = xkb::Keycode::new(evdev + 8);
         let literal = state.key_get_utf8(code);
         compose.feed(state.key_get_one_sym(code));
@@ -66,8 +63,29 @@ impl Emulator {
         output.filter(|value| !value.is_empty() && !value.chars().any(char::is_control))
     }
 
+    fn layer_state(&self, shift: bool, alt_gr: bool) -> xkb::State {
+        let mut state = xkb::State::new(&self.keymap);
+        if shift {
+            state.update_key(xkb::Keycode::new(42 + 8), xkb::KeyDirection::Down);
+        }
+        if alt_gr {
+            state.update_key(xkb::Keycode::new(100 + 8), xkb::KeyDirection::Down);
+        }
+        state
+    }
+
+    /// Return the real XKB dead keysym name, not a guessed printable accent.
+    /// A dead key has no single-key UTF-8 output, but remains a valid mapping.
+    pub fn dead_key_name(&self, physical: Key, shift: bool, alt_gr: bool) -> Option<String> {
+        let code = xkb::Keycode::new(evdev_code(physical)? + 8);
+        let state = self.layer_state(shift, alt_gr);
+        if !state.key_get_utf8(code).is_empty() { return None; }
+        xkb::keysym_get_name(state.key_get_one_sym(code))
+            .strip_prefix("dead_").map(|name| name.replace('_', " "))
+    }
+
     /// Translate a physical key position. Does not capture the keyboard globally.
-    /// Modifier state is constructed per key; dead-key/Compose sequences are future work.
+    /// Modifier state is constructed per key; scoring uses separate Compose state.
     pub fn translate(&self, physical: Key, shift: bool) -> Option<String> {
         self.translate_layer(physical,shift,false)
     }
@@ -77,9 +95,7 @@ impl Emulator {
     /// physical left-Alt from AltGr input on every compositor.
     pub fn translate_layer(&self,physical:Key,shift:bool,alt_gr:bool)->Option<String> {
         let evdev=evdev_code(physical)?;
-        let mut state=xkb::State::new(&self.keymap);
-        if shift {state.update_key(xkb::Keycode::new(42+8),xkb::KeyDirection::Down);}
-        if alt_gr {state.update_key(xkb::Keycode::new(100+8),xkb::KeyDirection::Down);}
+        let state = self.layer_state(shift, alt_gr);
         let result=state.key_get_utf8(xkb::Keycode::new(evdev+8));
         if result.is_empty() || result.chars().any(char::is_control) {None} else {Some(result)}
     }
@@ -189,6 +205,13 @@ mod tests {
             assert_eq!(layout.translate_layer(key, shift, alt_gr).as_deref(), Some(expected),
                 "regression in {id} {key:?}, Shift={shift}, AltGr={alt_gr}");
         }
+    }
+    #[test] fn preview_reports_real_dead_keys_not_unavailable_layouts() {
+        let es = Emulator::compile("es").unwrap();
+        assert_eq!(es.translate_layer(Key::Quote, false, false), None);
+        assert_eq!(es.dead_key_name(Key::Quote, false, false).as_deref(), Some("acute"));
+        assert_eq!(es.dead_key_name(Key::E, false, false), None);
+        assert_eq!(es.dead_key_name(Key::F12, false, false), None);
     }
     #[test] fn not_installed_layout_fails_explicitly() {
         assert!(Emulator::compile("zz_no_such_layout").is_err());

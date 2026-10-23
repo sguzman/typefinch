@@ -1055,7 +1055,7 @@ impl Typefinch {
                 ui.add_space((row_index*12) as f32);
                 for key in keys {
                     let custom=self.prefs.custom_layouts.iter().find(|l|l.id==self.prefs.layout);
-                    let value=if let Some(personal)=custom {
+                    let mapped=if let Some(personal)=custom {
                         if alt_gr {None} else {personal.translate(*key,shift)}
                     } else if let Some(emulator)=&self.emulator {
                         emulator.translate_layer(*key,shift,alt_gr)
@@ -1063,7 +1063,12 @@ impl Typefinch {
                         None
                     } else {
                         layouts::emulate(*key,&self.prefs.layout,shift).map(|c|c.to_string())
-                    }.unwrap_or_else(||"–".into());
+                    };
+                    let dead=if mapped.is_none() && custom.is_none() {
+                        self.emulator.as_ref().and_then(|xkb|xkb.dead_key_name(*key,shift,alt_gr))
+                    } else {None};
+                    // Dotted circle = an intentionally pending accent, dash = no mapping.
+                    let value=mapped.unwrap_or_else(||if dead.is_some() {"◌".into()} else {"–".into()});
                     let missed=if value.chars().count()==1 {
                         value.chars().next().map(|c|self.session.missed_character_count(c)).unwrap_or(0)
                     } else {0};
@@ -1079,7 +1084,9 @@ impl Typefinch {
                                 RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
                             ).selectable(false));
                         });
-                    if missed>0 {
+                    if let Some(name)=dead {
+                        cell.response.on_hover_text(format!("XKB dead key: {name}. Composes with the next matching key when a locale Compose table is installed."));
+                    } else if missed>0 {
                         cell.response.on_hover_text(format!("{missed} missed attempt(s) for this character in the current session"));
                     } else if let Some(ms)=value.chars().next().and_then(|ch|self.session.average_key_latency_ms(ch)) {
                         cell.response.on_hover_text(format!("{ms:.0} ms average interval for this character; session only"));
@@ -1097,7 +1104,7 @@ impl Typefinch {
                 ui.label(format!("{} · {:.0} ms average between committed keys",ch,ms));
             }
         }
-        ui.small("Modifier levels are inspected through XKB; AltGr for personal two-layer maps remains unavailable rather than guessed.");
+        ui.small("◌ = genuine XKB dead key (hover for accent name); – = unmapped position. AltGr remains unavailable for personal two-layer maps.");
         ui.small("Preview only. Actual OS input may differ; reliable physical AltGr, ISO/JIS keys and dead-key composition remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {

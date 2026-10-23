@@ -361,6 +361,68 @@ impl Typefinch {
         }
         ui.small("Goals and progress belong to the selected local profile.");
     }
+    fn show_custom_layout_editor(&mut self,ui:&mut egui::Ui) {
+        egui::CollapsingHeader::new("🛠 Personal ANSI keymaps")
+            .default_open(false).show(ui,|ui| {
+                let enabled=self.session.state!=State::Running;
+                ui.small("Personal layouts remap physical ANSI positions inside Typefinch only.");
+                ui.horizontal_wrapped(|ui| {
+                    if ui.add_enabled(enabled,egui::Button::new("New mapping")).clicked() {
+                        self.layout_draft=Some(CustomLayout::starter());
+                    }
+                    let current=self.prefs.custom_layouts.iter()
+                        .find(|l|l.id==self.prefs.layout).cloned();
+                    if ui.add_enabled(enabled && current.is_some(),egui::Button::new("Edit selected")).clicked() {
+                        self.layout_draft=current;
+                    }
+                });
+                let mut save=false;
+                let mut cancel=false;
+                if let Some(draft)=self.layout_draft.as_mut() {
+                    ui.add_enabled_ui(enabled,|ui| {
+                        ui.label("Name (1–32 graphemes)");
+                        ui.add(egui::TextEdit::singleline(&mut draft.name).desired_width(240.0));
+                        for i in 0..3 {
+                            ui.label(match i {0=>"Top row",1=>"Home row",_=>"Bottom row"});
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label("Base");
+                                ui.add(egui::TextEdit::singleline(&mut draft.base[i]).desired_width(165.0));
+                                ui.label("Shift");
+                                ui.add(egui::TextEdit::singleline(&mut draft.shifted[i]).desired_width(165.0));
+                            });
+                        }
+                        ui.small("Exactly 10 grapheme mappings per row. No global remapping.");
+                        if ui.button("Validate, save and activate").clicked() {save=true;}
+                        if ui.button("Cancel editing").clicked() {cancel=true;}
+                    });
+                }
+                if cancel {self.layout_draft=None;}
+                if save {
+                    if let Some(draft)=self.layout_draft.clone() {
+                        match draft.validate() {
+                            Err(e)=>self.message=format!("Invalid keymap: {e}"),
+                            Ok(())=>{
+                                if let Some(old)=self.prefs.custom_layouts.iter_mut()
+                                    .find(|l|l.id==draft.id) {
+                                    *old=draft.clone();
+                                } else if self.prefs.custom_layouts.len()<32 {
+                                    self.prefs.custom_layouts.push(draft.clone());
+                                } else {
+                                    self.message="Maximum of 32 personal keymaps reached.".into();
+                                    return;
+                                }
+                                self.prefs.layout=draft.id;
+                                self.emulator=None;
+                                self.mode=Mode::Emulated;
+                                self.layout_draft=None;
+                                self.save();
+                                self.message="Personal ANSI keymap saved and activated inside Typefinch.".into();
+                            }
+                        }
+                    }
+                }
+            });
+    }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading("Test setup");
         ui.vertical(|ui| {
@@ -564,6 +626,7 @@ impl Typefinch {
             let inferred=recorded_layout(self.mode,&self.prefs.layout,&self.keyboards,&self.installed_layouts);
             ui.small(format!("Scoring layout attribution: {inferred} (seat-level, not per-keyboard)"));
         }
+        self.show_custom_layout_editor(ui);
         if self.session.state == State::Running { ui.small("Layout and input mode are locked while a test is running."); }
         if self.mode == Mode::Emulated {
             ui.colored_label(accent_ink(ui.visuals().dark_mode), "Emulation uses physical ANSI key positions inside Typefinch only; it never changes your system layout.");

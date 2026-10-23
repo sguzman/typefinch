@@ -4,6 +4,7 @@ use rusqlite::{Connection,OpenFlags};
 use serde_json::Value;
 use std::{collections::HashSet,fs,path::Path};
 
+#[derive(Debug)]
 pub struct BackupSummary {pub profiles:usize,pub sessions:i64,pub schema:i64}
 fn require_file(path:&Path,label:&str)->Result<(),String>{
     let metadata=fs::symlink_metadata(path).map_err(|e|format!("{label}: {e}"))?;

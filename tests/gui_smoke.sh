@@ -11,7 +11,7 @@ cleanup() {
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
   if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
-    for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png; do
+    for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png typefinch-recovery.png; do
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
   fi
@@ -335,3 +335,42 @@ import -window "$window" "$tmp/typefinch-hidpi.png"
 [[ -s "$tmp/typefinch-hidpi.png" ]] || { echo "Missing 150% scaled viewport screenshot"; exit 1; }
 identify -format '150% X11 DPI override viewport: %wx%h pixels\n' "$tmp/typefinch-hidpi.png"
 
+
+# Existing corrupt settings must never be silently replaced by a new default
+# profile. A native X11 session must refuse to persist scored input or backups.
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+recover_root="$tmp/recovery-config"
+mkdir -p "$recover_root/typefinch"
+printf '%s' '{"incomplete":' >"$recover_root/typefinch/settings.json"
+cp "$recover_root/typefinch/settings.json" "$tmp/original-invalid-settings.json"
+rm -f "$tmp/recovery-report.json"
+XDG_CONFIG_HOME="$recover_root" TYPEFINCH_QA_REPORT="$tmp/recovery-report.json" \
+  ./target/debug/typefinch >"$tmp/app-recovery.log" 2>&1 &
+app_pid=$!
+window=""
+for _ in $(seq 1 200); do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -n "$window" ]] && break
+  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app-recovery.log"; exit 1; fi
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo "No guarded-settings window"; exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+import -window "$window" "$tmp/typefinch-recovery.png"
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool type --clearmodifiers --delay 35 "little finches practice"
+sleep 2.5
+xdotool key --clearmodifiers F8
+sleep 0.5
+lua5.4 tests/smoke_assert.lua recovery \
+  "$recover_root/typefinch/settings.json" "$tmp/original-invalid-settings.json" \
+  "$recover_root/typefinch/sessions.sqlite3" "$tmp/recovery-report.json"
+if compgen -G "$recover_root/typefinch/exports/typefinch-backup-*" >/dev/null; then
+  echo "Corrupt-settings fallback must not create a misleading full backup"
+  exit 1
+fi

@@ -167,6 +167,23 @@ elseif mode == "card-theme" then
     assert(data:find('height="145"',1,true),"Compact layout size missing")
     assert(not data:find("<script",1,true),"Unsafe SVG script")
     print("Profile card studio PASS: Daybreak + mono + compact template reflected in native SVG")
+elseif mode == "recovery" then
+    local current=read(assert(arg[2]))
+    local original=read(assert(arg[3]))
+    equals(current,original,"Invalid settings preserved byte-for-byte")
+    local report=io.open(assert(arg[5]),"rb")
+    assert(report==nil,"Guarded session must not write scored QA report")
+    local path=assert(arg[4])
+    local f=io.open(path,"rb")
+    if f then
+        f:close()
+        local query="sqlite3 -json "..quoted(path).." "..quoted("SELECT COUNT(*) AS n FROM sessions")
+        local pipe=assert(io.popen(query,"r"))
+        local records=assert(json.decode(assert(pipe:read("*a"))))
+        assert(pipe:close())
+        equals(records[1].n,0,"Guarded session must not create any saved scores")
+    end
+    print("Recovery safety PASS: invalid settings preserved, no scored session or synthetic success report")
 elseif mode == "set-theme" then
     local path, theme=assert(arg[2]),assert(arg[3])
     assert(theme=="light" or theme=="dark")

@@ -66,7 +66,7 @@ fn key_heat_fill(errors:u32,dark:bool)->Color32 {
             0=>Color32::from_rgb(247,247,252),
             1=>Color32::from_rgb(255,235,237),
             2|3=>Color32::from_rgb(255,219,223),
-            _=>Color32::from_rgb(255,203,209),
+            _=>Color32::from_rgb(255,213,219),
         }
     }
 }

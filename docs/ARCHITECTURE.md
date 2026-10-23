@@ -53,3 +53,7 @@ The initial locale catalog contains `en` and `es-MX`. Both have original word, q
 A missing settings.json creates a normal writable first-run profile. An existing invalid/unreadable settings file instead produces a visible read-only recovery state: the original bytes are not changed, and the app blocks preferences saves, goal imports, full backups of fallback defaults and insertion of new scored sessions. Migration-generated profile IDs must successfully persist before history is recorded. Recovery must preserve both settings and the corresponding SQLite database; automatic destructive restore is deliberately not implemented.
 
 The guarded state does not open or initialize the existing SQLite database at startup and blocks exports that would misleadingly represent newly generated fallback identities. This avoids both identity orphaning and unintended schema migration before a valid settings file has been recovered.
+
+## Preview-only physical geometry
+
+The `geometry` module defines non-authoritative ANSI/ISO/JIS/split main typing-block positions in fractional-key units, with independent Linux evdev codes for ISO/JIS extras. The preview can inspect their XKB symbols but does not synthesize key events or claim connected-device geometry. A second split Space is only visual. The module is unit tested and does not change session persistence or input routing. See [KEYBOARDS.md](KEYBOARDS.md).

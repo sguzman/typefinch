@@ -78,11 +78,11 @@
 - 🐦 Local identity — `█████████░ 89%`
 - 🌗 Appearance — `███████░░░ 70%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `█████░░░░░ 54%`
+## 🗺️ M1 — Keyboard layout laboratory — `██████░░░░ 57%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `███████░░░ 70%`
+### 🧬 P3 — Recognition, emulation and geometry — `████████░░ 77%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -102,8 +102,8 @@
   - [x] Editor and geometry — src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Versioned schema — src/custom_layout.rs v1 UUID-identified serde JSON schema, Unicode grapheme validation, malformed-input unit tests; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Import/export and tests — src/app.rs bounded JSON file import/export, collision renaming, per-profile persistence and synthetic custom-keyboard input; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
-- 🌍 **T305** ANSI, ISO, JIS and split geometries — `░░░░░░░░░░ 0%`
-  - [ ] Geometry definitions
+- 🌍 **T305** ANSI, ISO, JIS and split geometries — `███░░░░░░░ 33%`
+  - [x] Geometry definitions — src/geometry.rs: typed ANSI/ISO/JIS/split main-block slot models, verified Linux evdev extra-key codes, uniqueness and non-attribution tests; GitHub Actions 39992682545: 111 Rust tests and native X11 smoke passed. This is preview geometry, not complete hardware routing.
   - [ ] Physical key routing
   - [ ] Per-key rendering
 
@@ -129,7 +129,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `███████░░░ 67%`
-- 🔀 Software layout emulation — `██████░░░░ 63%`
+- 🔀 Software layout emulation — `███████░░░ 71%`
 - 🔌 Multi-keyboard selection — `██░░░░░░░░ 17%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

@@ -56,7 +56,7 @@ While Typefinch is open inside Hyprland, it refreshes the keyboard inventory on 
 
 ## Modifier-layer inspector
 
-The preview exposes Base, Shift, AltGr and Shift+AltGr positions. XKB-backed layouts synthesize the right-Alt Level-3 modifier (evdev 100) for *read-only symbol inspection*, while the real input surface intentionally does not treat an undifferentiated left-Alt/right-Alt event as a trustworthy AltGr keystroke. Two-layer personal layouts have no inferred AltGr layer. Dead-key state and Compose sequences require a stateful input design before they may count toward the full-emulation acceptance gate.
+The preview exposes Base, Shift, AltGr and Shift+AltGr positions. XKB-backed layouts synthesize the right-Alt Level-3 modifier (evdev 100) for *read-only symbol inspection*, while the real input surface intentionally does not treat an undifferentiated left-Alt/right-Alt event as a trustworthy AltGr keystroke. Two-layer personal layouts have no inferred AltGr layer. Supported ANSI dead-key sequences use session-local Compose; physical AltGr, dedicated Compose-key routing, and complete ISO/JIS input remain unverified.
 
 ## Stateful Compose in scored ANSI emulation
 
@@ -67,3 +67,9 @@ The existing native-mode committed-text path remains unchanged. If no usable loc
 ## Layout symbol regression evidence
 
 Twenty exact XKB output expectations exercise ANSI punctuation, shifted digits, Shift/AltGr symbol levels, and non-Latin code points across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic layouts. The regression suite and existing GUI checks passed in [GitHub Actions run 39986908299](https://github.com/sguzman/typefinch/actions/runs/39986908299) (107 Rust tests). These are static installed-keymap expectations, **not** proof of compositor-level physical AltGr events, per-device event attribution, ISO/JIS geometry, or full IME correctness.
+
+## Illustrative ANSI, ISO, JIS and split previews
+
+The preview now lets the user choose among four **explicit illustrative main typing blocks**, without inferring a keyboard's hardware shape. ANSI/ISO/JIS labels name keyboard families; the model is not a complete 104/105/109-key device, numeric keypad or modifier-geometry reconstruction. Key slots are derived from named Linux evdev positions: ISO `KEY_102ND=86`, Japanese `KEY_RO=89`, `KEY_YEN=124`, `KEY_MUHENKAN=94`, `KEY_HENKAN=92`, and `KEY_KATAKANAHIRAGANA=93` ([Linux input-event codes](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)).
+
+The UI can inspect installed XKB symbols for extra slots by keycode without routing those slots to a guessed ordinary egui key event. Split layout is **visual separation** with exactly one scored Space identity; a second decorative space half is not a second physical input. Shape selection affects only the preview and is not a persisted hardware configuration. The underlying geometry model and duplicate/non-attribution tests passed [native CI 39992682545](https://github.com/sguzman/typefinch/actions/runs/39992682545) with 111 Rust tests; the expanded synthetic X11 geometry report passed [CI 39994019022](https://github.com/sguzman/typefinch/actions/runs/39994019022) with 112 tests. Full visual screenshot inspection and physical extra-key routing remain separate acceptance checks.

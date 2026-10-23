@@ -478,11 +478,12 @@
               "id": "T305",
               "emoji": "🌍",
               "name": "ANSI, ISO, JIS and split geometries",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Geometry definitions",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/geometry.rs: typed ANSI/ISO/JIS/split main-block slot models, verified Linux evdev extra-key codes, uniqueness and non-attribution tests; GitHub Actions 39992682545: 111 Rust tests and native X11 smoke passed. This is preview geometry, not complete hardware routing."
                 },
                 {
                   "text": "Physical key routing",

@@ -43,6 +43,12 @@ fn error_ink(dark: bool) -> Color32 {
     if dark { Color32::from_rgb(255,136,148) }
     else { Color32::from_rgb(177,47,70) }
 }
+/// Untyped reference characters are instructions, not disabled controls:
+/// keep them readable in either theme instead of fading them below 4.5:1.
+fn reference_ink(dark:bool)->Color32 {
+    if dark {Color32::from_rgb(185,190,205)}
+    else {Color32::from_rgb(85,85,92)}
+}
 
 
 pub struct Typefinch {
@@ -585,7 +591,7 @@ impl Typefinch {
                 Some(c) if crate::engine::canonically_equal(c,ch) => correct_ink(ui.visuals().dark_mode),
                 Some(_) => error_ink(ui.visuals().dark_mode),
                 None if position == entered && self.session.state == State::Running => accent_ink(ui.visuals().dark_mode),
-                None => ui.visuals().text_color().gamma_multiply(0.75),
+                None => reference_ink(ui.visuals().dark_mode),
             };
             job.append(ch, 0.0, egui::TextFormat {
                 font_id: egui::FontId::monospace(21.0),
@@ -911,10 +917,10 @@ mod palette_tests {
     #[test] fn brand_ink_and_feedback_meet_normal_text_contrast() {
         let light=Color32::WHITE;
         let dark=Color32::from_rgb(32,38,69);
-        for ink in [accent_ink(false),correct_ink(false),error_ink(false)] {
+        for ink in [accent_ink(false),correct_ink(false),reference_ink(false),error_ink(false)] {
             assert!(contrast(ink,light)>=4.5, "light foreground {ink:?}");
         }
-        for ink in [accent_ink(true),correct_ink(true),error_ink(true)] {
+        for ink in [accent_ink(true),correct_ink(true),reference_ink(true),error_ink(true)] {
             assert!(contrast(ink,dark)>=4.5, "dark foreground {ink:?}");
         }
         assert!(contrast(PERIWINKLE,light)<4.5); // Never use accent swatch as white-background text.

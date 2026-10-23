@@ -164,7 +164,7 @@
               "id": "T103",
               "emoji": "🎯",
               "name": "Per-profile goals and settings",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Settings and goals UI",
@@ -183,7 +183,8 @@
                 },
                 {
                   "text": "Native GUI goal import/export interaction and persistence",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs F12 keyboard focus to ordinary goal-import path, Enter validated import, and Shift+F12 explicit JSON export; tests/goals_gui_smoke.sh and tests/goals_gui_assert.lua exercise real native X11 egui interactions, versioned goal transfer, private on-disk settings and unchanged profile identity/test/score fields. GitHub Actions 40041334789: 155 Rust tests, goal imported/exported PASS, custom passage and full GUI QA passed. Not physical Hyprland acceptance."
                 }
               ]
             }

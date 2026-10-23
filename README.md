@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `████████░░ 76%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `████████░░ 77%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
@@ -28,6 +28,8 @@
 A read-only terminal inspector is also available: `typefinch --inspect-keyboards` prints versioned JSON containing compositor/X11 seat and reported layout metadata. The command does not open a GUI, capture keystrokes, identify the physical source of typing, or modify the system. It returns a nonzero exit status when inspection is unavailable.
 
 Native custom passage file import was verified end to end under X11: F11 opens the normal path editor, Enter imports bounded UTF-8, and the saved Custom score contains no source text or path. Symbolic-link import is rejected. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022).
+
+Native per-profile goals JSON import (F12 then Enter) and export (Shift+F12) passed [GitHub Actions 40041334789](https://github.com/sguzman/typefinch/actions/runs/40041334789), preserving profile identity and score fields.
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 

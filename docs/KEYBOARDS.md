@@ -148,7 +148,7 @@ F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard
 
 ## Keyboard-operated profile goals transfer
 
-F12 focuses the normal per-profile local goals JSON path field; Enter invokes the regular validated import and persists only the selected profile's goals. Shift+F12 explicitly exports the current goals. Neither action runs during an active typing test, and protected settings cannot be overwritten. The same buttons remain usable by mouse. The dedicated native X11 QA exercises these real shortcuts and checks JSON persistence, exported data and identity/score isolation. These controls do not inspect physical keyboard hardware or establish live Hyprland acceptance.
+F12 focuses the normal per-profile local goals JSON path field; Enter invokes the regular validated import and persists only the selected profile's goals. Shift+F12 explicitly exports the current goals. Neither action runs during an active typing test, and protected settings cannot be overwritten. The same buttons remain usable by mouse. [CI 40041334789](https://github.com/sguzman/typefinch/actions/runs/40041334789) passed 155 Rust tests and native X11 QA for both shortcuts: imported goals persisted only selected targets, and exported versioned JSON matched those targets while identity, test counts and personal bests remained unchanged. These controls do not inspect physical keyboard hardware or establish live Hyprland acceptance.
 
 ## Private passage and goal transfer checks
 

@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 76%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 77%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████████░ 86%`
+## 🐣 M0 — Native typing MVP — `█████████░ 88%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -28,7 +28,7 @@
   - [ ] Keyboard navigation audit
   - [x] HiDPI/small-window screenshots — CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface
 
-### 🐦 P1 — Profiles and persistence — `█████████░ 92%`
+### 🐦 P1 — Profiles and persistence — `██████████ 100%`
 
 - 👤 **T101** Multiple local profiles — `██████████ 100%`
   - [x] Create/select profile UI coded — src/app.rs
@@ -38,11 +38,11 @@
   - [x] Schema and migrations — src/history.rs: schema user_version=1, idempotent migration; Actions 39870213935
   - [x] Persist each complete test — src/history.rs and synthetic X11 session SQLite assertion; Actions 39870213935
   - [x] Retention and backup tests — src/history.rs: >100-session retention query, VACUUM INTO snapshot test and native F8 backup QA, CI 39895462191
-- 🎯 **T103** Per-profile goals and settings — `████████░░ 75%`
+- 🎯 **T103** Per-profile goals and settings — `██████████ 100%`
   - [x] Settings and goals UI — src/app.rs: independent editable WPM/accuracy goals and progress bars; Actions 39888678045
   - [x] Per-profile setting persistence — src/preferences.rs: per-profile goals and migration defaults; Actions 39888678045
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
-  - [ ] Native GUI goal import/export interaction and persistence
+  - [x] Native GUI goal import/export interaction and persistence — src/app.rs F12 keyboard focus to ordinary goal-import path, Enter validated import, and Shift+F12 explicit JSON export; tests/goals_gui_smoke.sh and tests/goals_gui_assert.lua exercise real native X11 egui interactions, versioned goal transfer, private on-disk settings and unchanged profile identity/test/score fields. GitHub Actions 40041334789: 155 Rust tests, goal imported/exported PASS, custom passage and full GUI QA passed. Not physical Hyprland acceptance.
 
 ### ⌨️ P2 — Tests and core scoring — `█████████░ 90%`
 
@@ -77,7 +77,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - ⌨️ Typing tests — `█████████░ 90%`
-- 🐦 Local identity — `█████████░ 92%`
+- 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `████████░░ 81%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 73%`

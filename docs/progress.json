@@ -247,7 +247,7 @@
               "id": "T203",
               "emoji": "⏱️",
               "name": "Timed tests",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Four durations coded",
@@ -261,7 +261,8 @@
                 },
                 {
                   "text": "Live timing edge-case QA",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs and src/app.rs: exact monotonic deadline checked before delayed GUI key processing; focus-loss cancel wins; incomplete grapheme grace never crosses timed cutoff. CI 40038837832 passed 153 Rust tests, native X11 2-second deadline (exact 2000 ms, three pre-deadline keys, late input excluded from SQLite), and full GUI/Wayland/X11 suites."
                 },
                 {
                   "text": "Session history persisted",

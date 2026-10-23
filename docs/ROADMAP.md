@@ -2,9 +2,9 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `███████░░░ 74%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 75%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `████████░░ 78%`
+## 🐣 M0 — Native typing MVP — `████████░░ 80%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -44,7 +44,7 @@
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
   - [ ] Native GUI goal import/export interaction and persistence
 
-### ⌨️ P2 — Tests and core scoring — `████████░░ 77%`
+### ⌨️ P2 — Tests and core scoring — `████████░░ 82%`
 
 - ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
   - [x] Input handlers implemented — src/app.rs
@@ -55,10 +55,10 @@
   - [x] Pure scoring function implemented — src/engine.rs
   - [x] Scoring tests authored — src/engine.rs
   - [x] CI scoring tests pass — GitHub Actions run 39867817749: all 11 Rust unit tests passed
-- ⏱️ **T203** Timed tests — `████████░░ 75%`
+- ⏱️ **T203** Timed tests — `██████████ 100%`
   - [x] Four durations coded — src/app.rs
   - [x] Monotonic timer coded — src/engine.rs
-  - [ ] Live timing edge-case QA
+  - [x] Live timing edge-case QA — src/engine.rs and src/app.rs: exact monotonic deadline checked before delayed GUI key processing; focus-loss cancel wins; incomplete grapheme grace never crosses timed cutoff. CI 40038837832 passed 153 Rust tests, native X11 2-second deadline (exact 2000 ms, three pre-deadline keys, late input excluded from SQLite), and full GUI/Wayland/X11 suites.
   - [x] Session history persisted — Xvfb session stored in SQLite during GUI smoke; Actions 39870213935
 - 📚 **T204** Word, quote, punctuation and custom tests — `█████████░ 86%`
   - [x] Starter English corpus — src/engine.rs
@@ -76,7 +76,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `████████░░ 77%`
+- ⌨️ Typing tests — `████████░░ 82%`
 - 🐦 Local identity — `█████████░ 92%`
 - 🌗 Appearance — `███████░░░ 70%`
 

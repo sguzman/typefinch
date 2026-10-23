@@ -6,6 +6,23 @@ use std::{fs, path::PathBuf};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Theme { #[default] System, Light, Dark }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Goals {
+    pub target_wpm: f64,
+    pub target_accuracy: f64,
+}
+impl Default for Goals {
+    fn default() -> Self { Self { target_wpm:60.0, target_accuracy:95.0 } }
+}
+impl Goals {
+    pub fn wpm_progress(&self, best:f64)->f32 {
+        (best.max(0.0)/self.target_wpm.max(1.0)).clamp(0.0,1.0) as f32
+    }
+    pub fn accuracy_progress(&self, best:f64)->f32 {
+        (best.max(0.0)/self.target_accuracy.max(1.0)).clamp(0.0,1.0) as f32
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Profile {
     #[serde(default = "new_profile_id")]
@@ -14,10 +31,12 @@ pub struct Profile {
     pub tests: u32,
     pub best_wpm: f64,
     pub best_accuracy: f64,
+    #[serde(default)]
+    pub goals: Goals,
 }
 fn new_profile_id() -> String { uuid::Uuid::new_v4().to_string() }
 impl Default for Profile {
-    fn default() -> Self { Self { id:new_profile_id(), name:"Finch".into(), tests:0, best_wpm:0.0, best_accuracy:0.0 } }
+    fn default() -> Self { Self { id:new_profile_id(), name:"Finch".into(), tests:0, best_wpm:0.0, best_accuracy:0.0, goals:Goals::default() } }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -112,10 +131,24 @@ mod tests {
         assert!(!repaired.profiles[2].id.is_empty());
         assert_ne!(repaired.profiles[1].id,repaired.profiles[2].id);
     }
+    #[test] fn independent_goals_survive_profile_serialization() {
+        let mut p=Preferences::default();
+        let other=Profile { name:"Other".into(), ..Default::default() };
+        p.profiles.push(other);
+        p.profiles[1].goals.target_wpm=110.0;
+        let bytes=serde_json::to_vec(&p).unwrap();
+        let loaded:Preferences=serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(loaded.profiles[0].goals.target_wpm,60.0);
+        assert_eq!(loaded.profiles[1].goals.target_wpm,110.0);
+        assert_eq!(loaded.profiles[1].goals.target_accuracy,95.0);
+        assert_eq!(loaded.profiles[0].goals.wpm_progress(30.0),0.5);
+        assert_eq!(loaded.profiles[1].goals.wpm_progress(120.0),1.0);
+    }
     #[test] fn legacy_profile_receives_id() {
         let p: Profile = serde_json::from_str(r#"{"name":"Old","tests":3,"best_wpm":60.0,"best_accuracy":95.0}"#).unwrap();
         assert!(!p.id.is_empty());
         assert_eq!(p.name, "Old");
+        assert_eq!(p.goals,Goals::default());
     }
     #[test] fn system_is_default() { assert_eq!(Preferences::default().theme, Theme::System); }
     #[test] fn settings_roundtrip() {

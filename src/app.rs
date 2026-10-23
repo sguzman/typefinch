@@ -235,8 +235,26 @@ impl Typefinch {
             self.save();
         }
         let p = &self.prefs.profiles[self.prefs.active_profile];
-        ui.label(format!("{} sessions  ·  benchmark best {:.1} WPM  ·  best accuracy {:.1}%",
+        ui.label(format!("{} sessions · benchmark best {:.1} WPM · {:.1}% accuracy",
             p.tests, p.best_wpm, p.best_accuracy));
+        ui.add_space(9.0);
+        ui.label(RichText::new("Personal goals").strong());
+        let mut changed=false;
+        ui.add_enabled_ui(self.session.state!=State::Running,|ui| {
+            let goals=&mut self.prefs.profiles[self.prefs.active_profile].goals;
+            changed |= ui.add(egui::Slider::new(&mut goals.target_wpm,10.0..=250.0)
+                .text("WPM target")).changed();
+            changed |= ui.add(egui::Slider::new(&mut goals.target_accuracy,70.0..=100.0)
+                .text("Accuracy target")).changed();
+        });
+        if changed { self.save(); }
+        let current=&self.prefs.profiles[self.prefs.active_profile];
+        let goals=&current.goals;
+        ui.label(format!("Speed: {:.0} / {:.0} WPM",current.best_wpm,goals.target_wpm));
+        ui.add(egui::ProgressBar::new(goals.wpm_progress(current.best_wpm)).show_percentage());
+        ui.label(format!("Accuracy: {:.1}% / {:.1}%",current.best_accuracy,goals.target_accuracy));
+        ui.add(egui::ProgressBar::new(goals.accuracy_progress(current.best_accuracy)).show_percentage());
+        ui.small("Goals and progress belong to the selected local profile.");
     }
     fn show_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading("Test setup");

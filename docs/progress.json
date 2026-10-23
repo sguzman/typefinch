@@ -478,7 +478,7 @@
               "id": "T305",
               "emoji": "🌍",
               "name": "ANSI, ISO, JIS and split geometries",
-              "progress": 60,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Geometry definitions",
@@ -498,6 +498,11 @@
                   "text": "Core control/modifier keycaps and XKB position parity",
                   "passed": true,
                   "evidence": "src/geometry.rs, src/app.rs and src/xkb.rs: typed Backspace/Tab/Enter/Caps/Shift/Ctrl/Alt/Super keycaps, geometry nonoverlap/non-attribution tests, 48 printable slot-to-XKB code parity checks and native ISO/JIS/split captures visually inspected; CI 40003691924: 116 Rust tests and X11 graphical suite passed"
+                },
+                {
+                  "text": "Function/navigation and numeric keypad reference views",
+                  "passed": true,
+                  "evidence": "src/geometry.rs, src/app.rs and tests/gui_smoke.sh: 26 function/navigation and 17 keypad Linux evdev reference keys, non-overlap/uniqueness/non-attribution tests and F10 native selection; Actions 40006834967 passed 118 Rust tests and X11 GUI assertions, both archived screenshots visually inspected"
                 },
                 {
                   "text": "Complete control/modifier and edge-key geometry",

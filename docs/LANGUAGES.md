@@ -19,3 +19,7 @@ The engine compares Unicode scalar positions rather than grapheme clusters, and 
 
 ## Future corpus governance
 Store future corpora as independently versioned, attributed, redistributable data assets, with provenance/license metadata, difficulty annotations, and language-specific speed conventions. Do not claim a comprehensive language corpus from the small initial phrase set.
+
+## Starter word difficulty
+
+Each language has an Easy, Standard and Challenge original word list. Tiers are manually curated from common/short words toward longer vocabulary and accents; they have not been calibrated using user performance data. The selection is persisted locally. The default Standard level preserves historical English `words` and Mexican Spanish `words/es-MX` identifiers; other levels append `/easy` or `/challenge`. This extra context prevents misleading cross-difficulty WPM comparisons. Tiers currently apply only to Words, not quotes or lessons.

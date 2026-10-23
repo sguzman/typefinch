@@ -1,6 +1,6 @@
 use crate::{
     devices::{self, Keyboard},
-    engine::{Language, Session, State, TestMode},
+    engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
     history::{self, Record},
     lesson,
@@ -83,7 +83,7 @@ impl Typefinch {
         let (keyboards, device_error) = Self::query_devices();
         let input = if prefs.test_mode == TestMode::Lesson {lesson::get(&prefs.lesson_id).passage} else {""};
         let duration = if prefs.test_mode == TestMode::Lesson {0} else {prefs.duration_seconds};
-        let session = Session::new_with_language(duration, prefs.test_mode, input, prefs.language);
+        let session = Session::new_with_settings(duration, prefs.test_mode, input, prefs.language, prefs.word_difficulty);
         let emulator = Emulator::compile(&prefs.layout).ok();
         let installed_layouts = registry::discover().unwrap_or_default();
         let history = history::recent(&prefs.profiles[prefs.active_profile].id).unwrap_or_default();
@@ -146,7 +146,7 @@ impl Typefinch {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
         let duration=if self.prefs.test_mode==TestMode::Lesson {0} else {self.prefs.duration_seconds};
-        self.session = Session::new_with_language(duration, self.prefs.test_mode, input, self.prefs.language);
+        self.session = Session::new_with_settings(duration, self.prefs.test_mode, input, self.prefs.language, self.prefs.word_difficulty);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
         if self.session.target.is_empty() {
@@ -344,6 +344,25 @@ impl Typefinch {
                 ui.small("Number passages are language-neutral, but their results remain separated by selected language.");
             } else {
                 ui.small("Each supported language has its own original starter passage.");
+            }
+            if self.prefs.test_mode == TestMode::Words {
+                ui.add_space(6.0);
+                ui.label("Word difficulty");
+                let previous=self.prefs.word_difficulty;
+                ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
+                    egui::ComboBox::from_id_salt("word-difficulty")
+                        .selected_text(previous.label())
+                        .show_ui(ui, |ui| {
+                            for difficulty in WordDifficulty::ALL {
+                                ui.selectable_value(&mut self.prefs.word_difficulty,difficulty,difficulty.label());
+                            }
+                        });
+                });
+                if self.prefs.word_difficulty!=previous {
+                    self.rebuild_session();
+                    self.save();
+                }
+                ui.small("Starter tiers use curated word length and accent variety, not measured typing difficulty.");
             }
             if self.prefs.test_mode == TestMode::Lesson {
                 ui.add_space(6.0);

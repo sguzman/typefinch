@@ -19,6 +19,22 @@ pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
 pub const WORDS: &str = "little finches practice every day with patient rhythm gentle wings make steady progress while fingers learn their keys accuracy grows through focused practice kind habits build confident typing and each new session brings another chance to improve";
 pub const WORDS_ES_MX: &str = "casa camino tiempo palabra ritmo teclado aprender práctica esfuerzo paciencia sonrisa alegría mañana corazón canción rápido lento montaña jardín sueño pequeño grande trabajo comunidad familia amistad libro ventana pueblo memoria historia ciudad México español niña niño café azúcar limón día noche tarde cielo lluvia viento nueva meta claridad futuro";
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum WordDifficulty { Easy, #[default] Standard, Challenge }
+impl WordDifficulty {
+    pub const ALL:[Self;3]=[Self::Easy,Self::Standard,Self::Challenge];
+    pub fn label(self)->&'static str {
+        match self {Self::Easy=>"Easy",Self::Standard=>"Standard",Self::Challenge=>"Challenge"}
+    }
+    pub fn key(self)->&'static str {
+        match self {Self::Easy=>"easy",Self::Standard=>"standard",Self::Challenge=>"challenge"}
+    }
+}
+pub const WORDS_EN_EASY:&str="cat dog sun moon lake bird tree home game book fish day play warm cool fast calm word note kind time rain road blue green run walk look see read";
+pub const WORDS_ES_MX_EASY:&str="casa mesa gato perro pato agua cielo campo mano libro amigo juego flor sol luna patio joven leer día tarde noche comer caminar";
+pub const WORDS_EN_CHALLENGE:&str="synchronization perseverance extraordinary pronunciation configuration responsibility telecommunications architectural ambiguity interdisciplinary experimentation mathematical";
+pub const WORDS_ES_MX_CHALLENGE:&str="extraordinariamente responsabilidad pronunciación comunicación configuración investigación interdisciplinario arquitectura interpretación colaboración organización comprensión";
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Language {
     #[default]
     #[serde(rename="en")]
@@ -52,9 +68,16 @@ impl TestMode {
         match self { Self::Words=>"words", Self::Quotes=>"quotes", Self::Numbers=>"numbers", Self::Punctuation=>"punctuation", Self::Paragraphs=>"paragraphs", Self::Custom=>"custom", Self::Lesson=>"lesson" }
     }
 }
-fn corpus(mode: TestMode, language:Language) -> String {
+fn corpus(mode: TestMode, language:Language, difficulty:WordDifficulty) -> String {
     let (text, repeats) = match mode {
-        TestMode::Words => (if language==Language::MexicanSpanish {WORDS_ES_MX} else {WORDS}, 8),
+        TestMode::Words => (match (language,difficulty) {
+            (Language::English,WordDifficulty::Easy)=>WORDS_EN_EASY,
+            (Language::English,WordDifficulty::Standard)=>WORDS,
+            (Language::English,WordDifficulty::Challenge)=>WORDS_EN_CHALLENGE,
+            (Language::MexicanSpanish,WordDifficulty::Easy)=>WORDS_ES_MX_EASY,
+            (Language::MexicanSpanish,WordDifficulty::Standard)=>WORDS_ES_MX,
+            (Language::MexicanSpanish,WordDifficulty::Challenge)=>WORDS_ES_MX_CHALLENGE,
+        }, 8),
         TestMode::Quotes => (
             if language==Language::MexicanSpanish {
                 "Con práctica constante, cada palabra encuentra su ritmo. Una mejora pequeña también cuenta."
@@ -86,6 +109,7 @@ pub enum State { Ready, Running, Finished }
 pub struct Session {
     pub mode: TestMode,
     pub language: Language,
+    pub difficulty: WordDifficulty,
     pub target: String,
     pub typed: String,
     pub duration: Duration,
@@ -119,22 +143,36 @@ impl Session {
         Self::new_with_language(seconds,mode,custom,Language::English)
     }
     pub fn new_with_language(seconds:u64, mode:TestMode, custom:&str, language:Language)->Self {
+        Self::new_with_settings(seconds,mode,custom,language,WordDifficulty::Standard)
+    }
+    pub fn new_with_settings(seconds:u64, mode:TestMode, custom:&str,
+        language:Language, difficulty:WordDifficulty)->Self {
         // Newline/whitespace are normalized to spaces so the target remains
         // typable by the existing committed-character pipeline.
-        let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) { custom.to_owned() } else { corpus(mode,language) };
+        let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) {
+            custom.to_owned()
+        } else {
+            corpus(mode,language,difficulty)
+        };
         let target = source.chars().take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
-        Self { mode, language, target, typed:String::new(), duration:Duration::from_secs(seconds),
+        Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
             corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new() }
     }
     pub fn history_mode(&self)->String {
-        if self.mode.counts_for_benchmark() && self.language!=Language::English {
-            format!("{}/{}",self.mode.key(),self.language.code())
-        } else {
-            // Keep legacy English identifiers stable in existing SQLite files.
-            self.mode.key().to_owned()
+        if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
+        let mut result=self.mode.key().to_owned();
+        if self.language!=Language::English {
+            result.push('/');
+            result.push_str(self.language.code());
         }
+        if self.mode==TestMode::Words && self.difficulty!=WordDifficulty::Standard {
+            result.push('/');
+            result.push_str(self.difficulty.key());
+        }
+        // The standard English context keeps its legacy ID in SQLite.
+        result
     }
     pub fn begin(&mut self) {
         self.typed.clear();
@@ -258,6 +296,23 @@ mod tests {
         for mode in TestMode::ALL {
             assert_eq!(mode.counts_for_benchmark(), !matches!(mode,TestMode::Custom|TestMode::Lesson));
         }
+    }
+    #[test] fn word_difficulty_passages_are_distinct_and_context_safe() {
+        for language in Language::ALL {
+            let sessions=WordDifficulty::ALL.map(|difficulty|
+                Session::new_with_settings(30,TestMode::Words,"",language,difficulty));
+            assert!(sessions.iter().all(|s|s.target.chars().count()>90));
+            assert_ne!(sessions[0].target,sessions[1].target);
+            assert_ne!(sessions[1].target,sessions[2].target);
+            assert_ne!(sessions[0].history_mode(),sessions[1].history_mode());
+            assert_ne!(sessions[1].history_mode(),sessions[2].history_mode());
+            assert_eq!(sessions[1].history_mode(),if language==Language::English {"words"} else {"words/es-MX"});
+        }
+        assert_eq!(serde_json::to_string(&WordDifficulty::Easy).unwrap(),"\"easy\"");
+        assert_eq!(Session::new_with_settings(30,TestMode::Words,"",Language::MexicanSpanish,WordDifficulty::Challenge).history_mode(),"words/es-MX/challenge");
+        // Difficulty applies only to Words; quotes are not silently split.
+        let quotes=Session::new_with_settings(30,TestMode::Quotes,"",Language::English,WordDifficulty::Easy);
+        assert_eq!(quotes.history_mode(),"quotes");
     }
     #[test] fn english_and_mexican_spanish_word_sessions_are_distinct() {
         let en=Session::new_with_language(30,TestMode::Words,"",Language::English);

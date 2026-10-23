@@ -269,11 +269,22 @@ impl Typefinch {
         self.keyboards=updated;
         self.device_error=error;
     }
-    fn refresh_keyboards(&mut self) {
-        // A manual refresh supersedes any pending background answer.
-        self.pending_device_query=None;
+    fn request_device_query(&mut self,ctx:&egui::Context) {
+        // A newer request replaces the receiver for an older result. The
+        // detached inspector never runs on the UI thread, and a stale
+        // response cannot overwrite more recent keyboard metadata.
+        let (send,receive)=mpsc::channel();
+        self.pending_device_query=Some(receive);
         self.device_poll_started=Instant::now();
-        self.apply_device_result(devices::inspect());
+        let repaint=ctx.clone();
+        std::thread::spawn(move || {
+            let result=devices::inspect();
+            let _=send.send(result);
+            repaint.request_repaint();
+        });
+    }
+    fn refresh_keyboards(&mut self,ctx:&egui::Context) {
+        self.request_device_query(ctx);
     }
     fn poll_keyboard_hotplug(&mut self,ctx:&egui::Context,focused:bool) {
         if let Some(receiver)=self.pending_device_query.as_ref() {
@@ -293,15 +304,7 @@ impl Typefinch {
         let focus_gained=focused && !self.last_window_focused;
         if should_poll_devices(hyprland,focused,focus_gained,self.device_poll_started.elapsed())
             && self.pending_device_query.is_none() {
-            self.device_poll_started=Instant::now();
-            let (send,receive)=mpsc::channel();
-            self.pending_device_query=Some(receive);
-            let repaint=ctx.clone();
-            std::thread::spawn(move || {
-                let result=devices::inspect();
-                let _=send.send(result);
-                repaint.request_repaint();
-            });
+            self.request_device_query(ctx);
         }
         if focused && hyprland {
             ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
@@ -961,7 +964,10 @@ impl Typefinch {
         ui.small("Read-only Hyprland keyboard metadata or one configured X11 aggregate seat. Hyprland refreshes on focus and every 20 seconds; no input capture.");
         ui.vertical(|ui| {
             if ui.button("Refresh device list").clicked() {
-                self.refresh_keyboards();
+                self.refresh_keyboards(ui.ctx());
+            }
+            if self.pending_device_query.is_some() {
+                ui.small("Refreshing keyboard / seat metadata in the background.");
             }
             if !self.keyboards.is_empty() {
                 self.device_index = self.device_index.min(self.keyboards.len() - 1);

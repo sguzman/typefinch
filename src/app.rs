@@ -477,12 +477,27 @@ impl Typefinch {
         });
         ui.small("This selector inspects keyboard metadata. Ordinary Wayland typing events are seat-level: this is not yet a per-device input filter.");
     }
+    fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
+        self.custom_text=drill;
+        self.prefs.test_mode=TestMode::Custom;
+        self.rebuild_session();
+        self.save();
+        self.start_test(ctx);
+        self.message="Practice drill started using missed reference keys. Text stays in memory only.".into();
+    }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
             let name = if self.session.state == State::Running { "Restart test" } else { "Start test" };
             if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
+            if self.session.state == State::Finished {
+                if let Some(drill)=self.session.weak_character_drill() {
+                    if ui.button("Practice missed keys").clicked() {
+                        self.start_weak_drill(drill,ctx);
+                    }
+                }
+            }
             ui.label(match self.session.state {
                 State::Ready=>"Ready · press Start to capture typing",
                 State::Running=>"Typing · Esc cancels · Backspace corrects",

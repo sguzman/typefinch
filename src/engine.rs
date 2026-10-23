@@ -1,5 +1,5 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
-use std::time::{Duration, Instant};
+use std::{collections::BTreeMap, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
 
 /// Parse a local custom passage in bounded memory; the bytes are never logged.
@@ -58,6 +58,7 @@ pub struct Session {
     pub corrections: u32,
     pub attempts: u32,
     pub mistakes: u32,
+    weak_keys: BTreeMap<char,u32>,
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Score {
@@ -84,13 +85,15 @@ impl Session {
         let target = source.chars().take(4096).collect::<String>()
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, target, typed:String::new(), duration:Duration::from_secs(seconds),
-            state:State::Ready, started:None, elapsed:Duration::ZERO, corrections:0, attempts:0, mistakes:0 }
+            state:State::Ready, started:None, elapsed:Duration::ZERO,
+            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new() }
     }
     pub fn begin(&mut self) {
         self.typed.clear();
         self.corrections = 0;
         self.attempts = 0;
         self.mistakes = 0;
+        self.weak_keys.clear();
         self.elapsed = Duration::ZERO;
         self.started = Some(Instant::now());
         self.state = State::Running;
@@ -102,13 +105,29 @@ impl Session {
         for ch in text.chars().filter(|c| !c.is_control()) {
             if cursor >= total { break; }
             self.attempts = self.attempts.saturating_add(1);
-            if self.target.chars().nth(cursor) != Some(ch) {
+            let expected=self.target.chars().nth(cursor);
+            if expected != Some(ch) {
                 self.mistakes = self.mistakes.saturating_add(1);
+                if let Some(key)=expected.filter(|c|!c.is_control() && !c.is_whitespace()) {
+                    let errors=self.weak_keys.entry(key).or_default();
+                    *errors=errors.saturating_add(1);
+                }
             }
             self.typed.push(ch);
             cursor += 1;
         }
         if self.typed.chars().count() >= self.target.chars().count() { self.finish(); }
+    }
+    /// Create a temporary drill targeting commonly mistyped reference characters.
+    /// Does not persist target text, error positions, or the generated drill.
+    pub fn weak_character_drill(&self)->Option<String> {
+        let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
+        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let mut syllables=Vec::new();
+        for (ch,_) in candidates.into_iter().take(8) {
+            for _ in 0..8 {syllables.push(ch.to_string());}
+        }
+        if syllables.is_empty() {None} else {Some(syllables.join(" "))}
     }
     pub fn backspace(&mut self) {
         if self.state == State::Running && self.typed.pop().is_some() { self.corrections += 1; }
@@ -242,6 +261,21 @@ mod tests {
         assert_eq!(a.accuracy,0.0);
         assert_eq!(a.wpm,0.0);
         assert_eq!(a.entered,0);
+    }
+    #[test] fn adaptive_drill_is_deterministic_ephemeral_and_resettable() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");
+        s.begin();
+        assert!(s.weak_character_drill().is_none());
+        s.type_text("x");
+        s.backspace();
+        s.type_text("c");
+        s.type_text("a");
+        s.type_text("x");
+        let drill=s.weak_character_drill().unwrap();
+        assert_eq!(drill.split_whitespace().collect::<Vec<_>>(),
+            vec!["c","c","c","c","c","c","c","c","t","t","t","t","t","t","t","t"]);
+        s.begin();
+        assert!(s.weak_character_drill().is_none());
     }
     #[test] fn raw_metrics_preserve_corrected_mistakes() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");

@@ -17,3 +17,5 @@ The persistent directory is `$XDG_CONFIG_HOME/typefinch`, falling back to `~/.co
 - **JSON history export:** F7 (or the explicit export button) writes a versioned, aggregate-only file for the active profile to `exports/typefinch-history.json`. Unlike the dashboard's recent-session cache, it includes every saved session for that profile. The output includes its pseudonymous profile ID and never includes raw passages, typed strings, credentials, or hardware addresses. No automatic publishing takes place.
 
 - **Dropped files:** Only a user-initiated local file drop in Custom mode is read. Typefinch rejects files above 64 KiB, invalid UTF-8, unsupported control characters and empty passages. Only the first 4,096 characters are retained in memory for practice; file paths and file contents are not stored in session history or remote services.
+
+- **Adaptive missed-key drills:** Expected characters associated with mistakes are collected only in the running session's memory. Generated practice text is not persisted, published, or included in analytics history; the durable database still stores only aggregate counts.

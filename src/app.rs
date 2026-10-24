@@ -185,6 +185,16 @@ fn session_progress_fraction(session:&Session)->f32 {
         (1.0-session.seconds_left()/session.duration.as_secs_f64()) as f32
     }
 }
+/// While a native IME has a live candidate, Backspace edits that candidate
+/// and Escape dismisses it; neither action may erase or cancel a scored
+/// session. The compositor reports the resulting preedit/commit separately.
+fn ime_owns_navigation(mode:Mode,preedit:&mut String,key:egui::Key)->bool {
+    if mode!=Mode::System || preedit.is_empty() || !matches!(key,egui::Key::Escape|egui::Key::Backspace) {
+        return false;
+    }
+    if key==egui::Key::Escape { preedit.clear(); }
+    true
+}
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
 }
@@ -761,12 +771,16 @@ impl Typefinch {
         for event in events {
             match event {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
-                    self.session.state = State::Ready;
-                    self.ime_preedit.clear();
-                    if let Some(compose) = self.composition.as_mut() { compose.reset(); }
+                    if !ime_owns_navigation(self.mode,&mut self.ime_preedit,egui::Key::Escape) {
+                        self.session.state = State::Ready;
+                        self.ime_preedit.clear();
+                        if let Some(compose) = self.composition.as_mut() { compose.reset(); }
+                    }
                 }
                 egui::Event::Key { key: egui::Key::Backspace, pressed: true, repeat: false, .. } => {
-                    if let Some(compose) = self.composition.as_mut().filter(|compose|
+                    if ime_owns_navigation(self.mode,&mut self.ime_preedit,egui::Key::Backspace) {
+                        // Let the IME update its candidate; scored input is untouched.
+                    } else if let Some(compose) = self.composition.as_mut().filter(|compose|
                         compose.status() == xkbcommon::xkb::compose::Status::Composing) {
                         // The pending accent has not entered scoring: cancel it first.
                         compose.reset();
@@ -2859,6 +2873,26 @@ mod palette_tests {
             &egui::Event::Ime(egui::ImeEvent::Commit(String::new()))));
         assert!(preview.is_empty());
         assert_eq!(session.attempts,0);
+    }
+    #[test] fn active_ime_candidate_owns_escape_and_backspace_not_scored_input() {
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"你好世界");
+        s.begin();
+        s.type_text("你");
+        let original=(s.typed.clone(),s.attempts,s.corrections,s.state);
+        let mut preedit=String::from("ni");
+        assert!(ime_owns_navigation(Mode::System,&mut preedit,egui::Key::Backspace));
+        assert_eq!(preedit,"ni","the IME, not Typefinch, edits a live candidate");
+        assert_eq!((s.typed.clone(),s.attempts,s.corrections,s.state),original);
+        assert!(ime_owns_navigation(Mode::System,&mut preedit,egui::Key::Escape));
+        assert!(preedit.is_empty(),"Escape discards the local candidate preview");
+        assert_eq!((s.typed.clone(),s.attempts,s.corrections,s.state),original);
+        assert!(!ime_owns_navigation(Mode::System,&mut preedit,egui::Key::Backspace),
+            "after composition ends, ordinary Backspace must still work");
+        let mut candidate=String::from("ni");
+        assert!(!ime_owns_navigation(Mode::Emulated,&mut candidate,egui::Key::Escape),
+            "software emulation must preserve its existing cancellation rules");
+        assert!(!ime_owns_navigation(Mode::System,&mut candidate,egui::Key::Enter),
+            "Enter is handled independently to avoid confirming IME candidates");
     }
     #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {
         let plain=egui::Modifiers::default();

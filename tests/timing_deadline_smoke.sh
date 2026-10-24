@@ -17,6 +17,21 @@ trap cleanup EXIT
 export XDG_CONFIG_HOME="$tmp/config"
 mkdir -p "$XDG_CONFIG_HOME"
 export TYPEFINCH_QA_REPORT="$tmp/deadline.json"
+# xvfb-run can return before its X11 socket is accepting clients on a
+# loaded runner. Do not mistake an initial XOpenDisplayFailed for an app
+# or deadline regression. This probe never touches a user display.
+display_ready=0
+for _ in $(seq 1 50);do
+  if xdotool getdisplaygeometry >/dev/null 2>&1;then
+    display_ready=1
+    break
+  fi
+  sleep 0.1
+done
+if ((display_ready!=1));then
+  echo "Disposable Xvfb display never accepted an X11 client" >&2
+  exit 1
+fi
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
 window=""

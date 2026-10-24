@@ -107,6 +107,7 @@ jobs:
           path: |
             typefinch-window.png
             typefinch-wayland-virtual.png
+            typefinch-wayland-rtl-*.png
             typefinch-light.png
             typefinch-dark.png
             typefinch-narrow.png

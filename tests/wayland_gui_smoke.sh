@@ -134,3 +134,93 @@ print("Nested Weston real Wayland wl_keyboard PASS: 3/3 OS-input graphemes, unat
 LUA
 import -window "$parent" typefinch-wayland-virtual.png
 echo "Nested Weston production Wayland GUI typed and saved one clean Custom session"
+# Two isolated native Wayland applications, driven through the real Weston
+# wl_keyboard surface (the X11 host supplies only the virtual hardware).
+kill "$app_pid" 2>/dev/null || true
+wait "$app_pid" 2>/dev/null || true
+app_pid=""
+for script in arabic hebrew;do
+  export XDG_CONFIG_HOME="$tmp/$script-config"
+  export TYPEFINCH_QA_EDITOR_CARET_REPORT="$tmp/$script-caret.json"
+  mkdir -p "$XDG_CONFIG_HOME"
+  if [[ "$script" == arabic ]];then
+    printf '%s' 'سَلَام بالعربية 123' >"$tmp/$script-source.txt"
+  else
+    printf '%s' 'שָׁלוֹם בעברית 123' >"$tmp/$script-source.txt"
+  fi
+  ./target/debug/typefinch >"$tmp/$script-app.log" 2>&1 &
+  app_pid=$!
+  cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
+  ready=0
+  for _ in $(seq 1 30);do
+    kill -0 "$app_pid" 2>/dev/null || {
+      echo "Wayland $script native app exited prematurely" >&2;exit 1;
+    }
+    xdotool windowactivate --sync "$parent" 2>/dev/null || true
+    xdotool windowfocus "$parent" 2>/dev/null || true
+    xdotool mousemove --window "$parent" 500 340 click 1
+    xdotool key --clearmodifiers F11
+    sleep 0.3
+    if [[ -f "$cfg" ]] && grep -q '"test_mode": "custom"' "$cfg";then ready=1;break;fi
+  done
+  ((ready==1)) || { echo "Wayland $script custom mode unavailable" >&2;exit 1; }
+  xdotool type --clearmodifiers --delay 25 "$tmp/$script-source.txt"
+  xdotool key --clearmodifiers Return
+  sleep 0.6
+  xdotool key --clearmodifiers ctrl+e
+  sleep 0.35
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.25
+  [[ -s "$TYPEFINCH_QA_EDITOR_CARET_REPORT" ]] || {
+    echo "Wayland $script native editor has no caret report" >&2;exit 1;
+  }
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"
+  direction=''
+  for side in Right Left;do
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.15
+    xdotool key --clearmodifiers "shift+$side"
+    sleep 0.25
+    status="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret")
+print(tostring(d.selected_graphemes)..":"..tostring(d.index))
+LUA
+)"
+    [[ "$status" != "1:1" ]] || { direction="$side";break; }
+  done
+  [[ -n "$direction" ]] || {
+    echo "Wayland $script Shift+Arrow failed whole grapheme: $status" >&2;exit 1;
+  }
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-selected.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script.png"
+  if [[ "$direction" == Right ]];then reverse=Left;else reverse=Right;fi
+  xdotool key --clearmodifiers "shift+$reverse"
+  sleep 0.25
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-back.json"
+  lua5.4 - "$tmp/$script-start.json" "$tmp/$script-selected.json" \
+    "$tmp/$script-back.json" "$cfg" "$tmp/$script-source.txt" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"))
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local start,selected,back=read(arg[1]),read(arg[2]),read(arg[3])
+assert(start.total>8 and start.index==0 and start.selected_graphemes==0)
+assert(selected.total==start.total and selected.index==1 and selected.selected_graphemes==1)
+assert(back.total==start.total and back.index==0 and back.selected_graphemes==0)
+local cf=assert(io.open(arg[4],"rb"));local settings=assert(cf:read("*a"));cf:close()
+local sf=assert(io.open(arg[5],"rb"));local passage=assert(sf:read("*a"));sf:close()
+assert(not settings:find(arg[5],1,true) and not settings:find(passage,1,true),
+  "Native Wayland source or local path leaked into settings")
+print("Native Weston Wayland RTL keyboard selection PASS: 0 -> 1 -> 0 with private source")
+LUA
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+  app_pid=""
+done
+echo "Nested Weston Wayland Arabic/Hebrew marked-grapheme selection PASS"

@@ -194,6 +194,36 @@ mod tests {
         publish_via(&mock,"alice/cards",DEMO,true).unwrap();
         assert_eq!(mock.calls.borrow()[2].1.as_ref().unwrap()["sha"],"a".repeat(40));
     }
+    #[test] fn rejects_foreign_or_unverifiable_remote_card_without_put(){
+        for invalid in [
+            json!({"type":"dir","sha":"a".repeat(40),"encoding":"base64","content":STANDARD.encode(DEMO)}),
+            json!({"type":"file","sha":"wrong","encoding":"base64","content":STANDARD.encode(DEMO)}),
+            json!({"type":"file","sha":"a".repeat(40),"encoding":"none","content":STANDARD.encode(DEMO)}),
+            json!({"type":"file","sha":"a".repeat(40),"encoding":"base64","content":"%%%"}),
+            json!({"type":"file","sha":"a".repeat(40),"encoding":"base64","content":STANDARD.encode([0xff,0xfe])}),
+            json!({"type":"file","sha":"a".repeat(40),"encoding":"base64","content":STANDARD.encode("<svg xmlns=\\\"http://www.w3.org/2000/svg\\\">foreign</svg>")}),
+        ] {
+            let mock=Mock::new(vec![Ok(repo_info()),Ok(invalid)]);
+            assert!(publish_via(&mock,"alice/cards",DEMO,true).is_err());
+            let calls=mock.calls.borrow();
+            assert_eq!(calls.len(),2,"invalid card must be rejected before PUT");
+            assert!(calls.iter().all(|(_,body)|body.is_none()));
+        }
+    }
+    #[test] fn missing_ownership_and_upload_failure_are_not_success(){
+        let fake=Mock::new(vec![Ok(json!({"permissions":{}}))]);
+        assert!(publish_via(&fake,"alice/cards",DEMO,true).unwrap_err().contains("permission"));
+        assert_eq!(fake.calls.borrow().len(),1);
+        let failed=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),Err(ApiFailure::Unavailable)]);
+        assert!(publish_via(&failed,"alice/cards",DEMO,true).unwrap_err().contains("check the repository"));
+        assert_eq!(failed.calls.borrow().len(),3);
+        let wrong_receipt=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
+            Ok(json!({"content":{"path":"README.md"}}))]);
+        assert!(publish_via(&wrong_receipt,"alice/cards",DEMO,true).unwrap_err().contains("did not confirm"));
+        let bad_svg=Mock::new(vec![]);
+        assert!(publish_via(&bad_svg,"alice/cards","<svg><script/></svg>",true).is_err());
+        assert!(bad_svg.calls.borrow().is_empty());
+    }
     #[test] fn offline_and_missing_permissions_fail_closed(){
         let missing_permission=Mock::new(vec![Ok(json!({"permissions":{"push":false}}))]);
         assert!(publish_via(&missing_permission,"alice/cards",DEMO,true).is_err());

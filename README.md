@@ -6,6 +6,8 @@
 
 **Project color:** `#8696F5` · `oklch(70.123% 0.14003 274.97)` ([decision](docs/COLOR.md)). **Theme:** System by default, or explicit ☀ Light / 🌙 Dark.
 
+**Optional publishing:** An opt-in panel can upload the current card to a selected GitHub repository as `typefinch-profile.svg` through the user's existing authenticated `gh` CLI. It requires per-card public-data consent and does not store credentials or upload automatically. The manual SVG/Markdown export remains the default. [Permission and privacy policy](docs/GITHUB_PUBLISHING.md). This feature has no live account-publication acceptance claim.
+
 **GitHub profile card example (synthetic CI fixture, not real user statistics):**
 
 ![Typefinch synthetic example profile card](assets/typefinch-card-demo.svg)

@@ -64,6 +64,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/goals_gui_smoke.sh
       - name: Native keyboard Tab/Enter profile creation and guide visibility
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/keyboard_navigation_smoke.sh
+      - name: Arabic and Hebrew native rendering smoke (not BiDi acceptance)
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_gui_smoke.sh
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview
@@ -99,6 +101,7 @@ jobs:
             typefinch-reference-*.png
             typefinch-recovery.png
             typefinch-heatmap.png
+            rtl-*.png
             typefinch-gui-smoke.log
             typefinch-window-manager.log
             typefinch-profile.svg

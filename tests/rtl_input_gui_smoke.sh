@@ -134,8 +134,8 @@ for layout in ara il;do
   xdotool type --clearmodifiers --delay 25 "$tmp/$layout-passage.txt"
   xdotool key --clearmodifiers Return
   sleep 0.55
-  if [[ "$layout" == ara ]];then expected=arabic; codes=(39 42 43 46);
-  else expected=hebrew; codes=(38 45 30 32);fi
+  if [[ "$layout" == ara ]];then expected=arabic; codes=(39 42 43 46); wrong=38;
+  else expected=hebrew; codes=(38 45 30 32); wrong=39;fi
   lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"),"No native OS RTL import report")
@@ -152,6 +152,15 @@ LUA
   sleep 0.35
   xdotool key --clearmodifiers F2
   sleep 0.25
+  # The first typed grapheme is intentionally wrong, then corrected.
+  # Neither a wrong key nor its Backspace should complete this word.
+  xdotool key --clearmodifiers "$wrong"
+  sleep 0.20
+  [[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
+    echo "Wrong RTL key completed the native OS session" >&2;exit 1;
+  }
+  xdotool key --clearmodifiers BackSpace
+  sleep 0.16
   for code in "${codes[@]}";do
     xdotool key --clearmodifiers "$code"
     sleep 0.08
@@ -164,14 +173,15 @@ local r=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(r.synthetic and r.state=="finished" and r.entered==4
   and r.correct==4 and r.accuracy==100,"Native OS RTL layout failed to score")
 local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
-local sql=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct FROM sessions'",path)
+local sql=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions'",path)
 local pipe=assert(io.popen(sql,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))))
 assert(pipe:close())
 assert(#rows==1 and rows[1].input_mode=="OS" and rows[1].test_mode=="custom"
-  and rows[1].entered==4 and rows[1].correct==4,
-  "Native OS layout score mislabeled or missing")
-print("Native X11 OS-layout RTL word scoring PASS: 4/4")
+  and rows[1].entered==4 and rows[1].correct==4
+  and rows[1].attempts==5 and rows[1].mistakes==1 and rows[1].corrections==1,
+  "Native OS-layout RTL mistake/correction metadata wrong")
+print("Native X11 OS-layout RTL typing PASS: 4/4 after one corrected error, raw mistake retained")
 LUA
   stop_app
 done

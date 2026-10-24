@@ -28,6 +28,8 @@ export XDG_SESSION_TYPE=wayland
 export WINIT_UNIX_BACKEND=wayland
 export LIBGL_ALWAYS_SOFTWARE=1
 export TYPEFINCH_QA_REPORT="$tmp/score.json"
+export TYPEFINCH_QA_EDITOR_CARET_REPORT="$tmp/rtl-caret.json"
+export TYPEFINCH_QA_IMPORT_REPORT="$tmp/rtl-import.json"
 unset HYPRLAND_INSTANCE_SIGNATURE WAYLAND_SOCKET
 printf '%s' 'abc' > "$tmp/source.txt"
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
@@ -134,39 +136,34 @@ print("Nested Weston real Wayland wl_keyboard PASS: 3/3 OS-input graphemes, unat
 LUA
 import -window "$parent" typefinch-wayland-virtual.png
 echo "Nested Weston production Wayland GUI typed and saved one clean Custom session"
-# Two isolated native Wayland applications, driven through the real Weston
-# wl_keyboard surface (the X11 host supplies only the virtual hardware).
-kill "$app_pid" 2>/dev/null || true
-wait "$app_pid" 2>/dev/null || true
-app_pid=""
+# Reuse one live Wayland client. Weston 13's X11 backend can crash while
+# rapidly tearing down/recreating this synthetic surface between scripts;
+# the production editor itself resets and imports each new private source.
 for script in arabic hebrew;do
-  export XDG_CONFIG_HOME="$tmp/$script-config"
-  export TYPEFINCH_QA_EDITOR_CARET_REPORT="$tmp/$script-caret.json"
-  mkdir -p "$XDG_CONFIG_HOME"
   if [[ "$script" == arabic ]];then
     printf '%s' 'سَلَام بالعربية 123' >"$tmp/$script-source.txt"
   else
     printf '%s' 'שָׁלוֹם בעברית 123' >"$tmp/$script-source.txt"
   fi
-  ./target/debug/typefinch >"$tmp/$script-app.log" 2>&1 &
-  app_pid=$!
-  cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
-  ready=0
-  for _ in $(seq 1 30);do
-    kill -0 "$app_pid" 2>/dev/null || {
-      echo "Wayland $script native app exited prematurely" >&2;exit 1;
-    }
-    xdotool windowactivate --sync "$parent" 2>/dev/null || true
-    xdotool windowfocus "$parent" 2>/dev/null || true
-    xdotool mousemove --window "$parent" 500 340 click 1
-    xdotool key --clearmodifiers F11
-    sleep 0.3
-    if [[ -f "$cfg" ]] && grep -q '"test_mode": "custom"' "$cfg";then ready=1;break;fi
-  done
-  ((ready==1)) || { echo "Wayland $script custom mode unavailable" >&2;exit 1; }
+  kill -0 "$app_pid" 2>/dev/null || {
+    echo "Wayland $script native editor process exited prematurely" >&2;exit 1;
+  }
+  xdotool windowactivate --sync "$parent" 2>/dev/null || true
+  xdotool windowfocus "$parent" 2>/dev/null || true
+  xdotool key --clearmodifiers F11
+  sleep 0.3
+  xdotool key --clearmodifiers ctrl+a
+  rm -f "$TYPEFINCH_QA_IMPORT_REPORT" "$TYPEFINCH_QA_EDITOR_CARET_REPORT"
   xdotool type --clearmodifiers --delay 25 "$tmp/$script-source.txt"
   xdotool key --clearmodifiers Return
   sleep 0.6
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$script" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Native Wayland RTL import not confirmed")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="custom-import" and d.script==arg[2]
+  and d.graphemes>8,"Wrong Arabic/Hebrew Wayland source or failed import")
+LUA
   xdotool key --clearmodifiers ctrl+e
   sleep 0.35
   xdotool key --clearmodifiers ctrl+Home
@@ -219,8 +216,5 @@ assert(not settings:find(arg[5],1,true) and not settings:find(passage,1,true),
   "Native Wayland source or local path leaked into settings")
 print("Native Weston Wayland RTL keyboard selection PASS: 0 -> 1 -> 0 with private source")
 LUA
-  kill "$app_pid" 2>/dev/null || true
-  wait "$app_pid" 2>/dev/null || true
-  app_pid=""
 done
 echo "Nested Weston Wayland Arabic/Hebrew marked-grapheme selection PASS"

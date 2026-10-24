@@ -56,7 +56,7 @@ GitHub Actions runs a real X11/virtual-display smoke test using Openbox and soft
 
 **Export acceptance:** [F6 native SVG + Markdown integration passed in CI](https://github.com/sguzman/typefinch/actions/runs/39873211637).
 
-**Latest acceptance evidence:** [39 Rust tests + native X11 corrected-error, paste, theme and export QA](https://github.com/sguzman/typefinch/actions/runs/39880764327). Hyprland physical-device QA remains pending.
+**Earlier acceptance evidence:** [39 Rust tests + native X11 corrected-error, paste, theme and export QA](https://github.com/sguzman/typefinch/actions/runs/39880764327). Hyprland physical-device QA remains pending.
 
 ## 🪶 Practice lessons
 
@@ -66,11 +66,11 @@ Five starter lessons (home row, top row, bottom row, common pairs, symbols) run 
 
 **Per-profile goals:** Each local identity now keeps independent speed and accuracy targets, with live progress bars. Goals are editable without account synchronization and older settings retain safe defaults.
 
-**Latest full verification:** [46 Rust tests and a Lua-asserted X11 graphical suite, including JSON history export](https://github.com/sguzman/typefinch/actions/runs/39888678045). The SVG/profile widget remains manually published; Hyprland hardware QA is pending.
+**Earlier lesson verification:** [46 Rust tests and a Lua-asserted X11 graphical suite, including JSON history export](https://github.com/sguzman/typefinch/actions/runs/39888678045). The SVG/profile widget remains manually published; Hyprland hardware QA is pending.
 
-**Private custom text import:** While Custom text is selected, drag a local UTF-8 text/Markdown file onto the window. Imports are bounded at 64 KiB, retain at most 4,096 characters in memory and are discarded on exit. Importing never logs or persists the passage.
+**Private custom text import:** While Custom text is selected, drag a local UTF-8 text/Markdown file onto the window. Imports are bounded at 64 KiB, retain at most 4,096 extended grapheme clusters in memory and are discarded on exit. Importing never logs or persists the passage.
 
-**Adaptive practice preview:** After a session with mistakes, **Practice missed keys** repeats up to eight missed reference characters, weighting repetitions by mistake frequency. **Practice missed pairs** repeats adjacent two-grapheme reference patterns without joining across whitespace. Both use two to eight repetitions per pattern, remain in memory, and do not affect benchmark records. These are deterministic practice-allocation heuristics, **not evidence that training improves real typing proficiency**. Historical per-key statistics and human training-efficacy evaluation remain open.
+**Adaptive practice preview:** After a session with mistakes, **Practice missed keys** repeats up to eight missed reference characters, weighting repetitions by mistake frequency. **Practice missed pairs** repeats adjacent two-grapheme reference patterns without joining across whitespace. Both use two to eight repetitions per pattern, remain in memory, and do not affect benchmark records. These are deterministic practice-allocation heuristics, **not evidence that training improves real typing proficiency**. Historical per-key statistics and human training-efficacy evaluation remain open. [Adaptive-drill evaluation protocol](docs/DRILL_EVALUATION.md) distinguishes algorithm tests from measured transfer.
 
 **Finger-position guide:** The layout preview now includes conventional ANSI left/right finger labels by physical key position, independent of its selected XKB symbol map. These are hints, not personalized ergonomic guidance or a replacement for future per-key heatmaps.
 
@@ -86,7 +86,7 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 
 **Full local backups:** F8 or **Backup settings + SQLite** creates a timestamped pair under `exports/`: a settings JSON file and a consistent SQLite snapshot. The pair includes local profile names and complete aggregate history, so treat both as private files. They are not uploaded, published or automatically restored; backup creation never deletes existing data.
 
-**Latest language and backup acceptance:** [55 passing Rust tests + native Spanish Easy session + consistent settings/SQLite snapshot](https://github.com/sguzman/typefinch/actions/runs/39895462191). Normalization, IMEs, RTL and physical Hyprland QA remain open.
+**Earlier language and backup acceptance:** [55 passing Rust tests + native Spanish Easy session + consistent settings/SQLite snapshot](https://github.com/sguzman/typefinch/actions/runs/39895462191). Normalization, IMEs, RTL and physical Hyprland QA remain open.
 
 **Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Complex IME and bidirectional input are not yet validated.
 

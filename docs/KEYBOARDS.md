@@ -275,3 +275,25 @@ Although not keyboard hardware functions, personal goals and imported private te
 ## Full family reference-inventory acceptance
 
 [GitHub Actions 40134673256](https://github.com/sguzman/typefinch/actions/runs/40134673256) passed **224 Rust tests** and the complete native X11 graphical suite. The new `full_ansi_iso_jis_and_split_reference_inventories_are_exact` regression checks Linux evdev code uniqueness over the **typing**, **function/navigation** and **keypad** sections, with **104 distinct ANSI**, **105 ISO**, **109 JIS**, and **104 split ANSI** physical-code *reference slots*. The split second Space drawing carries code zero and cannot double-count a real key. ISO 102nd and JIS Ro/Yen have readable fallback captions, and right Alt is distinguishable from left Alt without claiming reliable physical AltGr input. A second regression rejects fake printable egui events for those national edge keys. Archived 1100×850 native ISO, JIS and split screenshots were independently opened and inspected for layout and readable keycaps; previous F10 navigation/keypad screenshots were inspected in CI 40006834967. The acceptance is a **software-rendered reference model**, not physical device shape identification or actual ISO/JIS event routing.
+
+## Hosted headless Hyprland compositor QA boundary
+
+Two deliberately isolated experimental GitHub Actions runs tried to open the
+actual Typefinch Wayland GUI under real Hyprland in an Ubuntu 26.04 container:
+[40138733735](https://github.com/sguzman/typefinch/actions/runs/40138733735)
+(stand-alone headless software renderer) and
+[40139025545](https://github.com/sguzman/typefinch/actions/runs/40139025545)
+(nested behind a working software-rendered Weston 14 parent). Ubuntu provided
+Hyprland 0.53.3, but both stopped **before** Typefinch started because
+Hyprland/Aquamarine threw `CBackend::create() failed` without a usable
+GPU/render allocator. Weston itself initialized the headless output in the
+second attempt. Neither run demonstrates a failing typing or rendering path
+inside Typefinch. No screenshots were produced and **no T001/T902 or hardware
+acceptance is credited**.
+
+The isolated opt-in workflow `.github/workflows/hyprland-headless.yml` is
+kept as a documented reproducible probe, not a required passing CI gate.
+Do not keep repeating it on the same GPU-less hosted runner. A next attempt
+needs a functioning renderer (or an authorized graphical Hyprland test runner)
+and must preserve independent screenshots, keyboard and focus evidence without
+touching the user's active workspace, global input devices or private data.

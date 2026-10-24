@@ -126,6 +126,7 @@ jobs:
             typefinch-narrow.png
             typefinch-hidpi.png
             typefinch-geometry-*.png
+            typefinch-starter-full-*.png
             typefinch-reference-*.png
             typefinch-recovery.png
             typefinch-heatmap.png

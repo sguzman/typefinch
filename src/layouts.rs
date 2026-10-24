@@ -92,8 +92,32 @@ pub fn finger_hint(key:egui::Key)->Option<&'static str> {
     let (_,col)=physical_index(key)?;
     FINGERS.get(col).copied()
 }
+/// Exact US ANSI number-row and punctuation fallback when XKB is absent.
+/// National/variant layouts must use their installed XKB layers instead.
+fn us_ansi_outer_key(key: egui::Key, shift: bool) -> Option<char> {
+    let (base,upper)=match key {
+        egui::Key::Num1=>('1','!'),egui::Key::Num2=>('2','@'),
+        egui::Key::Num3=>('3','#'),egui::Key::Num4=>('4','$'),
+        egui::Key::Num5=>('5','%'),egui::Key::Num6=>('6','^'),
+        egui::Key::Num7=>('7','&'),egui::Key::Num8=>('8','*'),
+        egui::Key::Num9=>('9','('),egui::Key::Num0=>('0',')'),
+        egui::Key::Minus=>('-','_'),egui::Key::Equals=>('=','+'),
+        egui::Key::OpenBracket=>('[','{'),
+        egui::Key::CloseBracket=>(']','}'),
+        egui::Key::Backslash=>('\\','|'),
+        egui::Key::Backtick=>('`','~'),
+        egui::Key::Quote=>('\'','"'),
+        _=>return None
+    };
+    Some(if shift {upper}else{base})
+}
 pub fn emulate(key: egui::Key, id: &str, shift: bool) -> Option<char> {
     if key == egui::Key::Space { return Some(' '); }
+    let entry=find(id)?;
+    entry.rows?;
+    if id=="us" {
+        if let Some(symbol)=us_ansi_outer_key(key,shift){return Some(symbol);}
+    }
     let (row, col) = physical_index(key)?;
     let mapped = find(id)?.rows?[row].chars().nth(col)?;
     Some(if shift { shifted(mapped) } else { mapped })
@@ -124,6 +148,27 @@ mod tests {
         assert_eq!(emulate(egui::Key::Q, "us(dvorak)", false), Some('\''));
         assert_eq!(emulate(egui::Key::E, "us", true), Some('E'));
         assert_eq!(emulate(egui::Key::Space, "us(colemak_dh)", false), Some(' '));
+    }
+    #[test] fn us_ansi_outer_punctuation_fallback_has_complete_shift_layer(){
+        let cases=[
+            (egui::Key::Num1,'1','!'),(egui::Key::Num2,'2','@'),
+            (egui::Key::Num3,'3','#'),(egui::Key::Num4,'4','$'),
+            (egui::Key::Num5,'5','%'),(egui::Key::Num6,'6','^'),
+            (egui::Key::Num7,'7','&'),(egui::Key::Num8,'8','*'),
+            (egui::Key::Num9,'9','('),(egui::Key::Num0,'0',')'),
+            (egui::Key::Minus,'-','_'),(egui::Key::Equals,'=','+'),
+            (egui::Key::OpenBracket,'[','{'),
+            (egui::Key::CloseBracket,']','}'),
+            (egui::Key::Backslash,'\\','|'),(egui::Key::Backtick,'`','~'),
+            (egui::Key::Quote,'\'','"'),
+        ];
+        for (key,base,upper) in cases {
+            assert_eq!(emulate(key,"us",false),Some(base));
+            assert_eq!(emulate(key,"us",true),Some(upper));
+        }
+        for id in ["us(dvorak)","us(colemak)","es","ara"] {
+            assert_eq!(emulate(egui::Key::Num4,id,true),None);
+        }
     }
     #[test] fn unknown_layout_never_silently_emulates_us() {
         assert_eq!(emulate(egui::Key::Q, "unknown-layout", false), None);

@@ -1,7 +1,7 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
 use std::{collections::BTreeMap, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
-use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
+use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
 // A standard typing WPM unit is five extended grapheme clusters, not a
@@ -40,15 +40,6 @@ fn reference_pair_at(target:&str,position:usize)->Option<String> {
         return Some(format!("{left}{glyph}"));
     }
     None
-}
-fn extends_previous_grapheme(ch:char, typed:&str)->bool {
-    let value=ch as u32;
-    canonical_combining_class(ch)>0
-        || matches!(value,0x200D|0x20E3|0xFE0E|0xFE0F)
-        || (0x1F3FB..=0x1F3FF).contains(&value)
-        || typed.ends_with('\u{200D}')
-        || ((0x1F1E6..=0x1F1FF).contains(&value)
-            && typed.chars().last().is_some_and(|c|(0x1F1E6..=0x1F1FF).contains(&(c as u32))))
 }
 
 /// Parse a local custom passage in bounded memory; the bytes are never logged.
@@ -324,13 +315,21 @@ impl Session {
             // as committed LF. Only an expected custom hard break is typable.
             if ch=='\n' && !self.awaits_newline() {continue;}
             let cursor=grapheme_count(&self.typed);
-            // Allow a combining mark to extend the final grapheme, including
-            // when its base character arrived in a separate Text event.
-            let extension=extends_previous_grapheme(ch,&self.typed);
-            if cursor>=total && !extension {break;}
-            let position=if extension && cursor>0 {cursor-1} else {cursor};
-            let expected=self.target.graphemes(true).nth(position).unwrap_or("");
+            // Determine extension from actual Unicode grapheme boundaries,
+            // not a hand-maintained list of combining codepoints. The latter
+            // misses Hangul Jamo joining, Indic consonant conjuncts, and
+            // regional-indicator parity when text arrives across IME events.
             self.typed.push(ch);
+            let updated=grapheme_count(&self.typed);
+            if updated>total {
+                // Never accept an extra grapheme beyond the reference,
+                // including when the final grapheme is still composing.
+                self.typed.pop();
+                break;
+            }
+            let extension=cursor>0 && updated==cursor;
+            let position=if extension {cursor-1} else {cursor};
+            let expected=self.target.graphemes(true).nth(position).unwrap_or("");
             self.attempts=self.attempts.saturating_add(1);
             let actual=self.typed.graphemes(true).nth(position).unwrap_or("");
             if !canonical_prefix(expected,actual) {
@@ -541,6 +540,58 @@ mod tests {
         assert_eq!(session.state,State::Finished);
         assert_eq!(session.score().entered,1);
         assert_eq!(session.score().correct,1);
+        assert_eq!(session.mistakes,0);
+    }
+    #[test] fn hangul_jamo_arriving_across_events_join_into_nfc_syllables() {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"한글");
+        session.begin();
+        for ch in "한글".chars() {
+            session.type_text(&ch.to_string());
+        }
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.typed.graphemes(true).count(),2);
+        assert_eq!(session.attempts,6,"raw scalar keystrokes remain diagnostic");
+        assert_eq!(session.mistakes,0);
+        assert_eq!(session.score().correct,2);
+        assert_eq!(session.score().accuracy,100.0);
+    }
+    #[test] fn regional_indicator_parity_survives_three_separate_events() {
+        // First two symbols join to one flag; third begins a new cluster.
+        // The old heuristic incorrectly extended all consecutive indicators.
+        let symbols=['🇲','🇽','🇨'];
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"🇲🇽🇨");
+        session.begin();
+        session.type_text(&symbols[0].to_string());
+        assert_eq!(session.typed.graphemes(true).count(),1);
+        session.type_text(&symbols[1].to_string());
+        assert_eq!(session.typed.graphemes(true).count(),1);
+        session.type_text(&symbols[2].to_string());
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().correct,2);
+        assert_eq!(session.mistakes,0);
+        assert_eq!(session.attempts,3);
+    }
+    #[test] fn emoji_zwj_sequence_split_at_each_scalar_keeps_one_grapheme(){
+        let glyph="👩‍💻";
+        let mut session=Session::new_with_custom(0,TestMode::Custom,glyph);
+        session.begin();
+        for ch in glyph.chars() {
+            session.type_text(&ch.to_string());
+        }
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().entered,1);
+        assert_eq!(session.attempts,3);
+        assert_eq!(session.mistakes,0);
+    }
+    #[test] fn unneeded_combining_sequence_cannot_overrun_reference(){
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"e\u{301} z");
+        session.begin();
+        session.type_text("e");
+        session.type_text("\u{301}");
+        session.type_text(" ");
+        session.type_text("z");
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().correct,3);
         assert_eq!(session.mistakes,0);
     }
     #[test] fn composed_emoji_and_flags_remain_single_graphemes() {

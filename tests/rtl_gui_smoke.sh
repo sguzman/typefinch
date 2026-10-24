@@ -224,6 +224,39 @@ LUA
       exit 1
     }
     echo "Native $name reverse RTL selection PASS: selected one full cluster and retracted to anchor"
+    # Ordinary (unshifted) Arrow navigation must also skip diacritic
+    # interiors with a single physical keypress, without selecting text.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.15
+    xdotool key --clearmodifiers "$selected_direction"
+    sleep 0.3
+    plain_forward="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+print(tostring(d.selected_graphemes)..":"..tostring(d.index))
+LUA
+)"
+    [[ "$plain_forward" == "0:1" ]] || {
+      echo "Native $name plain Arrow did not advance one whole RTL grapheme: $plain_forward" >&2
+      exit 1
+    }
+    xdotool key --clearmodifiers "$reverse"
+    sleep 0.3
+    plain_reverse="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+print(tostring(d.selected_graphemes)..":"..tostring(d.index))
+LUA
+)"
+    [[ "$plain_reverse" == "0:0" ]] || {
+      echo "Native $name plain Arrow did not return to previous whole grapheme: $plain_reverse" >&2
+      exit 1
+    }
+    echo "Native $name plain Arrow grapheme navigation PASS: 0 -> 1 -> 0"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi

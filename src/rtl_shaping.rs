@@ -61,23 +61,25 @@ pub fn selection_spans(text:&str,selected:Option<(usize,usize)>,
 /// can land inside Arabic harakat, Hebrew niqqud, or joined emoji. Only
 /// Shift+Arrow selections use this helper; neither source text nor caret
 /// positioning for IME composition is rewritten.
-pub fn snap_partial_selection(text:&str,active:usize,anchor:usize,previous:usize)->Option<usize>{
-    if active==anchor || active==previous {return None;}
+/// Arrow-only movement through marked graphemes: resolve a native scalar
+/// cursor step to the next or previous *complete* extended grapheme.
+pub fn snap_moved_caret(text:&str,active:usize,previous:usize)->Option<usize>{
+    if active==previous {return None;}
     let total=text.chars().count();
-    if active>total || anchor>total || previous>total {return None;}
+    if active>total || previous>total {return None;}
     let mut start=0;
     for grapheme in text.graphemes(true) {
         let end=start+grapheme.chars().count();
         if start<active && active<end {
-            // Snap in the direction actually moved by the native cursor:
-            // increasing expands to the cluster end; decreasing retreats
-            // to its start. Comparing only to the anchor incorrectly traps
-            // reverse Shift+Arrow at an already-selected marked cluster.
             return Some(if active>previous {end} else {start});
         }
         start=end;
     }
     None
+}
+pub fn snap_partial_selection(text:&str,active:usize,anchor:usize,previous:usize)->Option<usize>{
+    if active==anchor || anchor>text.chars().count() {return None;}
+    snap_moved_caret(text,active,previous)
 }
 pub struct ShapedImage {
     pub image:egui::ColorImage,
@@ -227,6 +229,22 @@ mod tests {
         assert_eq!(snap_partial_selection(emoji,99,0,0),None);
         assert_eq!(snap_partial_selection(emoji,1,99,0),None);
         assert_eq!(snap_partial_selection("abc",1,0,0),None);
+    }
+    #[test] fn plain_arrow_navigation_skips_combining_mark_interiors(){
+        let hebrew="שָׁלוֹם";
+        assert_eq!(snap_moved_caret(hebrew,1,0),Some(3));
+        assert_eq!(snap_moved_caret(hebrew,2,3),Some(0));
+        assert_eq!(snap_moved_caret(hebrew,3,0),None);
+        assert_eq!(snap_moved_caret(hebrew,0,3),None);
+        assert_eq!(snap_moved_caret(hebrew,2,2),None);
+        let arabic="سَلَام";
+        assert_eq!(snap_moved_caret(arabic,1,0),Some(2));
+        assert_eq!(snap_moved_caret(arabic,1,2),Some(0));
+        let emoji="👩‍💻";
+        assert_eq!(snap_moved_caret(emoji,1,0),Some(3));
+        assert_eq!(snap_moved_caret(emoji,2,3),Some(0));
+        assert_eq!(snap_moved_caret(emoji,99,0),None);
+        assert_eq!(snap_moved_caret("abc",1,0),None);
     }
     #[test] fn egui_scalar_editor_caret_snaps_to_unicode_graphemes(){
         let text="שָׁלוֹם 🌍👩‍💻 سلام";

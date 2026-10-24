@@ -1271,15 +1271,20 @@ impl Typefinch {
                                 pressed:true,modifiers,repeat:false,..}
                                 if modifiers.shift && !modifiers.alt
                                     && !modifiers.command && !modifiers.ctrl)));
+                        let plain_arrow=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::Key {
+                                key:egui::Key::ArrowLeft|egui::Key::ArrowRight,
+                                pressed:true,modifiers,repeat:false,..}
+                                if !modifiers.shift && !modifiers.alt
+                                    && !modifiers.command && !modifiers.ctrl)));
                         let ime_event=ui.input(|i|i.events.iter().any(|event|
                             matches!(event,egui::Event::Ime(_))));
-                        // Capture the active endpoint *before* the native editor
-                        // handles the arrow. Moving backward should contract a
-                        // grapheme selection, not snap it back to its old end.
-                        let previous_cursor=if shift_arrow && !ime_event {
+                        // Read the native range before TextEdit consumes Arrow
+                        // input. Direction is determined from actual logical
+                        // movement, not a visual Left/Right guess under BiDi.
+                        let previous_range=if (shift_arrow || plain_arrow) && !ime_event {
                             egui::TextEdit::load_state(ui.ctx(),editor_id)
                                 .and_then(|state|state.cursor.char_range())
-                                .map(|range|range.primary.index)
                         }else{None};
                         let edit=ui.add_enabled(self.session.state!=State::Running,
                             egui::TextEdit::multiline(&mut self.custom_text)
@@ -1298,17 +1303,27 @@ impl Typefinch {
                         // Do not modify IME composition, unshifted navigation
                         // or mouse selections.
                         if edit.has_focus() {
-                            if let Some(previous_cursor)=previous_cursor {
+                            if let Some(previous_range)=previous_range {
                                 if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
                                     if let Some(mut range)=state.cursor.char_range() {
-                                        if let Some(endpoint)=rtl_shaping::snap_partial_selection(
-                                            &self.custom_text,range.primary.index,
-                                            range.secondary.index,previous_cursor) {
-                                        // Preserve the native horizontal preferred position and
-                                        // anchor rather than reconstructing CCursorRange.
-                                        range.primary=egui::text::CCursor::new(endpoint);
-                                        state.cursor.set_char_range(Some(range));
-                                        state.store(ui.ctx(),editor_id);
+                                        let endpoint=if shift_arrow {
+                                            rtl_shaping::snap_partial_selection(
+                                                &self.custom_text,range.primary.index,
+                                                range.secondary.index,previous_range.primary.index)
+                                        }else if plain_arrow
+                                            && previous_range.primary.index==previous_range.secondary.index
+                                            && range.primary.index==range.secondary.index {
+                                            rtl_shaping::snap_moved_caret(
+                                                &self.custom_text,range.primary.index,
+                                                previous_range.primary.index)
+                                        }else{None};
+                                        if let Some(endpoint)=endpoint {
+                                            // Preserve the native horizontal preferred position,
+                                            // original selection anchor, and IME ownership.
+                                            range.primary=egui::text::CCursor::new(endpoint);
+                                            if plain_arrow {range.secondary=range.primary;}
+                                            state.cursor.set_char_range(Some(range));
+                                            state.store(ui.ctx(),editor_id);
                                         }
                                     }
                                 }

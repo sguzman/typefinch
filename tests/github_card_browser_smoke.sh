@@ -53,7 +53,7 @@ grep -Fq 'data-card-loaded="550x145"' "$tmp/dom.html" || {
 # Typefinch's local resvg output. It can be visually reviewed on GitHub.
 screenshot="$PWD/typefinch-github-card-browser.png"
 timeout 65s "$browser" "${flags[@]}" --user-data-dir="$tmp/browser-screenshot" \
-  --window-size=650,300 --screenshot="$screenshot"
+  --window-size=650,300 --screenshot="$screenshot" \
   "file://$tmp/fixture.html" >"$tmp/screenshot.log" 2>>"$tmp/browser.err" || {
   echo 'GitHub card browser screenshot failed' >&2
   tail -n 25 "$tmp/browser.err" >&2 || true

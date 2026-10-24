@@ -563,7 +563,7 @@ mod tests {
         s.type_text(&malicious);
         assert!(s.typed.chars().count()<=MAX_UNEXPECTED_CLUSTER_SCALARS+1,
             "invalid marks must not accumulate forever in one grapheme");
-        assert!(s.attempts<=MAX_UNEXPECTED_CLUSTER_SCALARS+1);
+        assert!((s.attempts as usize)<=MAX_UNEXPECTED_CLUSTER_SCALARS+1);
         assert_eq!(s.state,State::Finished);
         assert_eq!(s.score().correct,0);
     }

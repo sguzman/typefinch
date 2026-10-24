@@ -106,6 +106,7 @@ jobs:
           name: typefinch-gui-smoke
           path: |
             typefinch-window.png
+            typefinch-wayland-virtual.png
             typefinch-light.png
             typefinch-dark.png
             typefinch-narrow.png

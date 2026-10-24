@@ -45,12 +45,18 @@ cat >"$XDG_CONFIG_HOME/fcitx5/config" <<'CONFIG'
 ActiveByDefault=False
 CONFIG
 fcitx5 -d >"$tmp/fcitx.log" 2>&1
+# Fcitx 5.1.x (Ubuntu 24.04) does not support remote -l. Probe its
+# documented running-state and selected-method APIs instead.
 for _ in $(seq 1 80);do
-  fcitx5-remote -l 2>/dev/null | grep -q 'pinyin' && break
+  fcitx5-remote --check >/dev/null 2>&1 && break
   sleep 0.25
 done
-fcitx5-remote -l | grep -q 'pinyin' || {
-  echo "Installed Fcitx Pinyin engine unavailable" >&2; exit 1;
+fcitx5-remote --check >/dev/null 2>&1 || {
+  echo "Fcitx5 DBus controller unavailable" >&2; exit 1;
+}
+fcitx5-remote -s pinyin
+[[ "$(fcitx5-remote -n)" == pinyin ]] || {
+  echo "Installed Pinyin engine did not become selected" >&2;exit 1;
 }
 setxkbmap -layout us
 printf '%s' '你' >"$tmp/chinese.txt"

@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 83%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 85%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
@@ -194,11 +194,11 @@
 - 📊 Statistics — `██████████ 100%`
 - 🏆 Achievements — `██████████ 100%`
 
-## 🎨 M4 — Profile card studio — `████████░░ 75%`
+## 🎨 M4 — Profile card studio — `█████████░ 94%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `████████░░ 75%`
+### 🐤 P7 — Widgets and publishing — `█████████░ 94%`
 
 - 🪄 **T701** GitHub-safe SVG card — `██████████ 100%`
   - [x] SVG generator coded — src/export.rs
@@ -213,15 +213,16 @@
   - [x] README Markdown — src/export.rs produces paired local Markdown/SVG and validates the embed; GitHub Actions 39872686067
   - [x] PNG renderer — src/export.rs resvg/tiny-skia native PNG raster at 550×205, unit test plus F9 X11 GUI and Lua PNG validation; CI 39948522387
   - [x] Privacy-aware data exports — src/export.rs, src/history.rs: entire profile's versioned JSON aggregate export; Actions 39888678045 native F7 export QA
-- 🔄 **T704** Optional GitHub profile updates — `░░░░░░░░░░ 0%`
-  - [ ] Explicit opt-in
-  - [ ] Safe credentials
-  - [ ] Offline failure handling
+- 🔄 **T704** Optional GitHub profile updates — `████████░░ 75%`
+  - [x] Explicit opt-in — src/app.rs optional collapsible public publishing panel defaults off; valid GitHub repo name, fresh explicit public-data checkbox and enabled user click required; consent resets when card or destination changes, single-flight nonblocking worker, no automatic publication. src/publish.rs mock API tests deny missing consent without any API call. CI 40052478666 full green.
+  - [x] Safe credentials — src/publish.rs uses existing authenticated GitHub CLI via fixed non-shell argv, GH_PROMPT_DISABLED=1 and bounded timeout; no tokens accepted or stored. Permissions.push verified; target restricted to fixed repository-root typefinch-profile.svg; unrelated and unverifiable remote files refused; existing owned SHA required for safe replacement. Pure mock and native CI 40052478666 green; no user account action performed.
+  - [x] Offline failure handling — src/publish.rs mocked network/auth errors fail closed, corrupt/missing/foreign existing card refused, upload failure and wrong response path not reported as confirmed success. UI has single in-flight worker and no deferred upload queue. CI 40052478666 passed unit and full native graphical suite.
+  - [ ] Real authorized GitHub publication and verified result
 
 **Feature inventory** (computed from associated task progress):
 
 - 🐤 GitHub widget — `██████████ 100%`
-- 🔄 Publishing automation — `░░░░░░░░░░ 0%`
+- 🔄 Publishing automation — `████████░░ 75%`
 
 ## 🌎 M5 — Multilingual typing — `███████░░░ 67%`
 

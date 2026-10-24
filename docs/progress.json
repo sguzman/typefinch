@@ -997,18 +997,25 @@
               "id": "T704",
               "emoji": "🔄",
               "name": "Optional GitHub profile updates",
-              "progress": 0,
+              "progress": 75,
               "checks": [
                 {
                   "text": "Explicit opt-in",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs optional collapsible public publishing panel defaults off; valid GitHub repo name, fresh explicit public-data checkbox and enabled user click required; consent resets when card or destination changes, single-flight nonblocking worker, no automatic publication. src/publish.rs mock API tests deny missing consent without any API call. CI 40052478666 full green."
                 },
                 {
                   "text": "Safe credentials",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/publish.rs uses existing authenticated GitHub CLI via fixed non-shell argv, GH_PROMPT_DISABLED=1 and bounded timeout; no tokens accepted or stored. Permissions.push verified; target restricted to fixed repository-root typefinch-profile.svg; unrelated and unverifiable remote files refused; existing owned SHA required for safe replacement. Pure mock and native CI 40052478666 green; no user account action performed."
                 },
                 {
                   "text": "Offline failure handling",
+                  "passed": true,
+                  "evidence": "src/publish.rs mocked network/auth errors fail closed, corrupt/missing/foreign existing card refused, upload failure and wrong response path not reported as confirmed success. UI has single in-flight worker and no deferred upload queue. CI 40052478666 passed unit and full native graphical suite."
+                },
+                {
+                  "text": "Real authorized GitHub publication and verified result",
                   "passed": false
                 }
               ]

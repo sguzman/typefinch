@@ -1509,6 +1509,12 @@ impl Typefinch {
                     rendered.image,egui::TextureOptions::LINEAR));
             }
             self.rtl_editor_signature=signature;
+            if self.rtl_raw_editor_open && self.rtl_editor_cursor_byte.is_some()
+                && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
+                // Machine-readable position check is synthetic-only; no text.
+                let _=crate::qa::write_rtl_editor_caret_audit(
+                    cursor_grapheme,total,first,last,self.rtl_editor_caret);
+            }
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
             ui.label(RichText::new("RTL shaped preview (read-only)").strong());

@@ -84,6 +84,21 @@ pub fn write_custom_import_audit(text:&str,count:usize)->Result<(),String>{
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
         .map_err(|e| e.to_string())
 }
+/// Synthetic, explicitly opted-in evidence of the *actual native editor*
+/// caret being projected into the separate shaped preview. No source text,
+/// profile, path, script, key identity or raw selection is recorded.
+pub fn write_rtl_editor_caret_audit(index:usize,total:usize,
+    first:usize,last:usize,caret:Option<(f32,f32)>)->Result<(),String>{
+    let Some(path)=env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT") else{return Ok(());};
+    let report=serde_json::json!({
+        "state":"rtl-editor-caret","synthetic":true,
+        "index":index,"total":total,"visible_start":first,
+        "visible_end":last,
+        "caret_positioned":caret.is_some(),
+    });
+    fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}
 #[cfg(test)]
 mod import_audit_tests {
     #[test] fn fixture_labels_distinguish_arabic_hebrew_and_mixed(){

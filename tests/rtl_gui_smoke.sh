@@ -47,6 +47,7 @@ start_app(){
   local name="$1"
   export XDG_CONFIG_HOME="$tmp/$name/config"
   export TYPEFINCH_QA_IMPORT_REPORT="$tmp/$name/import.json"
+  export TYPEFINCH_QA_EDITOR_CARET_REPORT="$tmp/$name/editor-caret.json"
   mkdir -p "$XDG_CONFIG_HOME"
   ./target/debug/typefinch >"$tmp/$name/app.log" 2>&1 &
   app_pid=$!
@@ -109,9 +110,31 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.3
     import -window "$window" "$tmp/rtl-$name-editor-start.png"
+    [[ -s "$TYPEFINCH_QA_EDITOR_CARET_REPORT" ]] || {
+      echo "Native RTL editor has no caret audit: $name" >&2;exit 1;
+    }
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-start.json"
     xdotool key --clearmodifiers ctrl+End
     sleep 0.3
     import -window "$window" "$tmp/rtl-$name-editor-end.png"
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-end.json"
+    lua5.4 - "$tmp/$name/editor-start.json" "$tmp/$name/editor-end.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"No RTL editor audit")
+  local data=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(data.synthetic==true and data.state=="rtl-editor-caret")
+  assert(data.caret_positioned and data.index>=data.visible_start
+    and data.index<=data.visible_end,"Shaped preview caret outside visible window")
+  return data
+end
+local first,last=read(assert(arg[1])),read(assert(arg[2]))
+assert(first.index==0,"Ctrl+Home did not reset the native editor cursor")
+assert(last.total==first.total and last.total>=10,"RTL editor source changed unexpectedly")
+assert(last.index==last.total,
+  "Ctrl+End did not reach the actual logical end in the shaped preview")
+print("Native RTL editor cursor audit PASS: 0 to "..last.index.." graphemes")
+LUA
     editor_delta="$(compare -metric AE "$tmp/rtl-$name-editor-start.png" "$tmp/rtl-$name-editor-end.png" null: 2>&1 || true)"
     [[ "$editor_delta" =~ ^[0-9]+$ && "$editor_delta" -gt 30 ]] || {
       echo "Native RTL source editor caret/preview did not move: $name / $editor_delta" >&2

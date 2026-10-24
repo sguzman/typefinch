@@ -1643,8 +1643,12 @@ impl Typefinch {
             ui.label(format!("{} chars · {:.1} s elapsed", score.entered, score.elapsed.as_secs_f64()));
             if self.session.duration.is_zero() {
                 ui.label("Untimed practice");
+            } else if self.session.state==State::Finished {
+                ui.label(format!("Finished in {:.1} s",score.elapsed.as_secs_f64()));
+            } else if self.session.state==State::Ready {
+                ui.label(format!("{} s test",self.session.duration.as_secs()));
             } else {
-                ui.label(format!("{:.1} s left", self.session.seconds_left()));
+                ui.label(format!("{:.1} s left",self.session.seconds_left()));
             }
         });
         ui.add(egui::ProgressBar::new(

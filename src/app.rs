@@ -1397,7 +1397,7 @@ impl Typefinch {
     /// No screenshot or entered text leaves the in-memory native widget.
     /// On render failure, the existing regular egui reference stays visible.
     fn shape_rtl_reference(&mut self,ctx:&egui::Context,width:usize,
-        first:usize,last:usize,dark:bool)->Option<egui::TextureId> {
+        first:usize,last:usize,dark:bool)->Option<(egui::TextureId,f32)> {
         if !rtl_shaping::contains_rtl(&self.session.target){return None;}
         let width=width.clamp(128,1600);
         let runs=reference_runs(&self.session.target,&self.session.typed,
@@ -1411,7 +1411,9 @@ impl Typefinch {
             };
             (run.text.clone(),color)
         }).collect::<Vec<_>>();
-        let signature=format!("{width}:{first}:{last}:{dark}:{}:{}:{}",
+        let visible=spans.iter().map(|(text,_)|text.as_str()).collect::<String>();
+        let height=rtl_shaping::preview_height(&visible,width);
+        let signature=format!("{width}:{height}:{first}:{last}:{dark}:{}:{}:{}",
             self.session.state==State::Running,self.session.target,self.session.typed);
         if signature!=self.rtl_signature || self.rtl_texture.is_none() {
             let logical_cursor=self.session.typed.graphemes(true).count()
@@ -1419,7 +1421,7 @@ impl Typefinch {
             let cursor_byte=self.session.target.graphemes(true).skip(first)
                 .take(logical_cursor).map(str::len).sum::<usize>();
             let rendered=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
-                .render_with_caret(&spans,width,102,
+                .render_with_caret(&spans,width,height,
                     (self.session.state==State::Running).then_some(cursor_byte))?;
             self.rtl_caret=rendered.caret;
             if let Some(texture)=self.rtl_texture.as_mut(){
@@ -1430,7 +1432,7 @@ impl Typefinch {
             }
             self.rtl_signature=signature;
         }
-        self.rtl_texture.as_ref().map(|texture|texture.id())
+        self.rtl_texture.as_ref().map(|texture|(texture.id(),height as f32))
     }
     /// Keep the ordinary multiline input editable, but show a separately
     /// shaped, read-only RTL preview because egui's editor does not yet
@@ -1439,12 +1441,13 @@ impl Typefinch {
         if !rtl_shaping::contains_rtl(&self.custom_text){return;}
         let preview=self.custom_text.graphemes(true).take(160).collect::<String>();
         let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
+        let height=rtl_shaping::preview_height(&preview,width);
         let dark=ui.visuals().dark_mode;
-        let signature=format!("{width}:{dark}:{preview}");
+        let signature=format!("{width}:{height}:{dark}:{preview}");
         if signature!=self.rtl_editor_signature || self.rtl_editor_texture.is_none(){
             let spans=vec![(preview,reference_ink(dark))];
             let Some(image)=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
-                .render(&spans,width,96) else {
+                .render(&spans,width,height) else {
                 ui.small("RTL preview unavailable; editable source text is preserved.");
                 return;
             };
@@ -1458,7 +1461,7 @@ impl Typefinch {
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
             ui.label(RichText::new("RTL shaped preview (read-only)").strong());
-            ui.add(egui::Image::new((texture.id(),egui::vec2(width as f32,96.0))));
+            ui.add(egui::Image::new((texture.id(),egui::vec2(width as f32,height as f32))));
             ui.small("First 160 graphemes. Edit in the field above; native RTL selection and caret behavior remain unverified.");
         }
     }
@@ -1530,11 +1533,14 @@ impl Typefinch {
             }
         ).show_percentage());
         ui.add_space(8.0);
-        let entered = self.session.typed.graphemes(true).count();
-        let total = self.session.target.graphemes(true).count();
-        let (first, last) = crate::engine::viewport(total, entered, 230);
+        let entered=self.session.typed.graphemes(true).count();
+        let total=self.session.target.graphemes(true).count();
         let dark=ui.visuals().dark_mode;
         let render_width=(ui.available_width()-36.0).floor().clamp(128.0,1600.0) as usize;
+        let capacity=if rtl_shaping::contains_rtl(&self.session.target) {
+            rtl_shaping::preview_window_limit(render_width)
+        }else{230};
+        let (first,last)=crate::engine::viewport(total,entered,capacity);
         let rtl_texture=self.shape_rtl_reference(ctx,render_width,first,last,dark);
         let job=rtl_texture.is_none().then(||reference_layout_job(
             &self.session.target,&self.session.typed,first,last,
@@ -1544,9 +1550,9 @@ impl Typefinch {
             .inner_margin(egui::Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
-                if let Some(texture)=rtl_texture {
+                if let Some((texture,height))=rtl_texture {
                     let response=ui.add(egui::Image::new((texture,
-                        egui::vec2(render_width as f32,102.0))));
+                        egui::vec2(render_width as f32,height))));
                     rtl_image_rect=Some(response.rect);
                     if self.session.state==State::Running {
                         if let Some((x,y))=self.rtl_caret {

@@ -13,6 +13,21 @@ pub fn contains_rtl(text:&str)->bool {
         0x0590..=0x08FF | 0xFB1D..=0xFDFF | 0xFE70..=0xFEFF
         | 0x10E60..=0x10E7F | 0x1EE00..=0x1EEFF))
 }
+/// Keep at most approximately four to five visual lines of reference near
+/// the current logical cursor. This prevents long RTL passages from placing
+/// the caret in a clipped texture at narrow window widths.
+pub fn preview_window_limit(width:usize)->usize {
+    (width.max(128)/14).saturating_mul(4).clamp(40,230)
+}
+/// Approximate visual row occupancy. Source text is still shaped by COSMIC,
+/// not repositioned or reversed with this conservative sizing heuristic.
+pub fn preview_height(text:&str,width:usize)->usize {
+    let columns=(width.max(128)/12).max(1);
+    let rows=text.split('\n').map(|line|{
+        line.graphemes(true).count().max(1).div_ceil(columns)
+    }).sum::<usize>().max(1);
+    rows.saturating_mul(30).saturating_add(18).clamp(102,240)
+}
 pub struct ShapedImage {
     pub image:egui::ColorImage,
     /// Visual caret origin in texture-local points/pixels; no physical
@@ -73,7 +88,9 @@ impl Renderer {
                     .map(|(_,tail)|tail.len()).unwrap_or(before.len());
                 borrowed.cursor_position(&Cursor::new(line,column))
             })
-            .filter(|(x,y)|x.is_finite() && y.is_finite());
+            .filter(|(x,y)|x.is_finite() && y.is_finite()
+                && *x>=0.0 && *y>=0.0
+                && *x<=width as f32 && *y<height as f32);
         borrowed.draw(&mut self.cache,Color::rgb(255,255,255),|x,y,w,h,color|{
             let (red,green,blue,alpha)=color.as_rgba_tuple();
             if alpha==0{return;}
@@ -116,6 +133,20 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn narrow_viewport_keeps_rtl_shaped_caret_in_bounded_frames(){
+        let wide=preview_window_limit(900);
+        let narrow=preview_window_limit(175);
+        assert!(wide>narrow);
+        assert!(wide<=230 && narrow>=40);
+        let short="שלום 123";
+        assert_eq!(preview_height(short,800),102);
+        let long="שלום ".repeat(45);
+        let wide_height=preview_height(&long,900);
+        let narrow_height=preview_height(&long,175);
+        assert!(narrow_height>=wide_height);
+        assert!(narrow_height<=240);
+        assert!(preview_height("שלום\nשלום",175)>=102);
+    }
     #[test] fn rtl_detection_uses_script_not_unrelated_cjk_or_latin_text(){
         for passage in ["سَلَام","שָׁלוֹם","English سلام","فارسی"] {
             assert!(contains_rtl(passage));

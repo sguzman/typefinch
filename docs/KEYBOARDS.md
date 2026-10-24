@@ -30,6 +30,32 @@ Acceptance: hotplug two keyboards; map both with differing layouts; verify focus
 
 [Wayland keyboard protocol](https://wayland.app/protocols/wayland) · [Hyprland devices](https://wiki.hypr.land/configuring/core/devices/) · [Hyprland keyboard-layout documentation](https://wiki.hypr.land/configuring/core/binds/keyboard-layouts/).
 
+## Nested Weston native Wayland GUI acceptance
+
+[CI 40119656114](https://github.com/sguzman/typefinch/actions/runs/40119656114)
+passed the complete native source and GUI regression suite, including
+a new **actual Wayland GUI** fixture. Disposable Xvfb virtual keyboard
+events were routed through Weston 13's X11 backend into the production
+Typefinch egui surface over Wayland. The normal keyboard-only F11 import,
+F5 start and F2 typing-focus path scored the synthetic `abc` passage
+as **3/3 correct** in about 0.6 seconds. SQLite recorded one Custom
+result with `input_mode=OS` and **`layout=os:unknown`**, since a
+standard Wayland aggregate seat does not expose the active XKB keymap.
+Neither the imported passage nor the temporary local file path was
+persisted in settings.
+
+The archived `typefinch-wayland-virtual.png` image was opened and
+visually inspected. It shows the actual completed native Wayland
+Typefinch window, correctly sized controls, green completed reference,
+a 100% progress bar and no double-scored input. The first two
+integration attempts failed solely while locating Weston's outer X11
+window. The accepted fixture finds that window by compositor PID,
+class or title before sending input, and retains diagnostics if that
+discovery fails. **This is Weston/Xvfb virtual-input acceptance only:**
+it does not establish live Hyprland compatibility, a physical keyboard
+identity, generic active-XKB-seat detection or a native IME candidate
+overlay. T001, T403 and T902 remain below 100%.
+
 ## Starter ANSI Base/Shift and offline fallback
 
 [CI 40118806315](https://github.com/sguzman/typefinch/actions/runs/40118806315)

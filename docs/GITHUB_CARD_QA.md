@@ -22,10 +22,14 @@ Acceptance layers:
    checks text visibility.
 3. Public GitHub README must reference the **checked-in SVG**, not a
    private path, external image service or dynamically generated user data.
-4. A separate browser check must confirm the SVG loads and renders at its
-   expected dimensions **from GitHub's public URL**. GitHub HTML markup or
-   successful HTTP alone does not certify an image rendered. Only after this
-   check passes can T701's "Rendered validation on GitHub" be accepted.
+4. `tests/github_card_browser_smoke.sh` fetches the public GitHub raw URL
+   at the exact commit being tested, byte-compares it to the checked-in
+   synthetic asset, then loads that URL into a real headless Chromium-family
+   browser. The test requires the browser's decoded `naturalWidth=550`
+   and `naturalHeight=145` and archives a separate browser screenshot.
+   It makes no inference from an HTTP 200 or unrendered Markdown alone.
+   T701's "Rendered validation on GitHub" can be accepted only after the
+   full workflow succeeds and the screenshot is inspected.
 
 Manual publication remains supported without an OAuth flow; the optional
 T704 automatic profile-update acceptance gates remain unimplemented.

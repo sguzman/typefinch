@@ -18,7 +18,7 @@ pub const CATALOG: &[Layout] = &[
     Layout { id:"us", name:"US QWERTY", region:"English", rows:Some(["qwertyuiop","asdfghjkl;","zxcvbnm,./"]) },
     Layout { id:"us(dvorak)", name:"Dvorak", region:"English", rows:Some(["',.pyfgcrl","aoeuidhtns",";qjkxbmwvz"]) },
     Layout { id:"us(colemak)", name:"Colemak", region:"English", rows:Some(["qwfpgjluy;","arstdhneio","zxcvbkm,./"]) },
-    Layout { id:"us(colemak_dh)", name:"Colemak-DH", region:"English", rows:Some(["qwfpbjluy;","arstgmneio","zxcdvkh,./"]) },
+    Layout { id:"us(colemak_dh)", name:"Colemak-DH", region:"English", rows:Some(["qwfpbjluy;","arstgmneio","xcdvzkh,./"]) },
     Layout { id:"us(workman)", name:"Workman", region:"English", rows:None },
     Layout { id:"us(norman)", name:"Norman", region:"English", rows:None },
     Layout { id:"us(halmak)", name:"Halmak", region:"English", rows:None },
@@ -92,8 +92,9 @@ pub fn finger_hint(key:egui::Key)->Option<&'static str> {
     let (_,col)=physical_index(key)?;
     FINGERS.get(col).copied()
 }
-/// Exact US ANSI number-row and punctuation fallback when XKB is absent.
-/// National/variant layouts must use their installed XKB layers instead.
+/// Exact shared ANSI number-row and edge punctuation for the four starter
+/// English layouts. Dvorak's remapped edges are handled separately below.
+/// No mapping is inferred for the other, recognition-only catalog entries.
 fn us_ansi_outer_key(key: egui::Key, shift: bool) -> Option<char> {
     let (base,upper)=match key {
         egui::Key::Num1=>('1','!'),egui::Key::Num2=>('2','@'),
@@ -111,13 +112,29 @@ fn us_ansi_outer_key(key: egui::Key, shift: bool) -> Option<char> {
     };
     Some(if shift {upper}else{base})
 }
+/// Dvorak rearranges these physical punctuation positions. Preserve the
+/// installed XKB base/Shift symbols in offline starter-table emulation.
+fn dvorak_outer_key(key: egui::Key, shift: bool) -> Option<char> {
+    let (base,upper)=match key {
+        egui::Key::Minus=>('[','{'),
+        egui::Key::Equals=>(']','}'),
+        egui::Key::OpenBracket=>('/','?'),
+        egui::Key::CloseBracket=>('=','+'),
+        egui::Key::Quote=>('-','_'),
+        _=>return None,
+    };
+    Some(if shift {upper}else{base})
+}
 pub fn emulate(key: egui::Key, id: &str, shift: bool) -> Option<char> {
     if key == egui::Key::Space { return Some(' '); }
     let entry=find(id)?;
     entry.rows?;
-    if id=="us" {
-        if let Some(symbol)=us_ansi_outer_key(key,shift){return Some(symbol);}
+    if id=="us(dvorak)" {
+        if let Some(symbol)=dvorak_outer_key(key,shift){return Some(symbol);}
     }
+    // The four explicit starter maps all share the US number row and
+    // non-Dvorak edge positions. Never infer this for unknown layouts.
+    if let Some(symbol)=us_ansi_outer_key(key,shift){return Some(symbol);}
     let (row, col) = physical_index(key)?;
     let mapped = find(id)?.rows?[row].chars().nth(col)?;
     Some(if shift { shifted(mapped) } else { mapped })
@@ -166,8 +183,43 @@ mod tests {
             assert_eq!(emulate(key,"us",false),Some(base));
             assert_eq!(emulate(key,"us",true),Some(upper));
         }
-        for id in ["us(dvorak)","us(colemak)","es","ara"] {
+        for id in ["us","us(dvorak)","us(colemak)","us(colemak_dh)"] {
+            assert_eq!(emulate(egui::Key::Num4,id,true),Some('$'));
+        }
+        for id in ["es","ara"] {
             assert_eq!(emulate(egui::Key::Num4,id,true),None);
+        }
+    }
+    #[test] fn all_four_starter_base_and_shift_positions_match_installed_xkb() {
+        // Exhaustive 30 letter-row + 17 outer positions + Space comparison.
+        // The installed keymap is the authority; fallback is never allowed
+        // to silently permute Colemak-DH, Dvorak punctuation, or Shift.
+        let row_keys=[
+            [egui::Key::Q,egui::Key::W,egui::Key::E,egui::Key::R,egui::Key::T,
+             egui::Key::Y,egui::Key::U,egui::Key::I,egui::Key::O,egui::Key::P],
+            [egui::Key::A,egui::Key::S,egui::Key::D,egui::Key::F,egui::Key::G,
+             egui::Key::H,egui::Key::J,egui::Key::K,egui::Key::L,egui::Key::Semicolon],
+            [egui::Key::Z,egui::Key::X,egui::Key::C,egui::Key::V,egui::Key::B,
+             egui::Key::N,egui::Key::M,egui::Key::Comma,egui::Key::Period,egui::Key::Slash],
+        ];
+        let edge=[
+            egui::Key::Backtick,egui::Key::Num1,egui::Key::Num2,
+            egui::Key::Num3,egui::Key::Num4,egui::Key::Num5,
+            egui::Key::Num6,egui::Key::Num7,egui::Key::Num8,
+            egui::Key::Num9,egui::Key::Num0,egui::Key::Minus,
+            egui::Key::Equals,egui::Key::OpenBracket,egui::Key::CloseBracket,
+            egui::Key::Quote,egui::Key::Backslash,egui::Key::Space,
+        ];
+        for id in ["us","us(dvorak)","us(colemak)","us(colemak_dh)"] {
+            let compiled=crate::xkb::Emulator::compile(id)
+                .unwrap_or_else(|_|panic!("starter XKB {id} is not installed"));
+            for shifted in [false,true] {
+                for key in row_keys.into_iter().flatten().chain(edge) {
+                    let from_xkb=compiled.translate(key,shifted);
+                    assert_eq!(emulate(key,id,shifted).map(|symbol|symbol.to_string()),
+                        from_xkb,"starter fallback differs from installed XKB for {id} {key:?} shift={shifted}");
+                }
+            }
         }
     }
     #[test] fn unknown_layout_never_silently_emulates_us() {

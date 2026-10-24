@@ -42,7 +42,7 @@ The system-input scoring surface consumes ordinary compositor `Text` events and 
 
 ## Ephemeral IME preedit and grapheme progress
 
-While a system-input session owns focus, Typefinch visibly displays the active IME candidate as **Composing (not scored)**. Repeated preedit updates replace that ephemeral preview; only final committed text changes the typing result. The preview is bounded to 64 grapheme clusters and is cleared on IME disable/commit, restart, Escape or window-focus loss. It is never saved to the settings, score history or profile export. Untimed progress uses completed Unicode extended grapheme clusters instead of scalar character count, avoiding inflated progress from decomposed accents. Dedicated tests cover large preedit data, changing Japanese/Chinese candidate behavior and composed/decomposed completion, but do not replace native IME or RTL acceptance.
+While a system-input session owns focus, Typefinch visibly displays the active IME candidate as **Composing (not scored)**. Repeated preedit updates replace that ephemeral preview; only final committed text changes the typing result. The preview is bounded to 64 grapheme clusters and 4 KiB of UTF-8 data (including unusually long combining sequences) and is cleared on IME disable/commit, restart, Escape or window-focus loss. It is never saved to the settings, score history or profile export. Untimed progress uses completed Unicode extended grapheme clusters instead of scalar character count, avoiding inflated progress from decomposed accents. Dedicated tests cover large preedit data, changing Japanese/Chinese candidate behavior and composed/decomposed completion, but do not replace native IME or RTL acceptance.
 
 ## Optional installed Unicode glyph fallbacks
 

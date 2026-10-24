@@ -46,6 +46,15 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 // Keep provisional IME text *only in memory*, bounded to the visible
 // candidate preview. Never mistake it for a committed scoring event.
 const MAX_IME_PREEDIT_GRAPHEMES:usize=64;
+const MAX_IME_PREEDIT_BYTES:usize=4096;
+fn limited_ime_preedit(text:&str)->String {
+    let mut visible=String::new();
+    for grapheme in text.graphemes(true).take(MAX_IME_PREEDIT_GRAPHEMES) {
+        if visible.len()+grapheme.len()>MAX_IME_PREEDIT_BYTES {break;}
+        visible.push_str(grapheme);
+    }
+    visible
+}
 fn score_system_committed_event(session:&mut Session,preedit:&mut String,
     event:&egui::Event)->bool {
     match event {
@@ -54,7 +63,7 @@ fn score_system_committed_event(session:&mut Session,preedit:&mut String,
             false
         },
         egui::Event::Ime(egui::ImeEvent::Preedit(text))=>{
-            *preedit=text.graphemes(true).take(MAX_IME_PREEDIT_GRAPHEMES).collect();
+            *preedit=limited_ime_preedit(text);
             false
         },
         egui::Event::Ime(egui::ImeEvent::Commit(text))=>{
@@ -2203,6 +2212,12 @@ mod palette_tests {
         assert!(!score_system_committed_event(&mut session,&mut preview,
             &egui::Event::Ime(egui::ImeEvent::Preedit(huge))));
         assert_eq!(preview.graphemes(true).count(),MAX_IME_PREEDIT_GRAPHEMES);
+        assert!(preview.len()<=MAX_IME_PREEDIT_BYTES);
+        let huge_combining=format!("e{}", "\u{301}".repeat(10_000));
+        assert!(!score_system_committed_event(&mut session,&mut preview,
+            &egui::Event::Ime(egui::ImeEvent::Preedit(huge_combining))));
+        assert!(preview.len()<=MAX_IME_PREEDIT_BYTES,
+            "one giant combining grapheme must not bypass the preview byte cap");
         assert!(session.typed.is_empty());
         assert_eq!(session.attempts,0);
         assert!(!score_system_committed_event(&mut session,&mut preview,

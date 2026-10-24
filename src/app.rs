@@ -391,6 +391,8 @@ pub struct Typefinch {
     rtl_caret:Option<(f32,f32)>,
     rtl_editor_texture:Option<egui::TextureHandle>,
     rtl_editor_signature:String,
+    rtl_editor_cursor_byte:Option<usize>,
+    rtl_editor_caret:Option<(f32,f32)>,
     rtl_raw_editor_open:bool,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
@@ -505,6 +507,7 @@ impl Typefinch {
             rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
             rtl_caret:None,
             rtl_editor_texture:None,rtl_editor_signature:String::new(),
+            rtl_editor_cursor_byte:None,rtl_editor_caret:None,
             rtl_raw_editor_open:false,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
@@ -656,6 +659,7 @@ impl Typefinch {
         self.rtl_texture=None;
         self.rtl_editor_signature.clear();
         self.rtl_editor_texture=None;
+        self.rtl_editor_caret=None;
         let input=if self.prefs.test_mode==TestMode::Lesson {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
@@ -1194,6 +1198,14 @@ impl Typefinch {
                                 .desired_width(ui.available_width())
                                 .hint_text("Edit private source text"));
                         if edit.changed(){self.rebuild_session();}
+                        self.rtl_editor_cursor_byte=if edit.has_focus(){
+                            egui::TextEdit::load_state(ui.ctx(),egui::Id::new("custom_text_editor"))
+                                .and_then(|state|state.cursor.char_range())
+                                .and_then(|range|rtl_shaping::editor_caret_byte(
+                                    &self.custom_text,range.primary.index))
+                        } else {None};
+                    } else {
+                        self.rtl_editor_cursor_byte=None;
                     }
                     self.show_rtl_editor_preview(ui);
                 } else {
@@ -1463,30 +1475,52 @@ impl Typefinch {
     /// provide fully correct mixed-script visual cursor behavior.
     fn show_rtl_editor_preview(&mut self,ui:&mut egui::Ui){
         if !rtl_shaping::contains_rtl(&self.custom_text){return;}
-        let preview=self.custom_text.graphemes(true).take(160).collect::<String>();
+        let total=self.custom_text.graphemes(true).count();
+        let cursor_grapheme=self.rtl_editor_cursor_byte.map(|byte|
+            self.custom_text.grapheme_indices(true)
+                .take_while(|(position,_)|*position<byte).count()).unwrap_or(0);
+        let (first,last)=crate::engine::viewport(total,cursor_grapheme,160);
+        let preview=self.custom_text.graphemes(true).skip(first)
+            .take(last-first).collect::<String>();
+        let skipped=self.custom_text.graphemes(true).take(first)
+            .map(str::len).sum::<usize>();
+        let local_cursor=self.rtl_editor_cursor_byte
+            .and_then(|index|index.checked_sub(skipped))
+            .filter(|index|*index<=preview.len());
         let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
         let height=rtl_shaping::preview_height(&preview,width);
         let dark=ui.visuals().dark_mode;
-        let signature=format!("{width}:{height}:{dark}:{preview}");
+        let signature=format!("{width}:{height}:{dark}:{first}:{last}:{local_cursor:?}:{preview}");
         if signature!=self.rtl_editor_signature || self.rtl_editor_texture.is_none(){
             let spans=vec![(preview,reference_ink(dark))];
-            let Some(image)=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
-                .render(&spans,width,height) else {
+            let Some(rendered)=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
+                .render_with_caret(&spans,width,height,local_cursor) else {
                 ui.small("RTL preview unavailable; editable source text is preserved.");
                 return;
             };
+            self.rtl_editor_caret=rendered.caret;
             if let Some(texture)=self.rtl_editor_texture.as_mut(){
-                texture.set(image,egui::TextureOptions::LINEAR);
+                texture.set(rendered.image,egui::TextureOptions::LINEAR);
             }else{
                 self.rtl_editor_texture=Some(ui.ctx().load_texture("typefinch-rtl-editor-preview",
-                    image,egui::TextureOptions::LINEAR));
+                    rendered.image,egui::TextureOptions::LINEAR));
             }
             self.rtl_editor_signature=signature;
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
             ui.label(RichText::new("RTL shaped preview (read-only)").strong());
-            ui.add(egui::Image::new((texture.id(),egui::vec2(width as f32,height as f32))));
-            ui.small("First 160 graphemes. Edit in the field above; native RTL selection and caret behavior remain unverified.");
+            let response=ui.add(egui::Image::new((texture.id(),
+                egui::vec2(width as f32,height as f32))));
+            if self.rtl_raw_editor_open
+                && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
+                if let Some((x,y))=self.rtl_editor_caret {
+                    let origin=response.rect.min+egui::vec2(x,y);
+                    ui.painter().line_segment([origin,origin+egui::vec2(0.0,27.0)],
+                        egui::Stroke::new(1.5,accent_ink(dark)));
+                }
+            }
+            ui.small(format!("Graphemes {}–{} of {total}. Editing stays in the native field above. Shaped caret follows its primary cursor, but native BiDi selection/IME remains unverified.",
+                first.saturating_add(1),last));
         }
     }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {

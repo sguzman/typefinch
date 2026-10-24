@@ -28,6 +28,16 @@ pub fn preview_height(text:&str,width:usize)->usize {
     }).sum::<usize>().max(1);
     rows.saturating_mul(30).saturating_add(18).clamp(102,240)
 }
+/// Map egui's scalar-character cursor into a valid UTF-8 grapheme boundary.
+/// A cursor inside Arabic marks, Hebrew niqqud, or joined emoji is snapped
+/// to the start of that cluster rather than fabricated between glyphs.
+pub fn editor_caret_byte(text:&str,char_index:usize)->Option<usize>{
+    let byte=text.char_indices().nth(char_index).map(|(offset,_)|offset)
+        .or_else(||(char_index==text.chars().count()).then_some(text.len()))?;
+    if byte==text.len(){return Some(byte);}
+    text.grapheme_indices(true).take_while(|(offset,_)|*offset<=byte)
+        .last().map(|(offset,_)|offset).or(Some(0))
+}
 pub struct ShapedImage {
     pub image:egui::ColorImage,
     /// Visual caret origin in texture-local points/pixels; no physical
@@ -133,6 +143,21 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn egui_scalar_editor_caret_snaps_to_unicode_graphemes(){
+        let text="שָׁלוֹם 🌍👩‍💻 سلام";
+        assert_eq!(editor_caret_byte(text,0),Some(0));
+        assert_eq!(editor_caret_byte(text,1),Some(0),
+            "niqqud after Hebrew base must not create a caret");
+        assert_eq!(editor_caret_byte(text,2),Some(0));
+        assert_eq!(editor_caret_byte(text,3),Some("שָׁ".len()));
+        let at_emoji=text.chars().position(|ch|ch=='👩').unwrap();
+        let start=editor_caret_byte(text,at_emoji).unwrap();
+        assert_eq!(editor_caret_byte(text,at_emoji+1),Some(start));
+        assert_eq!(editor_caret_byte(text,at_emoji+2),Some(start));
+        assert_eq!(editor_caret_byte(text,text.chars().count()),Some(text.len()));
+        assert_eq!(editor_caret_byte(text,text.chars().count()+1),None);
+        assert_eq!(editor_caret_byte("",0),Some(0));
+    }
     #[test] fn narrow_viewport_keeps_rtl_shaped_caret_in_bounded_frames(){
         let wide=preview_window_limit(900);
         let narrow=preview_window_limit(175);

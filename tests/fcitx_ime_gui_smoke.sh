@@ -17,15 +17,29 @@ tmp="$(mktemp -d)"
 app='' wm=''
 cleanup(){
   local code=$?
+  # Preserve the original test result. Fcitx5 -d owns a short-lived
+  # background daemon that may still create cache files after its exit
+  # request; deleting its XDG tree too early previously made a *passing*
+  # Pinyin commit fail at rm -rf before Anthy/Hangul could run.
+  set +e
   if ((code!=0));then
     echo "Native Fcitx ${engine} probe failed" >&2
     [[ ! -f "$tmp/fcitx.log" ]] || tail -n 90 "$tmp/fcitx.log" >&2
     [[ ! -f "$tmp/app.log" ]] || tail -n 90 "$tmp/app.log" >&2
   fi
-  [[ -z "$app" ]] || { kill "$app" 2>/dev/null || true; wait "$app" 2>/dev/null || true; }
-  [[ -z "$wm" ]] || { kill "$wm" 2>/dev/null || true; wait "$wm" 2>/dev/null || true; }
-  fcitx5-remote -e >/dev/null 2>&1 || true
-  rm -rf "$tmp"
+  [[ -z "$app" ]] || { kill "$app" 2>/dev/null; wait "$app" 2>/dev/null; }
+  [[ -z "$wm" ]] || { kill "$wm" 2>/dev/null; wait "$wm" 2>/dev/null; }
+  fcitx5-remote -e >/dev/null 2>&1
+  for _ in $(seq 1 40); do
+    fcitx5-remote --check >/dev/null 2>&1 || break
+    sleep 0.1
+  done
+  for _ in $(seq 1 5); do
+    if rm -rf "$tmp" 2>/dev/null; then exit "$code"; fi
+    sleep 0.2
+  done
+  echo "Could not remove isolated IME fixture directory after daemon exit" >&2
+  exit 1
 }
 trap cleanup EXIT
 export XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data"

@@ -241,6 +241,23 @@ physical Wayland/Hyprland sessions. The project's unrounded aggregate
 moved from 86.61% to 87.44%; the published whole-number average remains
 87% by the ledger's established rounding rule.
 
+## Mixed-script keyboard selection and visible native source hit-testing
+
+[CI 40131452479](https://github.com/sguzman/typefinch/actions/runs/40131452479)
+passed 222 Rust tests and the full native X11 GUI suite. The ordinary
+multiline source editor extended its selection from **22 to 37** logical
+graphemes with two Shift+Down events and retracted to **22** with Shift+Up.
+The separate COSMIC Text shaped preview cursor visited visual rows
+**0 → 30 → 60 pixels** while its selected-span color changed independently
+of the raw editor. All three synthetic-only screenshots were inspected:
+the Arabic-containing, Latin, and mixed Hebrew/Arabic lines remain legible
+and selection feedback follows the logical range. No text was stored.
+
+The next dedicated native X11 test also probes real mouse clicks in the
+Latin and Hebrew/Arabic paragraphs of the same disposable fixture; it
+is not accepted until its own end-to-end CI run verifies the expected
+logical indices and visually distinct shaped caret rows.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.

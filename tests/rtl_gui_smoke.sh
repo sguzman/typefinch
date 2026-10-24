@@ -352,6 +352,45 @@ LUA
       echo "Native mixed selection not visibly represented in shaped preview: $mixed_pixels" >&2
       exit 1
     }
+    # Hit-test the *actual* multiline source control with two native mouse
+    # clicks on the Latin and mixed Hebrew/Arabic paragraphs. Coordinates
+    # refer to the fixed 1060x760 disposable CI window and its text editor,
+    # never a production user desktop or a global input capture surface.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool mousemove --window "$window" 28 419 click 1
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-mouse-latin.json"
+    import -window "$window" "$tmp/rtl-mixed-mouse-latin.png"
+    xdotool mousemove --window "$window" 28 437 click 1
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-mouse-hebrew.json"
+    import -window "$window" "$tmp/rtl-mixed-mouse-hebrew.png"
+    lua5.4 - "$tmp/$name/mixed-mouse-latin.json" \
+      "$tmp/$name/mixed-mouse-hebrew.json" <<'LUA'
+local json=require("dkjson")
+local function read(file)
+  local f=assert(io.open(file,"rb"),"Missing native mixed-script mouse audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  assert(type(d.index)=="number" and type(d.caret_y_px)=="number")
+  assert(d.selected_graphemes==0,"Mouse click must not leave keyboard selection")
+  return d
+end
+local latin,hebrew=read(arg[1]),read(arg[2])
+assert(latin.total==hebrew.total and latin.total==54,
+  "Native source changed while mouse-hit-testing RTL/LTR paragraphs")
+assert(latin.index>=22 and latin.index<37 and latin.caret_y_px>=25
+  and latin.caret_y_px<55,
+  "Latin paragraph mouse click failed native logical caret hit-testing")
+assert(hebrew.index>=37 and hebrew.index<=54
+  and hebrew.caret_y_px>=55,
+  "Hebrew/Arabic paragraph mouse click failed native logical caret hit-testing")
+assert(hebrew.index>latin.index and hebrew.caret_y_px>latin.caret_y_px,
+  "Mixed-script mouse clicks did not move the shaped caret to the next paragraph")
+print("Native mixed BiDi mouse caret PASS: "..latin.index.." -> "..hebrew.index..
+  " graphemes, visual rows "..latin.caret_y_px.." -> "..hebrew.caret_y_px)
+LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
   fi

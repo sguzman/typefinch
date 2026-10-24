@@ -42,7 +42,7 @@ Layout=
 PROFILE
 cat >"$XDG_CONFIG_HOME/fcitx5/config" <<'CONFIG'
 [Behavior]
-ActiveByDefault=True
+ActiveByDefault=False
 CONFIG
 fcitx5 -d >"$tmp/fcitx.log" 2>&1
 for _ in $(seq 1 80);do
@@ -69,11 +69,15 @@ done
 xdotool windowactivate --sync "$window" 2>/dev/null || true
 xdotool windowfocus --sync "$window"
 sleep 0.45
+# Keep the source-path editor strictly Latin: enabling Pinyin before
+# importing a synthetic UTF-8 file would turn the path into IME candidates.
+fcitx5-remote -c
 xdotool key --clearmodifiers F11
 sleep 0.45
 grep -q '"test_mode": "custom"' "$XDG_CONFIG_HOME/typefinch/settings.json" || {
   echo "Custom source editor not activated" >&2;exit 1;
 }
+fcitx5-remote -c
 xdotool type --clearmodifiers --delay 35 "$tmp/chinese.txt"
 xdotool key --clearmodifiers Return
 sleep 0.55

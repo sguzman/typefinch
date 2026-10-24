@@ -121,6 +121,21 @@ LUA
     xdotool key --clearmodifiers ctrl+a
     sleep 0.35
     import -window "$window" "$tmp/rtl-$name-editor-selection.png"
+    # Compare only the shaped preview glyphs, not the egui source editor.
+    # These disposable test screenshots use a fixed 1060x760 X11 window;
+    # a changed source-field selection alone must not satisfy this check.
+    for state in end selection;do
+      convert "$tmp/rtl-$name-editor-$state.png" \
+        -crop 195x58+120+467 +repage \
+        "$tmp/$name/editor-$state-preview.png"
+    done
+    selected_pixels="$(compare -metric AE \
+      "$tmp/$name/editor-end-preview.png" \
+      "$tmp/$name/editor-selection-preview.png" null: 2>&1 || true)"
+    [[ "$selected_pixels" =~ ^[0-9]+$ && "$selected_pixels" -gt 80 ]] || {
+      echo "RTL shaped preview did not visibly highlight selection: $name ($selected_pixels)" >&2
+      exit 1
+    }
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-selection.json"
     lua5.4 - "$tmp/$name/editor-start.json" "$tmp/$name/editor-end.json" "$tmp/$name/editor-selection.json" <<'LUA'
 local json=require("dkjson")

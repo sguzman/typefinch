@@ -694,6 +694,7 @@ impl Typefinch {
             return;
         }
         let events = ctx.input(|i| i.events.clone());
+        let mut enter_scored_in_frame=false;
         for event in events {
             match event {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
@@ -710,6 +711,29 @@ impl Typefinch {
                         self.session.backspace();
                     }
                 },
+                egui::Event::Key { key: egui::Key::Enter, pressed:true, repeat:false,
+                    modifiers, .. }
+                    if !modifiers.command && !modifiers.ctrl && !modifiers.alt
+                    && self.ime_preedit.is_empty()
+                    && !self.composition.as_ref().is_some_and(|compose|
+                        compose.status()==xkbcommon::xkb::compose::Status::Composing)
+                    && self.session.awaits_newline() =>
+                {
+                    // The raw typing surface owns focus. Enter advances a
+                    // retained hard paragraph break in system and emulated
+                    // modes, but must not confirm an active IME candidate.
+                    self.session.type_text("\n");
+                    enter_scored_in_frame=true;
+                }
+                egui::Event::Text(ref text) if enter_scored_in_frame && text=="\n" => {
+                    // Some platforms also emit Text("\\n") for the Enter key.
+                    // Never consume the next reference grapheme twice.
+                    enter_scored_in_frame=false;
+                }
+                egui::Event::Ime(egui::ImeEvent::Commit(ref text))
+                    if enter_scored_in_frame && text=="\n" => {
+                    enter_scored_in_frame=false;
+                }
                 egui::Event::Key { key, physical_key, pressed: true, repeat, modifiers, .. }
                     if self.mode == Mode::Emulated && emulated_key_accepted(repeat,modifiers) =>
                 {

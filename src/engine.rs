@@ -237,15 +237,24 @@ impl Session {
     }
     pub fn new_with_settings(seconds:u64, mode:TestMode, custom:&str,
         language:Language, difficulty:WordDifficulty)->Self {
-        // Newline/whitespace are normalized to spaces so the target remains
-        // typable by the existing committed-character pipeline.
+        // Preserve meaningful hard paragraph breaks in private custom text.
+        // Collapse horizontal whitespace; normalize CRLF/CR; remove empty
+        // lines so each retained break has a typable Enter key event.
         let source = if matches!(mode, TestMode::Custom | TestMode::Lesson) {
             custom.to_owned()
         } else {
             corpus(mode,language,difficulty)
         };
-        let target = source.graphemes(true).take(4096).collect::<String>()
-            .split_whitespace().collect::<Vec<_>>().join(" ");
+        let bounded=source.graphemes(true).take(4096).collect::<String>();
+        let target=if mode==TestMode::Custom {
+            bounded.replace("\r\n","\n").replace('\r',"\n")
+                .split('\n')
+                .map(|line|line.split_whitespace().collect::<Vec<_>>().join(" "))
+                .filter(|line|!line.is_empty())
+                .collect::<Vec<_>>().join("\n")
+        } else {
+            bounded.split_whitespace().collect::<Vec<_>>().join(" ")
+        };
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
             corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),weak_graphemes:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
@@ -297,12 +306,20 @@ impl Session {
         keys.sort_by(|a,b|b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         keys
     }
+    /// Enter is a scored logical newline only when the next custom reference
+    /// grapheme is a hard break. This never treats Enter as a general shortcut
+    /// to insert unrelated control characters or launch a session.
+    pub fn awaits_newline(&self)->bool {
+        self.state==State::Running && self.target.graphemes(true)
+            .nth(grapheme_count(&self.typed))==Some("\n")
+    }
     pub fn type_text(&mut self, text: &str) {
         if self.state != State::Running { return; }
-        let single=text.chars().filter(|c|!c.is_control()).count()==1;
+        let allowed=|ch:char|!ch.is_control() || ch=='\n';
+        let single=text.chars().filter(|c|allowed(*c)).count()==1;
         if !single {self.last_key_at=None;}
         let total=grapheme_count(&self.target);
-        for ch in text.chars().filter(|c|!c.is_control()) {
+        for ch in text.chars().filter(|c|allowed(*c)) {
             let cursor=grapheme_count(&self.typed);
             // Allow a combining mark to extend the final grapheme, including
             // when its base character arrived in a separate Text event.
@@ -767,10 +784,42 @@ mod tests {
     #[test] fn custom_text_is_ephemeral_normalized_and_bounded() {
         let source = format!("  Hello,\nworld!  {} ", "x".repeat(5000));
         let session=Session::new_with_custom(60, TestMode::Custom, &source);
-        assert!(session.target.starts_with("Hello, world!"));
+        assert!(session.target.starts_with("Hello,\nworld!"));
         assert!(session.target.chars().count()<=4096);
-        assert!(!session.target.contains('\n'));
+        assert!(session.target.contains('\n'));
         assert!(Session::new_with_mode(60,TestMode::Custom).target.is_empty());
+    }
+    #[test] fn custom_multiline_enter_scoring_preserves_paragraphs_and_rejects_controls(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,
+            "  سَلَام (ABC)\r\n  שלום 42  \rEnglish XYZ\n\n");
+        assert_eq!(s.target,"سَلَام (ABC)\nשלום 42\nEnglish XYZ");
+        s.begin();
+        assert!(!s.awaits_newline());
+        s.type_text("سَلَام (ABC)");
+        assert!(s.awaits_newline());
+        s.type_text("\t\u{0}\r"); // non-newline controls never score
+        assert!(s.awaits_newline());
+        s.type_text("\n");
+        assert!(!s.awaits_newline());
+        s.type_text("שלום 42");
+        assert!(s.awaits_newline());
+        s.type_text("\nEnglish XYZ");
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.typed,s.target);
+        assert_eq!(s.score().accuracy,100.0);
+        assert_eq!(s.score().entered,s.target.graphemes(true).count());
+    }
+    #[test] fn custom_multiline_caret_enters_one_logical_newline_only(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"a\nb");
+        s.begin();
+        s.type_text("a");
+        assert!(s.awaits_newline());
+        s.type_text("\n");
+        assert_eq!(s.typed,"a\n");
+        assert!(!s.awaits_newline());
+        s.type_text("b");
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.score().correct,3);
     }
     #[test] fn viewport_follows_cursor_and_stays_in_range() {
         assert_eq!(viewport(0,0,230), (0,0));

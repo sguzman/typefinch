@@ -71,6 +71,22 @@ The scoped checks include pure engine cancellation/restart tests, emulator key-r
 
 The system-input scoring surface consumes ordinary compositor `Text` events and final `Ime(Commit(...))` results. IME candidate/preedit changes and enabling/disabling an IME are not scored; clipboard paste remains excluded. The focused typing surface requests an IME window/candidate rect when a scored OS-input session is running. Unit tests use synthetic Chinese characters to verify committed grapheme counts and that noncommit events do not inflate attempts. Candidate-window positioning is provisional, and complete native CJK IME integration, cross-script WPM benchmarking, and RTL shaping/caret tests remain separate acceptance gates. No physical-device identity is inferred from committed text.
 
+## Same-frame duplicate IME/text events
+
+In OS input mode, some platform adapters may represent one finalized string
+as both `Ime(Commit(text))` and `Text(text)` in the same egui frame.
+Typefinch now treats an immediately corresponding pair of **opposite event
+kinds with identical text** as one committed input. Two ordinary Text events,
+two separate IME commits, or a later same-string event remain independent.
+The guard is per-frame only, never depends on a timer or a physical device,
+and stores at most 16 KiB of candidate text temporarily in memory.
+It cannot infer duplicates emitted across frames or distinguish all
+compositor IME implementations. Tests cover both pair orderings in Chinese
+and Hebrew and valid repeated inputs. The complete
+[CI 40058295306](https://github.com/sguzman/typefinch/actions/runs/40058295306)
+passed those unit tests plus native virtual-X11 GUI regression; **real
+Fcitx/IBus integration remains pending**.
+
 ## Multiline private custom reference input
 
 Custom passages preserve meaningful hard paragraph boundaries after CRLF/CR

@@ -64,6 +64,23 @@ For installed XKB layouts, a fresh libxkbcommon Compose state is associated with
 
 The existing native-mode committed-text path remains unchanged. If no usable locale Compose table is installed, emulation retains its previous non-composing path rather than inventing symbols. Automated coverage exercises Spanish dead acute + e, cancellation/reset, and one-grapheme scoring ([CI run 39985958620](https://github.com/sguzman/typefinch/actions/runs/39985958620)). Actual compositor AltGr attribution, ISO/JIS, IMEs and physical keyboard acceptance are still separate gates.
 
+## Native X11 Arabic/Hebrew OS-layout integration
+
+A real X11 software-rendered GUI run under disposable Xvfb/Openbox uses
+`setxkbmap` **outside Typefinch** to choose Arabic `ara` and Hebrew
+`il` keymaps, then sends numeric X11 key-position events to Typefinch's
+ordinary **OS input** mode. [CI 40058295306](https://github.com/sguzman/typefinch/actions/runs/40058295306)
+passed both four-grapheme words with a deliberately wrong first key,
+Backspace, and a corrected final score while retaining raw mistake
+history. It also passed one synthetic mixed-language Custom passage
+with consecutive Arabic, US Latin and Hebrew layout switches: all
+13 Unicode graphemes were entered correctly, and the four archived
+frames visually demonstrate progression across differently directed
+script runs. The test-only 15-second fixture duration is explicitly
+gated and does not change the app's normal timing behavior.
+None of this attributes the input to a **physical** keyboard, measures
+true human typing speed, or verifies live Hyprland/Fcitx/IBus input.
+
 ## Layout symbol regression evidence
 
 Twenty exact XKB output expectations exercise ANSI punctuation, shifted digits, Shift/AltGr symbol levels, and non-Latin code points across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic layouts. The regression suite and existing GUI checks passed in [GitHub Actions run 39986908299](https://github.com/sguzman/typefinch/actions/runs/39986908299) (107 Rust tests). These are static installed-keymap expectations, **not** proof of compositor-level physical AltGr events, per-device event attribution, ISO/JIS geometry, or full IME correctness.

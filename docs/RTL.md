@@ -24,8 +24,10 @@ The custom-passages editor remains a regular egui multiline control so that
 its existing keyboard and clipboard editing behavior is preserved. Because
 egui's complex-script editor selection is not fully accepted, Typefinch
 additionally displays a separate, read-only COSMIC Text preview of up to
-160 graphemes. This makes the preview visually useful without pretending the
-editable caret is reliable.
+160 graphemes. When the raw editor owns focus, the preview window follows its
+primary character cursor, snaps interior Hebrew/Arabic combining marks and
+joined emoji to valid grapheme boundaries, and shows a shaped visual caret.
+**This does not replace or certify the native editable selection/IME model.**
 
 All source text, scoring and preview textures are local and in-memory.
 No keyboard hooks, telemetry, unrequested files, public statistics or
@@ -111,15 +113,52 @@ step passed in [CI 40055821789](https://github.com/sguzman/typefinch/actions/run
 These are emulated X11 input tests, **not** Fcitx/IBus composition, physical
 device attribution or production Hyprland acceptance.
 
+## Native editor-caret and mixed-layout integration
+
+[CI 40058295306](https://github.com/sguzman/typefinch/actions/runs/40058295306)
+passed the complete source and native GUI suite. A keyboard-only `Ctrl+E`
+shortcut opens the ordinary writable custom-passage editor (no new
+privileged input API). Its separate COSMIC Text preview now follows the
+native egui primary cursor and keeps up to 160 graphemes around that
+position. A synthetic-only metadata audit asserts that `Ctrl+Home`
+and `Ctrl+End` move the logical cursor **0 → 17** for the Arabic fixture
+and **0 → 15** for Hebrew, with a positioned shaped caret in the visible
+window. The source text, selection and file path are not recorded by this
+audit. Independent native screenshots were inspected: the shaped caret
+moves visibly through Arabic/Hebrew words with an ASCII numeric suffix.
+Selection within the raw egui editor is still not accepted.
+
+The same passing run actually switched the isolated **X11 OS** keyboard
+layout `ara` → `us` → `il` *during a single scored Custom session*.
+The synthetic passage contained Arabic, Latin and Hebrew characters.
+It finished at **13/13 correct graphemes**, with `input_mode=OS` in the
+disposable SQLite history. The four archived screenshots
+`rtl-native-mixed-start.png`, `rtl-native-mixed-arabic.png`,
+`rtl-native-mixed-latin.png` and `rtl-native-mixed-hebrew.png`
+were inspected. They show properly joined, bidirectionally ordered text
+and the scored progression **0 → 5 → 9 → 13**; the Hebrew image shows a
+finished, fully green passage. Earlier isolated native tests additionally
+deliberately mistyped and corrected one Arabic/Hebrew key; the final
+4/4-correct record retained one raw mistake and one Backspace correction.
+
+A real QA failure was retained as evidence: the original four-screen
+capture ran against the synthetic **2-second** timed fixture, which
+correctly stopped at 10/13 characters. A new, explicitly gated
+`TYPEFINCH_QA_DURATION_SECONDS=15` setting extends only this
+disposable screenshot fixture. All ordinary app durations and existing
+2-second deadline regression tests remain unchanged. The corrected
+CI run passed. This is **virtual X11 OS layout** and software-XKB QA,
+not physical Hyprland keyboard hardware or Fcitx/IBus integration.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.
-Real Arabic/Hebrew keyboard and IME composition, complex bidi paragraph
-selection, arrow/caret motion **inside the editable custom-text control**,
-focus changes under Hyprland, mixed punctuation and cursor overlays
-positioned under live input still need end-to-end QA. The adaptive shaped reference window addresses ordinary long RTL
+Real Arabic/Hebrew **physical** keyboard and IME composition, complete
+bidirectional selection in the editable control, focus changes under
+Hyprland, atypical punctuation and production IME cursor overlays still
+need end-to-end QA. The adaptive shaped reference window addresses ordinary long RTL
 wrapping in native X11, but atypical glyph widths, RTL/LTR paragraph changes
-and native editor-level visual caret/selection remain open.
+and native editor-level selection/IME behavior remain open.
 
 There must be no broad claim of bidirectional editing or screen-reader
 support until those paths are demonstrated. In particular, correct

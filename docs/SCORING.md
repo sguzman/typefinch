@@ -27,3 +27,11 @@ No CJK IME scoring policy or Arabic/Hebrew bidirectional caret/visual editing ac
 ## Native missed-key heatmap visibility
 
 The current session's keyboard preview paints missed reference characters with severity-aware semantic fills and displays the number of misses as text following the finger hint. This is a **reference-symbol heatmap**, not an attribution of raw physical-key events. Hover descriptions remain available. Native X11 QA creates and corrects an actual mistake, saves a screenshot of the scrolled keyboard preview, and checks a substantial number of interior error-fill pixels; color and contrast unit tests remain independent. This does not establish live Hyprland or extra-key routing.
+
+## Pause, focus, and key-repeat policy
+
+**Pausing is not supported for a scored benchmark**: Escape or window-focus loss cancels an active session rather than freezing and resuming its clock. A canceled session is not persisted. Restart creates a fresh attempt with reset text, event counts and monotonic timing. The application tests expiry before accepting the next GUI frame's text, preventing late keystrokes from extending a timed session.
+
+In **software emulation**, only a new physical-key press is eligible for scoring; egui key events marked `repeat` and Ctrl, Alt or command-modified shortcut presses are ignored. Shift remains a legitimate modifier for printable characters. In **system input mode**, the application uses compositor-provided committed text and does not claim a reliable way to identify which physical keyboard produced it or whether an OS-level text repeat was intentional. Repeated committed text is subject to ordinary passage scoring, never reclassified as independent hardware events. Clipboard paste is excluded from both scoring paths.
+
+The scoped checks include pure engine cancellation/restart tests, emulator key-repeat/modifier tests, real X11 paste suppression and competing-window focus cancellation, and timed-deadline GUI QA. They **do not prove** a universal OS keyboard autorepeat detector, hardware interception, or live Hyprland behavior.

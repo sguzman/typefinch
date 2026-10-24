@@ -39,6 +39,12 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 // Read modifier state from the *key press event*, not the frame-final
 // keyboard state. Fast synthetic chords and real quick releases may have
 // released Shift/Ctrl before the next GUI frame begins.
+// Only a fresh emulated physical-key press can add scored text. EgGui's
+// system-mode Text events are an aggregate committed stream and cannot be
+// safely labeled as physical repeat or uniquely attributed to hardware.
+fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
+    !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
+}
 fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::Modifiers> {
     events.iter().find_map(|event| match event {
         egui::Event::Key{key,pressed:true,repeat:false,modifiers,..} if *key==desired=>
@@ -555,8 +561,8 @@ impl Typefinch {
                         self.session.backspace();
                     }
                 },
-                egui::Event::Key { key, physical_key, pressed: true, repeat: false, modifiers, .. }
-                    if self.mode == Mode::Emulated && !modifiers.command && !modifiers.ctrl && !modifiers.alt =>
+                egui::Event::Key { key, physical_key, pressed: true, repeat, modifiers, .. }
+                    if self.mode == Mode::Emulated && emulated_key_accepted(repeat,modifiers) =>
                 {
                     // Crucially use the physical key, not an OS-translated logical letter.
                     // If unavailable, do not silently claim emulation works.
@@ -2083,6 +2089,18 @@ mod palette_tests {
         assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
+    }
+    #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {
+        let plain=egui::Modifiers::default();
+        assert!(emulated_key_accepted(false,plain));
+        assert!(!emulated_key_accepted(true,plain),
+            "auto-repeat cannot inflate emulated physical-key scoring");
+        assert!(emulated_key_accepted(false,egui::Modifiers{shift:true,..plain}),
+            "Shift produces a legitimate new physical key position");
+        assert!(!emulated_key_accepted(false,egui::Modifiers{ctrl:true,..plain}));
+        assert!(!emulated_key_accepted(false,egui::Modifiers{alt:true,..plain}));
+        assert!(!emulated_key_accepted(false,egui::Modifiers{command:true,..plain}));
+        assert!(!emulated_key_accepted(true,egui::Modifiers{shift:true,..plain}));
     }
     #[test] fn modified_shortcuts_preserve_keypress_modifiers_after_frame_release() {
         let held=egui::Modifiers { shift:true,..Default::default() };

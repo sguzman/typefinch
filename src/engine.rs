@@ -579,6 +579,26 @@ mod tests {
         assert!(Session::new_with_mode(30,TestMode::Numbers).target.contains("42"));
         assert!(Session::new_with_mode(30,TestMode::Punctuation).target.contains('?'));
     }
+    #[test] fn canceled_session_never_accepts_more_input_or_auto_finishes() {
+        let mut session=Session::new_with_custom(15,TestMode::Custom,"abcdefghijklmnop");
+        session.begin();
+        session.type_text("ab");
+        assert_eq!(session.state,State::Running);
+        let typed=session.typed.clone();
+        let attempts=session.attempts;
+        // This is the same cancellation state used by Escape and focus loss,
+        // deliberately NOT a pause that can later resume hidden input.
+        session.state=State::Ready;
+        session.type_text("defg");
+        session.backspace();
+        assert!(!session.tick());
+        assert_eq!(session.state,State::Ready);
+        assert_eq!(session.typed,typed);
+        assert_eq!(session.attempts,attempts);
+        session.begin();
+        assert!(session.typed.is_empty());
+        assert_eq!(session.attempts,0);
+    }
     #[test] fn timed_deadline_is_exact_and_rejects_late_input() {
         let mut s=Session::new_with_custom(2,TestMode::Custom,"abcdef");
         s.begin();

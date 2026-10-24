@@ -54,9 +54,9 @@ done
 fcitx5-remote --check >/dev/null 2>&1 || {
   echo "Fcitx5 DBus controller unavailable" >&2; exit 1;
 }
-# The controller can start before Pinyin loads. Without an app input
-# context there is no current IM to select: require the real engine-load
-# log, then select Pinyin only after Typefinch has focused its text surface.
+# The daemon has no focused input context at startup. Selecting Pinyin
+# here returns the keyboard method even if the addon is healthy. Wait
+# for its actual load and select it once the Typefinch target is focused.
 for _ in $(seq 1 80);do
   grep -q 'Loaded addon pinyin
 setxkbmap -layout us
@@ -135,7 +135,7 @@ assert(#rows==1 and rows[1].input_mode=='OS' and rows[1].test_mode=='custom'
   'Fcitx session persistence/provenance incorrect')
 print('Native XIM Fcitx5 Pinyin commit PASS: ni -> 你; 1/1 correct')
 LUA
- "$tmp/fcitx.log" 2>/dev/null && break
+ "$tmp/fcitx.log" && break
   sleep 0.25
 done
 grep -q 'Loaded addon pinyin

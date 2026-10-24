@@ -71,6 +71,8 @@ jobs:
         run: bash tests/github_card_browser_smoke.sh
       - name: Arabic and Hebrew native rendering smoke (not BiDi acceptance)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_gui_smoke.sh
+      - name: Native Arabic and Hebrew XKB emulated keypress scoring
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_input_gui_smoke.sh
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview

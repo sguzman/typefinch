@@ -19,16 +19,25 @@ fn canonical_prefix(expected:&str,entered:&str)->bool {
 fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
 /// An error belongs to the *specific* reference position where it occurred,
 /// not an arbitrary earlier occurrence of the same Unicode character.
+const MAX_DRILL_PAIR_BYTES:usize=256;
 fn reference_pair_at(target:&str,position:usize)->Option<String> {
-    let reference=target.graphemes(true).collect::<Vec<_>>();
-    let glyph=*reference.get(position)?;
-    if glyph.chars().all(char::is_whitespace) {return None;}
-    if let Some(right)=reference.get(position+1)
-        .filter(|right|!right.chars().all(char::is_whitespace)) {
+    // Scan to the specific error without allocating a vector for the whole
+    // reference on each mistaken key. Never cut a Unicode grapheme in half.
+    let mut graphemes=target.graphemes(true);
+    let previous=if position>0 {graphemes.nth(position-1)} else {None};
+    let glyph=graphemes.next()?;
+    if glyph.chars().all(char::is_whitespace) || glyph.len()>MAX_DRILL_PAIR_BYTES {
+        return None;
+    }
+    let valid_neighbor=|neighbor:&str| {
+        !neighbor.chars().all(char::is_whitespace)
+            && glyph.len()+neighbor.len()<=MAX_DRILL_PAIR_BYTES
+    };
+    if let Some(right)=graphemes.next().filter(|g|valid_neighbor(g)) {
         return Some(format!("{glyph}{right}"));
     }
-    if position>0 && !reference[position-1].chars().all(char::is_whitespace) {
-        return Some(format!("{}{glyph}",reference[position-1]));
+    if let Some(left)=previous.filter(|g|valid_neighbor(g)) {
+        return Some(format!("{left}{glyph}"));
     }
     None
 }
@@ -802,6 +811,19 @@ mod tests {
         assert_eq!(keys.last(),Some(&"h"));
         s.begin();
         assert!(s.weak_character_drill().is_none(),"new session forgets prior mistakes");
+    }
+    #[test] fn error_context_keeps_whole_emoji_clusters_and_limits_pair_bytes() {
+        let emoji="👩‍💻x";
+        assert_eq!(reference_pair_at(emoji,0).as_deref(),Some(emoji));
+        assert_eq!(reference_pair_at(emoji,1).as_deref(),Some(emoji));
+        let long_cluster=format!("e{}x","\u{301}".repeat(500));
+        assert_eq!(long_cluster.graphemes(true).count(),2);
+        assert!(reference_pair_at(&long_cluster,0).is_none(),
+            "pathological single grapheme cannot create an unbounded drill");
+        assert!(reference_pair_at(&long_cluster,1).is_none(),
+            "do not use an oversized left neighbor");
+        assert_eq!(reference_pair_at("a b",0),None);
+        assert_eq!(reference_pair_at("a b",2),None);
     }
     #[test] fn missed_pair_drill_uses_unicode_reference_neighbors() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"café niño");

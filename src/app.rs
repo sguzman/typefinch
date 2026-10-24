@@ -1282,6 +1282,9 @@ impl Typefinch {
                                     && !modifiers.command && !modifiers.ctrl)));
                         let ime_event=ui.input(|i|i.events.iter().any(|event|
                             matches!(event,egui::Event::Ime(_))));
+                        let pointer_selection=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::PointerMoved(_)
+                                | egui::Event::PointerButton{..})));
                         // Read the native range before TextEdit consumes Arrow
                         // input. Direction is determined from actual logical
                         // movement, not a visual Left/Right guess under BiDi.
@@ -1328,6 +1331,24 @@ impl Typefinch {
                                             state.cursor.set_char_range(Some(range));
                                             state.store(ui.ctx(),editor_id);
                                         }
+                                    }
+                                }
+                            }
+                        }
+                        // Native pointer dragging can select a base scalar
+                        // without its vowel marks or stop inside a joined emoji.
+                        // Normalize only actual, non-collapsed pointer ranges.
+                        // IME preedit and ordinary caret clicks are untouched.
+                        if edit.has_focus() && pointer_selection && !ime_event
+                            && !shift_arrow && !plain_arrow {
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id){
+                                if let Some(mut range)=state.cursor.char_range(){
+                                    if let Some((active,anchor))=rtl_shaping::snap_drag_selection(
+                                        &self.custom_text,range.primary.index,range.secondary.index){
+                                        range.primary=egui::text::CCursor::new(active);
+                                        range.secondary=egui::text::CCursor::new(anchor);
+                                        state.cursor.set_char_range(Some(range));
+                                        state.store(ui.ctx(),editor_id);
                                     }
                                 }
                             }

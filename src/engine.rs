@@ -1,7 +1,7 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
 use std::{collections::BTreeMap, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
-use unicode_normalization::UnicodeNormalization;
+use unicode_normalization::{UnicodeNormalization,char::canonical_combining_class};
 use unicode_segmentation::UnicodeSegmentation;
 
 // A standard typing WPM unit is five extended grapheme clusters, not a
@@ -12,9 +12,32 @@ pub const STANDARD_GRAPHEMES_PER_WORD:f64=5.0;
 /// Compare extended grapheme clusters after Unicode canonical normalization.
 pub fn canonically_equal(a:&str,b:&str)->bool {a.nfc().eq(b.nfc())}
 fn canonical_prefix(expected:&str,entered:&str)->bool {
-    let normalized=expected.nfd().collect::<String>();
-    let prefix=entered.nfd().collect::<String>();
-    normalized.starts_with(&prefix)
+    let normalized=expected.nfd().collect::<Vec<_>>();
+    let prefix=entered.nfd().collect::<Vec<_>>();
+    if normalized.starts_with(&prefix) {return true;}
+    // The canonical combining class reorders marks when a user enters
+    // a high-class mark before a later lower-class mark. A valid partial
+    // grapheme must not count as a mistake merely because normalization
+    // has reordered *expected* marks that have not all arrived yet.
+    //
+    // Only permit a strict subset of the exact marks on one starter.
+    // Once the cluster has the same scalar count, the canonical order
+    // MUST match; two equal-class marks entered in the wrong order
+    // cannot be rescued by a later addition and remain a real mistake.
+    if prefix.is_empty() || normalized.len()<=prefix.len()
+        || normalized.first()!=prefix.first()
+        || !normalized.iter().skip(1).all(|c|canonical_combining_class(*c)>0)
+        || !prefix.iter().skip(1).all(|c|canonical_combining_class(*c)>0) {
+        return false;
+    }
+    let mut missing=normalized[1..].to_vec();
+    for mark in prefix.iter().skip(1) {
+        let Some(index)=missing.iter().position(|candidate|candidate==mark) else {
+            return false;
+        };
+        missing.remove(index);
+    }
+    true
 }
 fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
 /// An error belongs to the *specific* reference position where it occurred,
@@ -530,6 +553,42 @@ mod tests {
         assert_eq!(scores.accuracy,100.0);
         assert!(canonically_equal("é","e\u{301}"));
         assert!(!canonically_equal("é","e"));
+    }
+    #[test] fn combining_marks_out_of_canonical_order_are_not_false_mistakes(){
+        // Dot-below class 220 sorts before acute class 230, even though
+        // the compositor delivered the acute first in a separate event.
+        let target="e\u{0323}\u{0301}";
+        let mut session=Session::new_with_custom(0,TestMode::Custom,target);
+        session.begin();
+        for part in ["e","\u{0301}","\u{0323}"] {
+            session.type_text(part);
+            assert_eq!(session.mistakes,0,"valid in-flight canonical marks");
+        }
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.attempts,3);
+        assert_eq!(session.score().entered,1);
+        assert_eq!(session.score().correct,1);
+        assert_eq!(session.score().accuracy,100.0);
+    }
+    #[test] fn reversed_equal_class_marks_are_still_real_errors(){
+        // Two marks in the same combining class preserve order under NFD.
+        // This sequence is not canonically equivalent and must be rejected.
+        let mut session=Session::new_with_custom(0,TestMode::Custom,
+            "e\u{0301}\u{0300}");
+        session.begin();
+        for part in ["e","\u{0300}","\u{0301}"] {session.type_text(part);}
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().correct,0);
+        assert_eq!(session.score().accuracy,0.0);
+        assert!(session.mistakes>0);
+    }
+    #[test] fn unrelated_canonical_mark_still_counts_as_error(){
+        let mut session=Session::new_with_custom(0,TestMode::Custom,
+            "e\u{0323}\u{0301}");
+        session.begin();
+        session.type_text("e");
+        session.type_text("\u{0303}");
+        assert!(session.mistakes>0);
     }
     #[test] fn accent_composition_can_arrive_in_separate_input_events() {
         let mut session=Session::new_with_custom(0,TestMode::Custom,"é");

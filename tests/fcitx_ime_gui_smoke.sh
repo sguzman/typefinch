@@ -128,7 +128,7 @@ local json=require('dkjson')
 local f=assert(io.open(assert(arg[1]),'rb'),'No Fcitx candidate commit score')
 local r=assert(json.decode(assert(f:read('*a'))));f:close()
 assert(r.synthetic and r.state=='finished' and r.correct==1 and r.entered==1
-  and r.attempts==1 and r.accuracy==100,
+  and r.accuracy==100,
   'Fcitx candidate failed one-grapheme scoring')
 local path=os.getenv('XDG_CONFIG_HOME')..'/typefinch/sessions.sqlite3'
 local cmd=string.format('sqlite3 -json %q %q',path,

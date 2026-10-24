@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 78%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 79%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 90%`
 
@@ -223,11 +223,11 @@
 - 🐤 GitHub widget — `█████████░ 92%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
-## 🌎 M5 — Multilingual typing — `█████░░░░░ 50%`
+## 🌎 M5 — Multilingual typing — `██████░░░░ 58%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `█████░░░░░ 50%`
+### 🗣️ P8 — Languages and input methods — `██████░░░░ 58%`
 
 - 🧾 **T801** Language packs and corpora — `██████████ 100%`
   - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
@@ -237,8 +237,8 @@
   - [x] Grapheme segmentation — src/engine.rs and src/app.rs: unicode-segmentation counts/display/Backspace; Actions 39896389227 (59 tests)
   - [x] Normalization rules — src/engine.rs: NFC canonical comparison, combining-accent completion; Actions 39896389227
   - [x] Regression tests — src/engine.rs: decomposed accent, joined emoji, flag and whole-grapheme Backspace regressions; Actions 39896389227
-- ㊙️ **T803** CJK IME composition — `░░░░░░░░░░ 0%`
-  - [ ] Committed text semantics
+- ㊙️ **T803** CJK IME composition — `███░░░░░░░ 33%`
+  - [x] Committed text semantics — src/app.rs score_system_committed_event accepts system-mode egui::Event::Text and ImeEvent::Commit, excludes noncommitted IME events and Paste, and advertises a focused IME candidate rectangle; synthetic 你好世界 custom passage test validates four graphemes and no scoring of enable/disable/paste. GitHub Actions 40044338842 passed 159 Rust tests including ime_commits_score_once_while_noncommitted_events_do_not plus native X11 GUI suite. No live CJK/Fcitx/IBus integration, cross-script speed policy or RTL acceptance claimed.
   - [ ] CJK integration tests
   - [ ] Speed conventions
 - 🪶 **T804** Arabic and Hebrew bidirectional input — `░░░░░░░░░░ 0%`
@@ -248,7 +248,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🌏 Languages — `███░░░░░░░ 33%`
+- 🌏 Languages — `████░░░░░░ 44%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
 ## 📦 M6 — Release quality — `██████░░░░ 58%`

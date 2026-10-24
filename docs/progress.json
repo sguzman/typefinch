@@ -1094,11 +1094,12 @@
               "id": "T803",
               "emoji": "㊙️",
               "name": "CJK IME composition",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Committed text semantics",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs score_system_committed_event accepts system-mode egui::Event::Text and ImeEvent::Commit, excludes noncommitted IME events and Paste, and advertises a focused IME candidate rectangle; synthetic 你好世界 custom passage test validates four graphemes and no scoring of enable/disable/paste. GitHub Actions 40044338842 passed 159 Rust tests including ime_commits_score_once_while_noncommitted_events_do_not plus native X11 GUI suite. No live CJK/Fcitx/IBus integration, cross-script speed policy or RTL acceptance claimed."
                 },
                 {
                   "text": "CJK integration tests",

@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `████████░░ 78%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `████████░░ 79%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
@@ -30,6 +30,8 @@ A read-only terminal inspector is also available: `typefinch --inspect-keyboards
 Native custom passage file import was verified end to end under X11: F11 opens the normal path editor, Enter imports bounded UTF-8, and the saved Custom score contains no source text or path. Symbolic-link import is rejected. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022).
 
 Native per-profile goals JSON import (F12 then Enter) and export (Shift+F12) passed [GitHub Actions 40041334789](https://github.com/sguzman/typefinch/actions/runs/40041334789), preserving profile identity and score fields.
+
+Partial system-input IME commit semantics are covered by synthetic CJK unit tests, while live CJK/RTL behavior remains unverified: see [scoring policy](docs/SCORING.md) and [CI 40044338842](https://github.com/sguzman/typefinch/actions/runs/40044338842).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 

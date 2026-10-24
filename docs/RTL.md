@@ -79,6 +79,38 @@ editable text control has a correct BiDi selection model. Pathological
 very-wide glyph clusters, mixed paragraph direction changes and native
 IME caret movement still need dedicated end-to-end testing.
 
+## Custom multiline paragraphs and scored virtual XKB input
+
+Custom passages now retain **meaningful hard line breaks** instead of flattening
+all paragraphs into spaces. CRLF and CR are normalized to LF; runs of
+horizontal whitespace are collapsed, and empty-only lines are omitted.
+An Enter keypress is scored against a retained LF only while the focused
+typing session expects that grapheme. Provisional IME candidates never count
+as Enter; a duplicate platform text event in the same frame is suppressed.
+Other control characters remain unscored. Ordinary benchmark/lesson content
+keeps its previous whitespace-normalization policy.
+
+[CI 40055443243](https://github.com/sguzman/typefinch/actions/runs/40055443243)
+passed both pure-Rust multiline normalization/scoring tests and real X11
+**F11 import → F5 start → F2 typing focus → `a`, Enter, `b`**:
+three correct graphemes were persisted once in a Custom SQLite record, with
+neither the fixture source nor file path saved to settings. The complete
+native GUI suite also passed. The independent mixed-script RTL screenshot
+`rtl-mixed-error.png` from this run was visually inspected: Arabic-base,
+English-base, and Hebrew/Arabic mixed paragraphs now appear on three
+separate lines in the active scored reference, with a red first logical
+mistake. Earlier screenshots showed an erroneously flattened single line.
+
+A second native scenario now uses **actual X11 virtual key-position events**
+routed through installed XKB Arabic (`ara`) and Hebrew (`il`) software
+emulation. It requires a complete four-grapheme logical word from each,
+rather than counting ASCII `x` as a script keystroke, and checks the
+finished score and layout/input-mode metadata in SQLite. The four-character
+key map is independently asserted in Rust. The dedicated native GUI
+step passed in [CI 40055821789](https://github.com/sguzman/typefinch/actions/runs/40055821789).
+These are emulated X11 input tests, **not** Fcitx/IBus composition, physical
+device attribution or production Hyprland acceptance.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.

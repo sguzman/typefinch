@@ -96,7 +96,7 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 
 **Earlier language and backup acceptance:** [55 passing Rust tests + native Spanish Easy session + consistent settings/SQLite snapshot](https://github.com/sguzman/typefinch/actions/runs/39895462191). Normalization, IMEs, RTL and physical Hyprland QA remain open.
 
-**RTL reference progress:** [Arabic/Hebrew shaping, visual caret and remaining IME/editor gates](docs/RTL.md). Native CI 40054099986 passed independent script-identified Arabic/Hebrew import, active-caret and incorrect-key screenshots; **full bidirectional editing and hardware input are not accepted**.
+**RTL and multiline reference progress:** [Arabic/Hebrew shaping, mixed paragraphs, scored Enter, and remaining IME/editor gates](docs/RTL.md). [CI 40055443243](https://github.com/sguzman/typefinch/actions/runs/40055443243) passed native multiline custom passage scoring and separate RTL/LTR paragraph screenshots. [CI 40055821789](https://github.com/sguzman/typefinch/actions/runs/40055821789) passed native virtual-X11 Arabic/Hebrew XKB-emulated word input and SQLite assertions. **Editable BiDi caret/selection, native IMEs, and real Hyprland hardware remain unaccepted**.
 
 **Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Complex IME and bidirectional input are not yet validated.
 

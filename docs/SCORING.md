@@ -71,6 +71,28 @@ The scoped checks include pure engine cancellation/restart tests, emulator key-r
 
 The system-input scoring surface consumes ordinary compositor `Text` events and final `Ime(Commit(...))` results. IME candidate/preedit changes and enabling/disabling an IME are not scored; clipboard paste remains excluded. The focused typing surface requests an IME window/candidate rect when a scored OS-input session is running. Unit tests use synthetic Chinese characters to verify committed grapheme counts and that noncommit events do not inflate attempts. Candidate-window positioning is provisional, and complete native CJK IME integration, cross-script WPM benchmarking, and RTL shaping/caret tests remain separate acceptance gates. No physical-device identity is inferred from committed text.
 
+## Multiline private custom reference input
+
+Custom passages preserve meaningful hard paragraph boundaries after CRLF/CR
+normalization, collapsing horizontal whitespace and dropping blank-only
+lines. The scorer treats LF as one extended grapheme. A focused Enter
+keypress commits it **only when the next expected custom reference grapheme
+is LF**; it never injects an unrelated control key into an ordinary test.
+A provisional IME candidate must not be confirmed as a scored newline.
+Duplicate Enter/Text newline representations inside one GUI frame are
+suppressed. This does not change ordinary benchmark and lesson whitespace
+normalization, and source passages remain in memory only.
+
+Native X11 import-and-scoring evidence in
+[CI 40055443243](https://github.com/sguzman/typefinch/actions/runs/40055443243)
+demonstrates `a`, Enter, `b` as three correctly scored graphemes in a
+single Custom record, without source text/path persistence. Separate
+[CI 40055821789](https://github.com/sguzman/typefinch/actions/runs/40055821789)
+tests score four Arabic and four Hebrew graphemes from virtual physical
+key-position events under installed-XKB *software emulation*. These tests do
+not establish native CJK/RTL IME acceptance, real-device identity, or live
+Wayland/Hyprland keyboard input.
+
 ## Ephemeral IME preedit and grapheme progress
 
 While a system-input session owns focus, Typefinch visibly displays the active IME candidate as **Composing (not scored)**. Repeated preedit updates replace that ephemeral preview; only final committed text changes the typing result. The preview is bounded to 64 grapheme clusters and 4 KiB of UTF-8 data (including unusually long combining sequences) and is cleared on IME disable/commit, restart, Escape or window-focus loss. It is never saved to the settings, score history or profile export. Untimed progress uses completed Unicode extended grapheme clusters instead of scalar character count, avoiding inflated progress from decomposed accents. Dedicated tests cover large preedit data, changing Japanese/Chinese candidate behavior and composed/decomposed completion, but do not replace native IME or RTL acceptance.

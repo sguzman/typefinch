@@ -191,9 +191,9 @@ elseif mode == "geometry-cycled" then
     local r=report(assert(arg[2]))
     local initial=assert(arg[3])
     local expected={
-        iso={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=4,modifiers=7,target="us"},
-        jis={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9,target="jp"},
-        split={name="ANSI main block",slots=60,unattributed=0,visual_only=0,controls=3,modifiers=9,target="us"},
+        iso={name="JIS main block",slots=66,unattributed=5,visual_only=0,controls=5,modifiers=9,target="us"},
+        jis={name="Split main block",slots=62,unattributed=0,visual_only=1,controls=4,modifiers=9,target="jp"},
+        split={name="ANSI main block",slots=61,unattributed=0,visual_only=0,controls=4,modifiers=9,target="us"},
     }
     local v=assert(expected[initial],"unknown source shape")
     assert(r.synthetic and r.state=="geometry-preview")
@@ -212,9 +212,9 @@ elseif mode == "spanish-geometry" then
     equals(r.shape,"ISO main block")
     equals(r.section,"Typing block")
     equals(r.target,"es")
-    equals(r.slots,61)
+    equals(r.slots,62)
     equals(r.unattributed,1)
-    equals(r.controls,3)
+    equals(r.controls,4)
     equals(r.modifiers,9)
     equals(r.visual_only,0)
     print("Native Spanish-XKB geometry PASS: installed Spanish target and typed dead-key preview")
@@ -222,9 +222,9 @@ elseif mode == "geometry-preview" then
     local r=report(assert(arg[2]))
     local shape=assert(arg[3])
     local expected={
-        iso={name="ISO main block",slots=61,unattributed=1,visual_only=0,controls=3,modifiers=9},
-        jis={name="JIS main block",slots=63,unattributed=5,visual_only=0,controls=4,modifiers=7},
-        split={name="Split main block",slots=61,unattributed=0,visual_only=1,controls=3,modifiers=9},
+        iso={name="ISO main block",slots=62,unattributed=1,visual_only=0,controls=4,modifiers=9},
+        jis={name="JIS main block",slots=66,unattributed=5,visual_only=0,controls=5,modifiers=9},
+        split={name="Split main block",slots=62,unattributed=0,visual_only=1,controls=4,modifiers=9},
     }
     local v=assert(expected[shape],"unknown geometry")
     assert(r.synthetic and r.state=="geometry-preview")

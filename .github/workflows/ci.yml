@@ -85,6 +85,7 @@ jobs:
             typefinch-geometry-*.png
             typefinch-reference-*.png
             typefinch-recovery.png
+            typefinch-heatmap.png
             typefinch-gui-smoke.log
             typefinch-window-manager.log
             typefinch-profile.svg

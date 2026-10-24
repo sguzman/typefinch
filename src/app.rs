@@ -1309,8 +1309,12 @@ impl Typefinch {
         if missed>0 {frame=frame.fill(key_heat_fill(missed,ui.visuals().dark_mode));}
         let cell=frame.show(ui,|ui| {
             let finger=layouts::finger_hint(key).unwrap_or("·");
+            // The miss count is legible without hovering and remains present
+            // even when a user cannot distinguish the red heatmap shades.
+            let note=if missed>0 {format!("{finger} · {missed}×")}
+                else {finger.to_string()};
             ui.add_sized([width,43.0],egui::Label::new(
-                RichText::new(format!("{value}\n{finger}")).monospace().size(13.0).color(ink)
+                RichText::new(format!("{value}\n{note}")).monospace().size(13.0).color(ink)
             ).selectable(false));
         });
         if let Some(name)=dead {
@@ -1439,7 +1443,7 @@ impl Typefinch {
                 ui.label(format!("{} · {:.0} ms average between committed keys",ch,ms));
             }
         }
-        ui.small("In-session red keycaps indicate missed attempts. Full ISO/JIS event routing, IMEs and live Hyprland verification remain separate work.");
+        ui.small("In-session heatmap: red keycaps mark missed reference characters; the count follows the finger hint as N×. No key events are attributed to a physical keyboard. Full ISO/JIS event routing, IMEs and live Hyprland verification remain separate work.");
     }
     fn show_history(&mut self, ui: &mut egui::Ui) {
         ui.heading("Typing history");

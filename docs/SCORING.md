@@ -23,3 +23,7 @@ Pastes are excluded from scored sessions. An emulation key repeat is suppressed,
 No CJK IME scoring policy or Arabic/Hebrew bidirectional caret/visual editing acceptance is implied by the shared five-grapheme convention. Those language-specific semantics remain open under the multilingual roadmap. The current application does not claim that a compositor delivers per-physical-device input events.
 
 **Verification:** `src/engine.rs` includes canonical-equivalence, corrected-speed and raw-attempt tests; native X11 deadline, paste rejection and focus cancellation are separately verified in CI.
+
+## Native missed-key heatmap visibility
+
+The current session's keyboard preview paints missed reference characters with severity-aware semantic fills and displays the number of misses as text following the finger hint. This is a **reference-symbol heatmap**, not an attribution of raw physical-key events. Hover descriptions remain available. Native X11 QA creates and corrects an actual mistake, saves a screenshot of the scrolled keyboard preview, and checks a substantial number of interior error-fill pixels; color and contrast unit tests remain independent. This does not establish live Hyprland or extra-key routing.

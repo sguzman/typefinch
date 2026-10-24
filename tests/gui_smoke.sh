@@ -16,7 +16,7 @@ cleanup() {
   if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi
   if [[ -n "$wm_pid" ]]; then kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; fi
   if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
-    for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png typefinch-recovery.png; do
+    for img in typefinch-window.png typefinch-light.png typefinch-dark.png typefinch-narrow.png typefinch-hidpi.png typefinch-recovery.png typefinch-heatmap.png; do
       if [[ -f "$tmp/$img" ]]; then cp "$tmp/$img" "$GITHUB_WORKSPACE/$img"; fi
     done
     for img in "$tmp"/typefinch-geometry-*.png "$tmp"/typefinch-reference-*.png; do
@@ -121,6 +121,30 @@ xdotool key --clearmodifiers BackSpace
 xdotool type --clearmodifiers --delay 35 "s"
 sleep 2.4
 lua5.4 tests/smoke_assert.lua correction "$tmp/report.json"
+# Capture the *actual* native keycap heatmap after a corrected mistake.
+# It must show a nonzero region painted with one of the exact semantic
+# miss fills, not merely a colorful title or a unit-test color constant.
+xdotool windowsize "$window" 1100 850
+sleep 0.5
+xdotool mousemove --window "$window" 825 590
+xdotool click --repeat 3 --delay 70 5
+sleep 0.5
+import -window "$window" "$tmp/typefinch-heatmap.png"
+[[ -s "$tmp/typefinch-heatmap.png" ]] || { echo "Missing native heatmap screenshot" >&2; exit 1; }
+# Match exact center pixels in either supported theme. ImageMagick emits
+# "N: (R,G,B) #RRGGBB ..." histogram rows, ignoring antialias edge pixels.
+heat="$(convert "$tmp/typefinch-heatmap.png" -format %c histogram:info:- |
+  awk 'toupper($0) ~ /#3B2434|#4B2335|#5B2537|#FFEBED|#FFDBDF|#FFD5DB/ {sub(/:.*/, "", $1); sum+=$1} END {print sum+0}')"
+if ((heat<80)); then
+  echo "Missed key not visibly painted in native screenshot ($heat exact error-fill pixels)" >&2
+  exit 1
+fi
+echo "Native key heatmap PASS: $heat visible error-color pixels, screenshot retained"
+
+# ImageMagick and scroll can change window focus; refocus before exports.
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.3
 xdotool key --clearmodifiers F6
 svg="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.svg"
 md="$XDG_CONFIG_HOME/typefinch/exports/typefinch-profile.md"

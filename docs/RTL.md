@@ -226,9 +226,20 @@ the first and last paragraph respectively, without text loss or a
 selection. This is **specific X11 input evidence**, not proof of arbitrary
 mixed-direction mouse hit-testing or physical Wayland correctness.
 
-T804 remains incomplete: arbitrary native BiDi selection/range motion,
-candidate overlays, hardware focus changes and full IME interaction are
-still unaccepted.
+[CI 40130276882](https://github.com/sguzman/typefinch/actions/runs/40130276882)
+also accepted ordinary **unshifted** Arrow navigation. The run passed
+222 Rust tests and the native GUI suite. One arrow advances through the
+entire first marked Arabic/Hebrew grapheme, and the opposite arrow returns
+to the anchor, without a selection (0→1→0 in both languages). The native
+IME, shortcut, mouse-selection and text contents are not rewritten by this
+endpoint adjustment.
+
+T804 **Shaping and caret** advances to accepted for these X11
+reference/editor pathways, while **RTL tests** remain unaccepted for
+arbitrary mixed-run editing, candidate overlays, hardware focus, and
+physical Wayland/Hyprland sessions. The project's unrounded aggregate
+moved from 86.61% to 87.44%; the published whole-number average remains
+87% by the ledger's established rounding rule.
 
 ## Unaccepted scope
 

@@ -1126,11 +1126,12 @@
               "id": "T804",
               "emoji": "🪶",
               "name": "Arabic and Hebrew bidirectional input",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Shaping and caret",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/rtl_shaping.rs COSMIC Text/OpenType/BiDi shaping and caret rendering; src/app.rs projects actual editable egui RTL source cursor into separate shaped preview. GitHub Actions 40129044449 passed 221 Rust tests and real X11 Arabic/Hebrew first marked grapheme selection, plus mixed Arabic/Latin/Hebrew source editor Ctrl+Home/End caret movement across a 60-pixel visual row; archived screenshots were inspected. Actions 40129503350 confirmed reverse Shift+Arrow retracts selected whole grapheme to anchor. Actions 40130276882 passed 222 Rust tests and complete native X11 GUI suite; unshifted Arrow moves the logical caret one complete Arabic/Hebrew grapheme forward and back (0→1→0) with no selection. Accepts shaping/caret for tested X11 paths only; full native BiDi mouse hit-testing, arbitrary editing, live Wayland/IME and physical Hyprland remain unaccepted."
                 },
                 {
                   "text": "Error highlighting",

@@ -224,11 +224,11 @@
 - 🐤 GitHub widget — `██████████ 100%`
 - 🔄 Publishing automation — `████████░░ 75%`
 
-## 🌎 M5 — Multilingual typing — `████████░░ 83%`
+## 🌎 M5 — Multilingual typing — `█████████░ 92%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `████████░░ 83%`
+### 🗣️ P8 — Languages and input methods — `█████████░ 92%`
 
 - 🧾 **T801** Language packs and corpora — `██████████ 100%`
   - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
@@ -242,14 +242,14 @@
   - [x] Committed text semantics — src/app.rs score_system_committed_event accepts system-mode egui::Event::Text and ImeEvent::Commit, excludes noncommitted IME events and Paste, and advertises a focused IME candidate rectangle; synthetic 你好世界 custom passage test validates four graphemes and no scoring of enable/disable/paste. GitHub Actions 40044338842 passed 159 Rust tests including ime_commits_score_once_while_noncommitted_events_do_not plus native X11 GUI suite. No live CJK/Fcitx/IBus integration, cross-script speed policy or RTL acceptance claimed.
   - [x] CJK integration tests — tests/fcitx_ime_gui_smoke.sh and .github/workflows/ime-probe.yml; GitHub Actions 40126249778: actual Fcitx5 Pinyin, Anthy, and Hangul X11/XIM sessions under isolated Xvfb/DBus passed one committed grapheme each (你, あ, 한) with zero premature preedit completion, 1/1 final score, exactly one attempt in SQLite, input_mode=OS and no passage/path persistence. This accepts CJK integration for three engines in virtual X11 only, not live Hyprland/Wayland, IBus, candidate-overlay positioning on hardware or all IMEs.
   - [x] Speed conventions — src/engine.rs Score.cpm counts correctly matched final Unicode grapheme clusters per elapsed minute, independently of raw IME keystrokes; tests cover corrected Chinese, Japanese kana, Korean Hangul, canonical accents and zero-duration bounds. src/app.rs displays corrected CPM separately from standardized WPM; docs/SCORING.md explicitly rejects cross-language equivalence and physical-key attribution. GitHub Actions 40048186051 passed 174 Rust tests and the complete native X11 graphical/compositor suite. Actual Fcitx/IBus CJK integration and RTL acceptance remain open.
-- 🪶 **T804** Arabic and Hebrew bidirectional input — `███░░░░░░░ 33%`
-  - [ ] Shaping and caret
+- 🪶 **T804** Arabic and Hebrew bidirectional input — `███████░░░ 67%`
+  - [x] Shaping and caret — src/rtl_shaping.rs COSMIC Text/OpenType/BiDi shaping and caret rendering; src/app.rs projects actual editable egui RTL source cursor into separate shaped preview. GitHub Actions 40129044449 passed 221 Rust tests and real X11 Arabic/Hebrew first marked grapheme selection, plus mixed Arabic/Latin/Hebrew source editor Ctrl+Home/End caret movement across a 60-pixel visual row; archived screenshots were inspected. Actions 40129503350 confirmed reverse Shift+Arrow retracts selected whole grapheme to anchor. Actions 40130276882 passed 222 Rust tests and complete native X11 GUI suite; unshifted Arrow moves the logical caret one complete Arabic/Hebrew grapheme forward and back (0→1→0) with no selection. Accepts shaping/caret for tested X11 paths only; full native BiDi mouse hit-testing, arbitrary editing, live Wayland/IME and physical Hyprland remain unaccepted.
   - [x] Error highlighting — src/app.rs logical reference_runs and RTL shape_rtl_reference; src/rtl_shaping.rs COSMIC Text bidi/OpenType raster maintains feedback colors and visual caret mapping. CI 40054099986: 193 Rust tests, complete native X11 suite, separate disposable Arabic and Hebrew app/config instances with synthetic script-identity/grapheme audit, real F5/F2 running-caret and incorrect-ASCII-key highlight screenshots. Archived rtl-arabic-error.png and rtl-hebrew-error.png visually inspected: correct script-specific right-to-left reference, first mistaken logical glyph red and caret visibly separate; no real RTL keyboard input or Fcitx/IBus/Hyprland acceptance. Earlier fixture falsely reused Arabic on Hebrew and was rejected before this isolated rerun.
   - [ ] RTL tests
 
 **Feature inventory** (computed from associated task progress):
 
-- 🌏 Languages — `████████░░ 78%`
+- 🌏 Languages — `█████████░ 89%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
 ## 📦 M6 — Release quality — `████████░░ 75%`

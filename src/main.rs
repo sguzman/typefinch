@@ -16,6 +16,7 @@ mod geometry;
 mod lesson;
 mod preferences;
 mod publish;
+mod rtl_shaping;
 mod registry;
 mod qa;
 mod xkb;

@@ -6,7 +6,7 @@
 
 **Project color:** `#8696F5` · `oklch(70.123% 0.14003 274.97)` ([decision](docs/COLOR.md)). **Theme:** System by default, or explicit ☀ Light / 🌙 Dark.
 
-> **Early development preview:** not yet a validated MVP. Code is committed, but compilation, native input behavior and real Hyprland QA must pass before claiming readiness.
+> **Development preview, not an accepted MVP:** CI builds and tests the application under native X11, but real Hyprland hardware, physical keyboard attribution, complete IME/RTL input, and release acceptance remain open.
 
 ## Currently implemented in source
 
@@ -19,7 +19,7 @@
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `████████░░ 79%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `████████░░ 80%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
@@ -70,7 +70,7 @@ Five starter lessons (home row, top row, bottom row, common pairs, symbols) run 
 
 **Private custom text import:** While Custom text is selected, drag a local UTF-8 text/Markdown file onto the window. Imports are bounded at 64 KiB, retain at most 4,096 characters in memory and are discarded on exit. Importing never logs or persists the passage.
 
-**Adaptive practice preview:** After a session with mistakes, choose **Practice missed keys** to start a generated custom drill concentrating on frequently missed reference characters. The drill is deterministic for that session, remains in memory, and does not affect benchmark records. Historical per-key statistics and adaptive efficacy evaluation remain future work.
+**Adaptive practice preview:** After a session with mistakes, choose **Practice missed keys** to start a deterministic custom drill of up to eight missed reference characters. The most frequently missed character gets eight repetitions; other characters get two to eight in proportion to their miss counts. The temporary drill resets with a new session and does not affect benchmark records. This is a tested practice-allocation heuristic, **not evidence that training improves real typing proficiency**. Historical per-key statistics and human training-efficacy evaluation remain open.
 
 **Finger-position guide:** The layout preview now includes conventional ANSI left/right finger labels by physical key position, independent of its selected XKB symbol map. These are hints, not personalized ergonomic guidance or a replacement for future per-key heatmaps.
 
@@ -78,9 +78,9 @@ The ANSI keycap preview now highlights mistakes from the current session in red 
 
 ## 🌎 Language foundation
 
-Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. This does not yet mean fully localized quotes, lesson curricula, Unicode grapheme normalization, AltGr/Compose, or IME certification. The OS-input mode is recommended for accented Spanish characters.
+Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. Canonical Unicode grapheme scoring is implemented and tested; complete localized academy lessons, native IME/RTL integration, and full AltGr/Compose hardware validation remain open. The OS-input mode is recommended for accented Spanish characters.
 
-**Language safety:** English benchmark IDs remain unchanged for existing histories; Mexican Spanish benchmark modes use distinct `/es-MX` identifiers. Spanish word, quote, punctuation and paragraph passages are original project text. Numbers are shared across languages but tracked under separate test contexts. English-only starter lessons and user-provided custom text are not translated automatically. Unicode grapheme normalization and complex input methods remain unverified.
+**Language safety:** English benchmark IDs remain unchanged for existing histories; Mexican Spanish benchmark modes use distinct `/es-MX` identifiers. Spanish word, quote, punctuation and paragraph passages are original project text. Numbers are shared across languages but tracked under separate test contexts. English-only starter lessons and user-provided custom text are not translated automatically. Canonical Unicode normalization is tested; real CJK IME composition, RTL layout, and physical keyboard routing remain unverified.
 
 **Word difficulty tiers:** English and Mexican Spanish Words tests support Easy, Standard and Challenge starter word lists. Standard preserves existing history IDs; alternative tiers receive their own context labels. These are transparent heuristic groupings, not validated proficiency ratings.
 

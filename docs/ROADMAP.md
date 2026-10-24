@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 79%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 80%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 90%`
 
@@ -251,11 +251,11 @@
 - 🌏 Languages — `████░░░░░░ 44%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
-## 📦 M6 — Release quality — `██████░░░░ 58%`
+## 📦 M6 — Release quality — `███████░░░ 67%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `██████░░░░ 58%`
+### 🧪 P9 — Acceptance and release — `███████░░░ 67%`
 
 - 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
@@ -265,10 +265,10 @@
   - [x] Headless run — Xvfb + Openbox + Mesa launched native egui app, typed 33 chars and captured screenshot; Actions 39870050679
   - [ ] Keyboard/input QA
   - [ ] Theme/layout screenshots
-- ♿ **T903** Accessibility review — `███░░░░░░░ 33%`
+- ♿ **T903** Accessibility review — `███████░░░ 67%`
   - [ ] Keyboard-only audit
   - [x] Contrast/reduced motion — src/app.rs: WCAG-oriented contrast palette tests and reduce-motion timing tests; native light/dark screenshot QA, Actions 39967868689
-  - [ ] Unicode fonts
+  - [x] Unicode fonts — src/fonts.rs: read-only installed system Noto CJK/Arabic/Hebrew fallbacks with size/type guards and egui font glyph coverage; GitHub Actions 40046042312 green, including dedicated TYPEFINCH_QA_UNICODE_FONTS test, compilation and full X11 QA. Glyph availability only: native shaping, RTL caret, and real IME acceptance remain open.
 - 🚀 **T904** Reproducible Linux release — `███████░░░ 67%`
   - [x] Versioned packages — GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal
   - [x] Install/rollback tests — GitHub Actions 39958743350: optimized Linux x86_64 build, deterministic allowlisted tar.gz + SHA-256, install/upgrade/rollback and unmanaged-executable refusal
@@ -277,5 +277,5 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🧪 Automated QA — `███████░░░ 67%`
-- 🚀 Release readiness — `█████░░░░░ 50%`
+- 🚀 Release readiness — `███████░░░ 67%`
 

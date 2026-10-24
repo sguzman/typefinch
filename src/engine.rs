@@ -312,11 +312,16 @@ impl Session {
     pub fn weak_character_drill(&self)->Option<String> {
         let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
         candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        // More frequent misses deserve more practice, but one difficult key
+        // must never create an unbounded lesson. Keep the existing eight-key
+        // cap and use between two and eight repetitions per selected key.
+        let largest=u64::from(candidates.first()?.1);
         let mut syllables=Vec::new();
-        for (ch,_) in candidates.into_iter().take(8) {
-            for _ in 0..8 {syllables.push(ch.to_string());}
+        for (ch,misses) in candidates.into_iter().take(8) {
+            let count=((u64::from(misses)*8+largest/2)/largest).clamp(2,8);
+            for _ in 0..count {syllables.push(ch.to_string());}
         }
-        if syllables.is_empty() {None} else {Some(syllables.join(" "))}
+        Some(syllables.join(" "))
     }
     pub fn backspace(&mut self) {
         if self.state!=State::Running {return;}
@@ -731,6 +736,36 @@ mod tests {
         s.begin();
         assert!(s.weak_character_drill().is_none());
         assert_eq!(s.missed_character_count('c'),0);
+    }
+    #[test] fn weighted_drill_exposes_frequent_misses_more_often() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"aaaab");
+        s.begin();
+        for _ in 0..4 {
+            s.type_text("x");
+            s.backspace();
+        }
+        s.type_text("aaaa");
+        s.type_text("x");
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.missed_character_count('a'),4);
+        assert_eq!(s.missed_character_count('b'),1);
+        let expected=std::iter::repeat_n("a",8)
+            .chain(std::iter::repeat_n("b",2)).collect::<Vec<_>>().join(" ");
+        assert_eq!(s.weak_character_drill().as_deref(),Some(expected.as_str()));
+        assert!(!expected.contains("x"),"wrongly typed characters are not drill references");
+    }
+    #[test] fn weighted_drill_is_bounded_to_eight_missed_references() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"abcdefghi");
+        s.begin();
+        s.type_text("xxxxxxxxx");
+        let drill=s.weak_character_drill().unwrap();
+        let keys=drill.split_whitespace().collect::<Vec<_>>();
+        assert_eq!(keys.len(),64,"at most eight keys, eight repetitions each");
+        assert!(keys.iter().all(|key|*key!="i"),"ninth key excluded deterministically");
+        assert_eq!(keys.first(),Some(&"a"));
+        assert_eq!(keys.last(),Some(&"h"));
+        s.begin();
+        assert!(s.weak_character_drill().is_none(),"new session forgets prior mistakes");
     }
     #[test] fn raw_metrics_preserve_corrected_mistakes() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");

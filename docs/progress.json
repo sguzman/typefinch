@@ -1212,7 +1212,7 @@
               "id": "T903",
               "emoji": "♿",
               "name": "Accessibility review",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Keyboard-only audit",
@@ -1225,7 +1225,8 @@
                 },
                 {
                   "text": "Unicode fonts",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/fonts.rs: read-only installed system Noto CJK/Arabic/Hebrew fallbacks with size/type guards and egui font glyph coverage; GitHub Actions 40046042312 green, including dedicated TYPEFINCH_QA_UNICODE_FONTS test, compilation and full X11 QA. Glyph availability only: native shaping, RTL caret, and real IME acceptance remain open."
                 }
               ]
             },

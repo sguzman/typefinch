@@ -15,7 +15,7 @@ Legacy English session identifiers remain `words`, `quotes`, `punctuation`, `par
 Comparison graphs match layout, input mode, content type plus language, duration, and scoring version. Dashboard high-water marks are still profile-wide benchmarks, not per-language records; they are displayed as overall records. Future leaderboard and publishing features must not present these as language-specific.
 
 ## Known limitations
-The engine compares Unicode scalar positions rather than grapheme clusters, and cannot yet certify canonically equivalent composed/decomposed strings, complex IME commit behavior, shaping, or RTL rendering. Spanish passages are intended for basic committed-text entry; no claim of complete Unicode correctness. Add grapheme segmentation, normalization and IME integration tests before marking multilingual support complete.
+The engine compares canonically normalized Unicode extended grapheme clusters (scoring version 2), including composed/decomposed equivalents and whole-grapheme Backspace. Synthetic CJK committed-text and IME preedit tests exist, and CI verifies installed fallback fonts for representative CJK, Arabic and Hebrew glyphs. None of these establish live Fcitx/IBus composition, bidirectional shaping/caret correctness, or complete Unicode coverage. Spanish passages are intended for basic committed-text entry; retain native IME and RTL acceptance gates.
 
 ## Future corpus governance
 Store future corpora as independently versioned, attributed, redistributable data assets, with provenance/license metadata, difficulty annotations, and language-specific speed conventions. Do not claim a comprehensive language corpus from the small initial phrase set.

@@ -4,7 +4,7 @@
 
 **Overall:** `████████░░ 78%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████████░ 88%`
+## 🐣 M0 — Native typing MVP — `█████████░ 90%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -44,7 +44,7 @@
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
   - [x] Native GUI goal import/export interaction and persistence — src/app.rs F12 keyboard focus to ordinary goal-import path, Enter validated import, and Shift+F12 explicit JSON export; tests/goals_gui_smoke.sh and tests/goals_gui_assert.lua exercise real native X11 egui interactions, versioned goal transfer, private on-disk settings and unchanged profile identity/test/score fields. GitHub Actions 40041334789: 155 Rust tests, goal imported/exported PASS, custom passage and full GUI QA passed. Not physical Hyprland acceptance.
 
-### ⌨️ P2 — Tests and core scoring — `█████████░ 90%`
+### ⌨️ P2 — Tests and core scoring — `██████████ 95%`
 
 - ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
   - [x] Input handlers implemented — src/app.rs
@@ -68,15 +68,15 @@
   - [x] Editable private custom passages — src/app.rs, src/engine.rs: in-memory custom editor and bounded text; Actions 39873831520 and 39880764327
   - [x] Bounded local UTF-8 file import into custom passages — src/engine.rs and src/app.rs: explicit Load local file and drag/drop into in-memory custom passage, 64 KiB/4096 grapheme cap, rejects symlinks/devices/controls and invalid UTF-8; Unicode ZWJ cluster and file fixture QA in CI 40025534946, 141 Rust tests and graphical suite pass
   - [x] Native GUI local-file import interaction and isolation — src/app.rs F11 keyboard navigation and normal local file-path importer; tests/gui_import_smoke.sh plus tests/smoke_assert.lua use real X11 egui focus, Enter and F5/F2 scoring in disposable profiles. CI 40040560022: 155 Rust tests and native GUI suite passed; Custom session 16/16 correct, no passage/path in persisted settings, independent symlink attempt produced no scored record. No live Hyprland or physical-device attribution implied.
-- 🧮 **T205** Scoring taxonomy and fair comparisons — `████████░░ 75%`
+- 🧮 **T205** Scoring taxonomy and fair comparisons — `██████████ 100%`
   - [x] Raw vs corrected WPM — src/engine.rs, src/history.rs: raw WPM, attempts and corrected metrics; Actions 39880764327 X11 corrected-error QA
   - [x] Per-language speed definitions — docs/SCORING.md and src/engine.rs: both supported languages use five correctly matched extended grapheme clusters per standardized corrected WPM unit, with explicit comparability limits; test english_and_mexican_spanish_share_explicit_five_grapheme_wpm_units and native X11 QA green in GitHub Actions 40039799888. No CJK/RTL equivalence or active keyboard attribution claimed.
-  - [ ] Pause/focus/repeat rules
+  - [x] Pause/focus/repeat rules — src/app.rs emulated_key_accepted and src/engine.rs canceled-session state semantics; docs/SCORING.md explicitly defines no pause/resume for benchmarks, Escape/focus loss cancellation, fresh restarts, emulated key-repeat and Ctrl/Alt/command filtering, Shift, and honest system committed-text limits. GitHub Actions 40043811020 passed 158 Rust tests including dedicated cancellation/restart and repeat/modifier regressions, native X11 two-window focus cancellation, paste exclusion, exact timed boundary, goal/custom import, heatmap and full graphical QA. No universal physical-repeat detection claimed.
   - [x] Anti-cheat tests — Real X11 Ctrl+V injection excluded from scored session; GitHub Actions 39872686067
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `█████████░ 90%`
+- ⌨️ Typing tests — `██████████ 95%`
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `████████░░ 81%`
 

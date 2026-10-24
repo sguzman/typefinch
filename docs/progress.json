@@ -320,7 +320,7 @@
               "id": "T205",
               "emoji": "🧮",
               "name": "Scoring taxonomy and fair comparisons",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Raw vs corrected WPM",
@@ -334,7 +334,8 @@
                 },
                 {
                   "text": "Pause/focus/repeat rules",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs emulated_key_accepted and src/engine.rs canceled-session state semantics; docs/SCORING.md explicitly defines no pause/resume for benchmarks, Escape/focus loss cancellation, fresh restarts, emulated key-repeat and Ctrl/Alt/command filtering, Shift, and honest system committed-text limits. GitHub Actions 40043811020 passed 158 Rust tests including dedicated cancellation/restart and repeat/modifier regressions, native X11 two-window focus cancellation, paste exclusion, exact timed boundary, goal/custom import, heatmap and full graphical QA. No universal physical-repeat detection claimed."
                 },
                 {
                   "text": "Anti-cheat tests",

@@ -59,15 +59,35 @@ privileged input-monitoring APIs are involved.
   These results are **not** live RTL keyboard typing, compositor IME,
   editor-selection or physical Hyprland acceptance.
 
+## Responsive wrapping evidence
+
+CI [40054677101](https://github.com/sguzman/typefinch/actions/runs/40054677101)
+passed the complete native regression suite with a third, independently
+imported long Hebrew fixture. `src/rtl_shaping.rs` bounds the grapheme
+reference window to the available width and varies the transparent texture
+height with estimated line occupancy. The native image
+`rtl-hebrew-long-error.png` was inspected: connected Hebrew words wrap
+into four right-to-left lines, the first logical error is red, the shaped
+caret remains visible and the UI reports the bounded reference window
+(1–184 of 247 graphemes). The read-only editor preview likewise wraps;
+the sidebar itself remains scrollable. The renderer caps image dimensions
+and never reverses the source passage.
+
+This is **bounded, cursor-centered visual pagination**, not a promise that
+all reference characters appear simultaneously or that the multiline
+editable text control has a correct BiDi selection model. Pathological
+very-wide glyph clusters, mixed paragraph direction changes and native
+IME caret movement still need dedicated end-to-end testing.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.
 Real Arabic/Hebrew keyboard and IME composition, complex bidi paragraph
 selection, arrow/caret motion **inside the editable custom-text control**,
 focus changes under Hyprland, mixed punctuation and cursor overlays
-positioned under live input still need end-to-end QA. The fixed-size shaped
-reference texture may also clip long wrapped passages and needs a responsive
-multi-line acceptance pass.
+positioned under live input still need end-to-end QA. The adaptive shaped reference window addresses ordinary long RTL
+wrapping in native X11, but atypical glyph widths, RTL/LTR paragraph changes
+and native editor-level visual caret/selection remain open.
 
 There must be no broad claim of bidirectional editing or screen-reader
 support until those paths are demonstrated. In particular, correct

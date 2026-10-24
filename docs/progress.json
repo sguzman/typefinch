@@ -842,7 +842,7 @@
               "id": "T603",
               "emoji": "🔥",
               "name": "Key timing and error heatmaps",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Event recording",
@@ -856,7 +856,8 @@
                 },
                 {
                   "text": "Visual heatmaps",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs visual severity heatmap with text miss count on each keycap, plus key_heat_fill light/dark contrast tests; tests/gui_smoke.sh renders a real corrected-error session, captures typefinch-heatmap.png, and counts 3731 native X11 screenshot pixels painted with semantic miss colors. GitHub Actions 40043194648 passed 156 Rust tests, full GUI QA, and native heatmap screenshot verification. Reference-symbol feedback only, not physical-device attribution or live Hyprland hardware."
                 }
               ]
             },

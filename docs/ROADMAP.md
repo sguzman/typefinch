@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 77%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 78%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 88%`
 
@@ -166,11 +166,11 @@
 - 🎓 Structured curriculum — `██████████ 100%`
 - 🧠 Adaptive exercises — `████████░░ 84%`
 
-## 📊 M3 — Statistics and achievements — `█████████░ 92%`
+## 📊 M3 — Statistics and achievements — `██████████ 100%`
 
 **Acceptance gate:** Reproducible longitudinal statistics and achievements.
 
-### 📈 P6 — Analytics and progression — `█████████░ 92%`
+### 📈 P6 — Analytics and progression — `██████████ 100%`
 
 - 🏅 **T601** Records by layout and test mode — `██████████ 100%`
   - [x] Basic profile bests tracked — src/app.rs
@@ -180,10 +180,10 @@
   - [x] Timeseries store — src/history.rs: timestamped SQLite session records and comparable context histories; Actions 39880764327
   - [x] Graphs and filters — src/history.rs selectable metric summaries and context filter; src/app.rs 4-metric chart/table UI; CI 39947014970 (66 Rust tests and X11 smoke)
   - [x] Consistency formulas — src/history.rs: mean, best and population standard deviation with unit test; Actions 39888678045
-- 🔥 **T603** Key timing and error heatmaps — `███████░░░ 67%`
+- 🔥 **T603** Key timing and error heatmaps — `██████████ 100%`
   - [x] Event recording — src/engine.rs bounded in-memory key/error interval recording, privacy-safe aggregates; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Aggregations — src/engine.rs deterministic missed-key counts and per-key timing averages; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
-  - [ ] Visual heatmaps
+  - [x] Visual heatmaps — src/app.rs visual severity heatmap with text miss count on each keycap, plus key_heat_fill light/dark contrast tests; tests/gui_smoke.sh renders a real corrected-error session, captures typefinch-heatmap.png, and counts 3731 native X11 screenshot pixels painted with semantic miss colors. GitHub Actions 40043194648 passed 156 Rust tests, full GUI QA, and native heatmap screenshot verification. Reference-symbol feedback only, not physical-device attribution or live Hyprland hardware.
 - 🏆 **T604** Achievements and streaks — `██████████ 100%`
   - [x] Rules and earned records — src/achievements.rs: six deterministic, profile-scoped earned badges with qualification and anti-gaming unit tests; CI 39947014970
   - [x] Celebration UI — src/app.rs: award celebration message and achievement status panel; CI 39947014970 native executable
@@ -191,7 +191,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 📊 Statistics — `█████████░ 89%`
+- 📊 Statistics — `██████████ 100%`
 - 🏆 Achievements — `██████████ 100%`
 
 ## 🎨 M4 — Profile card studio — `███████░░░ 69%`

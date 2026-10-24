@@ -17,10 +17,13 @@ jobs:
       - name: Native XIM, Fcitx5 and GUI dependencies
         run: |
           sudo apt-get -o Acquire::Retries=3 update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox lua5.4 lua-dkjson sqlite3 fonts-noto-cjk fcitx5 fcitx5-chinese-addons fcitx5-modules dbus-x11 x11-xkb-utils
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox lua5.4 lua-dkjson sqlite3 fonts-noto-cjk fcitx5 fcitx5-chinese-addons fcitx5-anthy fcitx5-hangul fcitx5-modules dbus-x11 x11-xkb-utils
       - name: Validate experimental fixture
         run: bash -n tests/fcitx_ime_gui_smoke.sh
       - name: Build native Typefinch GUI
         run: cargo build
-      - name: Real Fcitx5 Pinyin XIM candidate commit
-        run: xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash tests/fcitx_ime_gui_smoke.sh
+      - name: Real Fcitx5 Chinese, Japanese and Korean XIM commits
+        run: |
+          for engine in pinyin anthy hangul; do
+            xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash tests/fcitx_ime_gui_smoke.sh "$engine"
+          done

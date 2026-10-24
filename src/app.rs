@@ -2481,6 +2481,47 @@ mod palette_tests {
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
     }
+    #[test] fn arabic_hebrew_ime_commit_marks_logical_error_and_caret() {
+        for text in ["سَلَام","שָׁלוֹם"] {
+            let mut session=Session::new_with_custom(0,TestMode::Custom,text);
+            session.begin();
+            let mut pending=String::new();
+            let initial=text.graphemes(true).next().unwrap();
+            assert!(!score_system_committed_event(&mut session,&mut pending,
+                &egui::Event::Ime(egui::ImeEvent::Preedit(initial.to_owned()))));
+            assert!(session.typed.is_empty(),"RTL preedit must remain unscored");
+            assert!(score_system_committed_event(&mut session,&mut pending,
+                &egui::Event::Ime(egui::ImeEvent::Commit(initial.to_owned()))));
+            assert!(score_system_committed_event(&mut session,&mut pending,
+                &egui::Event::Text("x".into())));
+            let total=text.graphemes(true).count();
+            let reference=reference_runs(text,&session.typed,0,total,true);
+            assert_eq!(reference.iter().map(|s|s.text.as_str()).collect::<String>(),text);
+            assert_eq!(reference.first().unwrap().feedback,ReferenceFeedback::Correct);
+            assert!(reference.iter().any(|s|s.feedback==ReferenceFeedback::Error));
+            assert!(reference.iter().any(|s|s.feedback==ReferenceFeedback::Cursor));
+            assert_eq!(session.mistakes,1);
+            assert_eq!(session.typed.graphemes(true).count(),2);
+            let job=reference_layout_job(text,&session.typed,0,total,true,false);
+            assert_eq!(job.text,text);
+            assert!(job.sections.iter().any(|s|s.format.color==error_ink(false)));
+            // The same logical position is passed to the actual bidi raster
+            // renderer, which returns a visual caret. No reversed input.
+            let mut shaping=rtl_shaping::Renderer::new();
+            let spans=reference.iter().map(|run|{
+                let color=match run.feedback {
+                    ReferenceFeedback::Correct=>correct_ink(false),
+                    ReferenceFeedback::Error=>error_ink(false),
+                    ReferenceFeedback::Cursor=>accent_ink(false),
+                    ReferenceFeedback::Unentered=>reference_ink(false),
+                };
+                (run.text.clone(),color)
+            }).collect::<Vec<_>>();
+            let offset=text.graphemes(true).take(2).map(str::len).sum();
+            let shaped=shaping.render_with_caret(&spans,640,96,Some(offset)).unwrap();
+            assert!(shaped.caret.is_some(),"committed RTL input must yield a shaped visual cursor");
+        }
+    }
     #[test] fn ime_commits_score_once_while_noncommitted_events_do_not() {
         let mut session=Session::new_with_custom(0,TestMode::Custom,"你好世界");
         session.begin();

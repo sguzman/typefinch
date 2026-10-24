@@ -107,7 +107,7 @@ assert(result.synthetic and result.state=="finished"
   and result.entered==count and result.correct==count and result.accuracy==100,
   "Wrong starter layout text scored")
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
-local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct FROM sessions'",db)
+local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",db)
 local pipe=assert(io.popen(cmd,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout and rows[1].input_mode=="Emulated"
@@ -200,7 +200,7 @@ local report,layout,source=assert(arg[1]),assert(arg[2]),assert(arg[3])
 local f=assert(io.open(report,"rb"),"Native full ANSI result missing")
 local r=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(r.synthetic and r.state=="finished" and r.entered==42 and
-  r.correct==42 and r.accuracy==100 and r.attempts==42,
+  r.correct==42 and r.accuracy==100,
   string.format("Native full ANSI punctuation failed: %s entered=%s correct=%s",
     layout,tostring(r.entered),tostring(r.correct)))
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
@@ -209,7 +209,7 @@ local pipe=assert(io.popen(cmd,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout
   and rows[1].input_mode=="Emulated" and rows[1].test_mode=="custom"
-  and rows[1].entered==42 and rows[1].correct==42,
+  and rows[1].entered==42 and rows[1].correct==42 and rows[1].attempts==42,
   "Full ANSI session SQLite identity or score did not match")
 local file=assert(io.open(source,"rb"));local passage=assert(file:read("*a"));file:close()
 local sf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))

@@ -1,5 +1,5 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
-use std::{collections::BTreeMap, time::{Duration, Instant}};
+use std::{collections::{BTreeMap, BTreeSet}, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
 use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
 use unicode_segmentation::UnicodeSegmentation;
@@ -322,6 +322,38 @@ impl Session {
             for _ in 0..count {syllables.push(ch.to_string());}
         }
         Some(syllables.join(" "))
+    }
+    /// Generate in-memory two-grapheme drills adjacent to missed reference
+    /// characters. Never join characters across word boundaries, and never
+    /// persist source passage fragments or error positions.
+    pub fn weak_bigram_drill(&self)->Option<String> {
+        let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
+        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let largest=u64::from(candidates.first()?.1);
+        let reference=self.target.graphemes(true).collect::<Vec<_>>();
+        let mut unique=BTreeSet::new();
+        let mut pairs=Vec::new();
+        for (ch,misses) in candidates {
+            if unique.len()>=8 {break;}
+            let pair=reference.iter().enumerate().find_map(|(i,glyph)| {
+                if glyph.chars().next()!=Some(ch) {return None;}
+                if let Some(right)=reference.get(i+1)
+                    .filter(|right|!right.chars().all(char::is_whitespace)) {
+                    return Some(format!("{glyph}{right}"));
+                }
+                if i>0 && !reference[i-1].chars().all(char::is_whitespace) {
+                    return Some(format!("{}{glyph}",reference[i-1]));
+                }
+                None
+            });
+            if let Some(pair)=pair {
+                if unique.insert(pair.clone()) {
+                    let repetitions=((u64::from(misses)*8+largest/2)/largest).clamp(2,8);
+                    for _ in 0..repetitions {pairs.push(pair.clone());}
+                }
+            }
+        }
+        if pairs.is_empty() {None} else {Some(pairs.join(" "))}
     }
     pub fn backspace(&mut self) {
         if self.state!=State::Running {return;}
@@ -766,6 +798,50 @@ mod tests {
         assert_eq!(keys.last(),Some(&"h"));
         s.begin();
         assert!(s.weak_character_drill().is_none(),"new session forgets prior mistakes");
+    }
+    #[test] fn missed_pair_drill_uses_unicode_reference_neighbors() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"café niño");
+        s.begin();
+        s.type_text("x");
+        s.backspace();
+        s.type_text("café ");
+        s.type_text("x");
+        s.backspace();
+        s.type_text("niño");
+        assert_eq!(s.missed_character_count('c'),1);
+        assert_eq!(s.missed_character_count('n'),1);
+        let expected=std::iter::repeat_n("ca",8)
+            .chain(std::iter::repeat_n("ni",8)).collect::<Vec<_>>().join(" ");
+        assert_eq!(s.weak_bigram_drill().as_deref(),Some(expected.as_str()));
+        assert!(!expected.contains("x"),"mistyped text must not be copied into practice");
+    }
+    #[test] fn missed_pair_drill_preserves_combining_clusters_and_word_boundaries() {
+        let mut combining=Session::new_with_custom(30,TestMode::Custom,"e\u{301}x");
+        combining.begin();
+        combining.type_text("q");
+        let drill=combining.weak_bigram_drill().unwrap();
+        assert_eq!(drill.split_whitespace().next(),Some("e\u{301}x"));
+        assert_eq!(drill.split_whitespace().count(),8);
+        let mut isolated=Session::new_with_custom(30,TestMode::Custom,"a b");
+        isolated.begin();
+        isolated.type_text("x");
+        isolated.backspace();
+        isolated.type_text("a ");
+        isolated.type_text("x");
+        assert!(isolated.weak_bigram_drill().is_none(),
+            "do not make fake n-grams across word boundaries");
+    }
+    #[test] fn missed_pair_drill_has_an_eight_pattern_cap_and_resets() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"abcdefghi");
+        s.begin();
+        s.type_text("xxxxxxxxx");
+        let drill=s.weak_bigram_drill().unwrap();
+        let pairs=drill.split_whitespace().collect::<Vec<_>>();
+        assert_eq!(pairs.len(),64);
+        assert_eq!(pairs.first(),Some(&"ab"));
+        assert_eq!(pairs.last(),Some(&"hi"));
+        s.begin();
+        assert!(s.weak_bigram_drill().is_none());
     }
     #[test] fn raw_metrics_preserve_corrected_mistakes() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"cat");

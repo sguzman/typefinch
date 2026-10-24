@@ -1255,7 +1255,7 @@ impl Typefinch {
         self.rebuild_session();
         self.save();
         self.start_test(ctx);
-        self.message="Practice drill started using missed reference keys. Text stays in memory only.".into();
+        self.message="Practice drill started using missed reference patterns. Text stays in memory only.".into();
     }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
@@ -1266,6 +1266,11 @@ impl Typefinch {
             if self.session.state == State::Finished {
                 if let Some(drill)=self.session.weak_character_drill() {
                     if ui.button("Practice missed keys").clicked() {
+                        self.start_weak_drill(drill,ctx);
+                    }
+                }
+                if let Some(drill)=self.session.weak_bigram_drill() {
+                    if ui.button("Practice missed pairs").clicked() {
                         self.start_weak_drill(drill,ctx);
                     }
                 }

@@ -216,5 +216,39 @@ assert(not settings:find(arg[5],1,true) and not settings:find(passage,1,true),
   "Native Wayland source or local path leaked into settings")
 print("Native Weston Wayland RTL keyboard selection PASS: 0 -> 1 -> 0 with private source")
 LUA
+  # Verify the production native Wayland editor actually mutates the source,
+  # not only the shaped preview: one entire marked grapheme must disappear,
+  # and native Undo must restore it. Persist only counts, never source bytes.
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.2
+  xdotool key --clearmodifiers "shift+$direction"
+  sleep 0.3
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-before-delete.json"
+  xdotool key --clearmodifiers BackSpace
+  sleep 0.4
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-after-delete.json"
+  xdotool key --clearmodifiers ctrl+z
+  sleep 0.4
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-after-undo.json"
+  lua5.4 - "$tmp/$script-start.json" "$tmp/$script-before-delete.json"     "$tmp/$script-after-delete.json" "$tmp/$script-after-undo.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing Wayland RTL mutation report")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local start,selected,deleted,restored=read(arg[1]),read(arg[2]),read(arg[3]),read(arg[4])
+assert(start.total>8 and start.index==0 and start.selected_graphemes==0,
+  "Wayland RTL mutation did not start at first grapheme")
+assert(selected.total==start.total and selected.index==1 and selected.selected_graphemes==1,
+  "Wayland RTL mutation did not select precisely one full marked grapheme")
+assert(deleted.total==start.total-1 and deleted.index==0 and deleted.selected_graphemes==0,
+  "Wayland native Backspace did not remove exactly one grapheme")
+assert(restored.total==start.total and restored.selected_graphemes==0,
+  "Wayland native Undo did not restore the original source length")
+print("Native Wayland marked RTL grapheme Backspace/Undo PASS: "..
+  start.total.." -> "..deleted.total.." -> "..restored.total)
+LUA
 done
-echo "Nested Weston Wayland Arabic/Hebrew marked-grapheme selection PASS"
+echo "Nested Weston Wayland Arabic/Hebrew selection and editing regression PASS"

@@ -150,6 +150,32 @@ disposable screenshot fixture. All ordinary app durations and existing
 CI run passed. This is **virtual X11 OS layout** and software-XKB QA,
 not physical Hyprland keyboard hardware or Fcitx/IBus integration.
 
+## Shaped selection follows the actual native editor
+
+[CI 40113278026](https://github.com/sguzman/typefinch/actions/runs/40113278026)
+passed Rust Unicode selection-span tests and native X11 `Ctrl+A` selection
+in the **real egui source editor**. The separate COSMIC Text preview now
+colors only the logically selected extended grapheme clusters, using
+grapheme-aligned UTF-8 boundaries. No source text is reordered, copied into
+test logs or persisted. The synthetic-only GUI report records the count of
+selected graphemes, not the passage, selected substring or clipboard.
+
+The native fixture asserted **17/17 Arabic** and **15/15 Hebrew** selected
+graphemes after `Ctrl+A` and archived
+`rtl-arabic-editor-selection.png` and
+`rtl-hebrew-editor-selection.png`. Both images were visually inspected:
+the shaped preview visibly changes the selected glyph colors, separately
+from the editable source field. [CI 40113785730](https://github.com/sguzman/typefinch/actions/runs/40113785730)
+then passed a stronger real GUI regression comparing crops of **only the
+shaped preview**, so selecting text exclusively in the raw editor cannot
+falsely satisfy visual acceptance.
+
+This is selected-glyph **feedback** in a read-only rendered preview, not
+a replacement text editor. Native bidirectional editor hit-testing,
+selection motion across mixed RTL/LTR runs, arbitrary partial selections,
+platform IME preedit overlays and physical Hyprland keyboard QA remain
+unaccepted. T804 retains its existing acceptance percentage.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.

@@ -445,6 +445,7 @@ pub struct Typefinch {
     rtl_editor_texture:Option<egui::TextureHandle>,
     rtl_editor_signature:String,
     rtl_editor_cursor_byte:Option<usize>,
+    rtl_editor_selection_bytes:Option<(usize,usize)>,
     rtl_editor_caret:Option<(f32,f32)>,
     rtl_raw_editor_open:bool,
     preview_layer:PreviewLayer,
@@ -563,7 +564,7 @@ impl Typefinch {
             rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
             rtl_caret:None,
             rtl_editor_texture:None,rtl_editor_signature:String::new(),
-            rtl_editor_cursor_byte:None,rtl_editor_caret:None,
+            rtl_editor_cursor_byte:None,rtl_editor_selection_bytes:None,rtl_editor_caret:None,
             rtl_raw_editor_open:false,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
@@ -716,6 +717,7 @@ impl Typefinch {
         self.rtl_editor_signature.clear();
         self.rtl_editor_texture=None;
         self.rtl_editor_caret=None;
+        self.rtl_editor_selection_bytes=None;
         let input=if self.prefs.test_mode==TestMode::Lesson {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
@@ -1258,14 +1260,24 @@ impl Typefinch {
                         if edit.has_focus() {
                             ui.scroll_to_rect(edit.rect,Some(egui::Align::Center));
                         }
-                        self.rtl_editor_cursor_byte=if edit.has_focus(){
+                        let range=if edit.has_focus(){
                             egui::TextEdit::load_state(ui.ctx(),egui::Id::new("custom_text_editor"))
                                 .and_then(|state|state.cursor.char_range())
-                                .and_then(|range|rtl_shaping::editor_caret_byte(
-                                    &self.custom_text,range.primary.index))
-                        } else {None};
+                        }else{None};
+                        self.rtl_editor_cursor_byte=range.as_ref()
+                            .and_then(|range|rtl_shaping::editor_caret_byte(
+                                &self.custom_text,range.primary.index));
+                        self.rtl_editor_selection_bytes=range.and_then(|range|{
+                            let primary=rtl_shaping::editor_caret_byte(
+                                &self.custom_text,range.primary.index)?;
+                            let secondary=rtl_shaping::editor_caret_byte(
+                                &self.custom_text,range.secondary.index)?;
+                            (primary!=secondary).then_some((
+                                primary.min(secondary),primary.max(secondary)))
+                        });
                     } else {
                         self.rtl_editor_cursor_byte=None;
+                        self.rtl_editor_selection_bytes=None;
                     }
                     self.show_rtl_editor_preview(ui);
                 } else {
@@ -1550,9 +1562,15 @@ impl Typefinch {
         let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
         let height=rtl_shaping::preview_height(&preview,width);
         let dark=ui.visuals().dark_mode;
-        let signature=format!("{width}:{height}:{dark}:{first}:{last}:{local_cursor:?}:{preview}");
+        let visible_selection=self.rtl_editor_selection_bytes.and_then(|(start,end)|{
+            let from=start.max(skipped).saturating_sub(skipped);
+            let to=end.min(skipped+preview.len()).saturating_sub(skipped);
+            (from<to).then_some((from,to))
+        });
+        let signature=format!("{width}:{height}:{dark}:{first}:{last}:{local_cursor:?}:{visible_selection:?}:{preview}");
         if signature!=self.rtl_editor_signature || self.rtl_editor_texture.is_none(){
-            let spans=vec![(preview,reference_ink(dark))];
+            let spans=rtl_shaping::selection_spans(&preview,visible_selection,
+                reference_ink(dark),accent_ink(dark));
             let Some(rendered)=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
                 .render_with_caret(&spans,width,height,local_cursor) else {
                 ui.small("RTL preview unavailable; editable source text is preserved.");
@@ -1570,7 +1588,10 @@ impl Typefinch {
                 && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
                 // Machine-readable position check is synthetic-only; no text.
                 let _=crate::qa::write_rtl_editor_caret_audit(
-                    cursor_grapheme,total,first,last,self.rtl_editor_caret);
+                    cursor_grapheme,total,first,last,self.rtl_editor_caret,
+                    self.rtl_editor_selection_bytes.map(|(start,end)|
+                        self.custom_text[..end].graphemes(true).count()
+                        -self.custom_text[..start].graphemes(true).count()).unwrap_or(0));
             }
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
@@ -1585,7 +1606,9 @@ impl Typefinch {
                         egui::Stroke::new(1.5,accent_ink(dark)));
                 }
             }
-            ui.small(format!("Graphemes {}–{} of {total}. Editing stays in the native field above. Shaped caret follows its primary cursor, but native BiDi selection/IME remains unverified.",
+            let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
+                self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Editing stays in the native field above. The shaped preview colors selected glyphs, but native BiDi selection/IME remains unverified.",
                 first.saturating_add(1),last));
         }
     }

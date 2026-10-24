@@ -88,13 +88,15 @@ pub fn write_custom_import_audit(text:&str,count:usize)->Result<(),String>{
 /// caret being projected into the separate shaped preview. No source text,
 /// profile, path, script, key identity or raw selection is recorded.
 pub fn write_rtl_editor_caret_audit(index:usize,total:usize,
-    first:usize,last:usize,caret:Option<(f32,f32)>)->Result<(),String>{
+    first:usize,last:usize,caret:Option<(f32,f32)>,
+    selected_graphemes:usize)->Result<(),String>{
     let Some(path)=env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT") else{return Ok(());};
     let report=serde_json::json!({
         "state":"rtl-editor-caret","synthetic":true,
         "index":index,"total":total,"visible_start":first,
         "visible_end":last,
         "caret_positioned":caret.is_some(),
+        "selected_graphemes":selected_graphemes,
     });
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
         .map_err(|e|e.to_string())

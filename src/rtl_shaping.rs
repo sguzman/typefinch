@@ -38,6 +38,24 @@ pub fn editor_caret_byte(text:&str,char_index:usize)->Option<usize>{
     text.grapheme_indices(true).take_while(|(offset,_)|*offset<=byte)
         .last().map(|(offset,_)|offset).or(Some(0))
 }
+/// Split only on logical selection boundaries. COSMIC still performs
+/// the actual bidirectional shaping; no source reversal, text mutation,
+/// inferred cursor direction or IME state is involved.
+pub fn selection_spans(text:&str,selected:Option<(usize,usize)>,
+    regular:Color32,highlight:Color32)->Vec<(String,Color32)> {
+    let Some((start,end))=selected else{return vec![(text.into(),regular)];};
+    if start>=end || end>text.len()
+        || !text.is_char_boundary(start) || !text.is_char_boundary(end)
+        || !text.grapheme_indices(true).any(|(offset,_)|offset==start)
+        || (end!=text.len() && !text.grapheme_indices(true).any(|(offset,_)|offset==end)) {
+        return vec![(text.into(),regular)];
+    }
+    let mut result=Vec::with_capacity(3);
+    if start>0 {result.push((text[..start].into(),regular));}
+    result.push((text[start..end].into(),highlight));
+    if end<text.len(){result.push((text[end..].into(),regular));}
+    result
+}
 pub struct ShapedImage {
     pub image:egui::ColorImage,
     /// Visual caret origin in texture-local points/pixels; no physical
@@ -143,6 +161,30 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn rtl_selection_spans_preserve_logical_graphemes_and_boundaries(){
+        let text="سلام abc שָׁלוֹם";
+        let start="سلام ".len();
+        let end="سلام abc".len();
+        let regular=Color32::WHITE;
+        let highlight=Color32::from_rgb(130,200,240);
+        let spans=selection_spans(text,Some((start,end)),regular,highlight);
+        assert_eq!(spans.len(),3);
+        assert_eq!(spans[0],("سلام ".into(),regular));
+        assert_eq!(spans[1],("abc".into(),highlight));
+        assert_eq!(spans[2],(" שָׁלוֹם".into(),regular));
+        assert_eq!(spans.iter().map(|(part,_)|part.as_str()).collect::<String>(),text);
+        let renderer=&mut Renderer::new();
+        let neutral=renderer.render(&[(text.into(),regular)],640,102).unwrap();
+        let selected=renderer.render(&spans,640,102).unwrap();
+        assert!(neutral.pixels.iter().zip(&selected.pixels)
+            .filter(|(a,b)|a!=b).count()>10);
+        // Unaligned selection inside a niqqud cluster must fail closed.
+        let bad="سلام abc ש".len();
+        assert_eq!(selection_spans(text,Some((bad,end.max(bad+1))),regular,highlight),
+            vec![(text.into(),regular)]);
+        assert_eq!(selection_spans(text,Some((0,text.len()+2)),regular,highlight),
+            vec![(text.into(),regular)]);
+    }
     #[test] fn egui_scalar_editor_caret_snaps_to_unicode_graphemes(){
         let text="שָׁלוֹם 🌍👩‍💻 سلام";
         assert_eq!(editor_caret_byte(text,0),Some(0));

@@ -118,7 +118,11 @@ LUA
     sleep 0.3
     import -window "$window" "$tmp/rtl-$name-editor-end.png"
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-end.json"
-    lua5.4 - "$tmp/$name/editor-start.json" "$tmp/$name/editor-end.json" <<'LUA'
+    xdotool key --clearmodifiers ctrl+a
+    sleep 0.35
+    import -window "$window" "$tmp/rtl-$name-editor-selection.png"
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-selection.json"
+    lua5.4 - "$tmp/$name/editor-start.json" "$tmp/$name/editor-end.json" "$tmp/$name/editor-selection.json" <<'LUA'
 local json=require("dkjson")
 local function read(path)
   local f=assert(io.open(path,"rb"),"No RTL editor audit")
@@ -129,6 +133,10 @@ local function read(path)
   return data
 end
 local first,last=read(assert(arg[1])),read(assert(arg[2]))
+local selection=read(assert(arg[3]))
+assert(selection.total==last.total and selection.selected_graphemes==last.total,
+  "Ctrl+A did not select all logical RTL graphemes")
+assert(first.selected_graphemes==0 and last.selected_graphemes==0)
 assert(first.index==0,"Ctrl+Home did not reset the native editor cursor")
 assert(last.total==first.total and last.total>=10,"RTL editor source changed unexpectedly")
 assert(last.index==last.total,
@@ -141,6 +149,8 @@ LUA
       exit 1
     }
     echo "Native $name writable editor cursor and shaped preview moved ($editor_delta pixels)"
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.25
   fi
   focus_window
   import -window "$window" "$tmp/rtl-$name.png"

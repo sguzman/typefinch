@@ -125,3 +125,103 @@ LUA
   unset XKB_CONFIG_ROOT
 done
 echo 'Native Dvorak and Colemak-DH Shift/edge keys PASS with installed XKB and forced offline fallback'
+
+# Exhaustive native ANSI starter punctuation/Shift score for all four layouts.
+# Verify real winit physical-key routing with XKB and the offline table.
+# OS physical Right Alt attribution is separately tracked by T303.
+full_codes=(49 10 11 12 13 14 15 16 17 18 19 20 21 34 35 48 51 47 59 60 61)
+for layout_name in us dvorak colemak colemak-dh; do
+  case "$layout_name" in
+    us) layout='us' ;;
+    dvorak) layout='us(dvorak)' ;;
+    colemak) layout='us(colemak)' ;;
+    colemak-dh) layout='us(colemak_dh)' ;;
+  esac
+  for offline in no yes;do
+    label="all-ansi-$layout_name-$offline"
+    mkdir -p "$tmp/$label"
+    # Fixed independent expected symbols for the physical X11 US keycodes.
+    lua5.4 - "$layout" "$tmp/$label-source.txt" <<'LUA'
+local layout,path=assert(arg[1]),assert(arg[2])
+local tick=string.char(96)
+local ordinary=tick..[[1234567890-=[]'\;,./]]
+local ordinary_shift="~"..[[!@#$%^&*()_+{}"|:<>?]]
+local dvorak=tick..[[1234567890[]/=-\swvz]]
+local dvorak_shift="~"..[[!@#$%^&*(){}?+_|SWVZ]]
+local base,shift=ordinary,ordinary_shift
+if layout=="us(dvorak)" then base,shift=dvorak,dvorak_shift end
+assert(#base==21 and #shift==21,
+  "Fixture must describe all 21 physical punctuation/number positions")
+local f=assert(io.open(path,"wb"));assert(f:write(base,shift));assert(f:close())
+LUA
+    start_app "$label"
+    xdotool key --clearmodifiers F11
+    sleep 0.3
+    cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
+    grep -q '"test_mode": "custom"' "$cfg" || {
+      echo "Custom mode could not be selected for $label" >&2;exit 1;
+    }
+    stop_app
+    lua5.4 - "$cfg" "$layout" <<'LUA'
+local json=require("dkjson")
+local path,layout=assert(arg[1]),assert(arg[2])
+local f=assert(io.open(path,"rb"))
+local prefs=assert(json.decode(assert(f:read("*a"))));f:close()
+prefs.layout=layout
+local o=assert(io.open(path,"wb"))
+assert(o:write(json.encode(prefs,{indent=true})));assert(o:close())
+LUA
+    if [[ "$offline" == yes ]];then
+      mkdir -p "$tmp/empty-xkb-root"
+      export XKB_CONFIG_ROOT="$tmp/empty-xkb-root"
+    fi
+    export TYPEFINCH_QA_DURATION_SECONDS=15
+    start_app "$label"
+    xdotool key --clearmodifiers F11
+    sleep 0.3
+    xdotool type --clearmodifiers --delay 10 "$tmp/$label-source.txt"
+    xdotool key --clearmodifiers Return
+    sleep 0.3
+    xdotool key --clearmodifiers F5
+    sleep 0.18
+    xdotool key --clearmodifiers F2
+    sleep 0.18
+    for code in "${full_codes[@]}";do
+      xdotool key --clearmodifiers "$code"
+    done
+    for code in "${full_codes[@]}";do
+      xdotool key --clearmodifiers "shift+$code"
+    done
+    sleep 0.6
+    lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" \
+      "$tmp/$label-source.txt" <<'LUA'
+local json=require("dkjson")
+local report,layout,source=assert(arg[1]),assert(arg[2]),assert(arg[3])
+local f=assert(io.open(report,"rb"),"Native full ANSI result missing")
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="finished" and r.entered==42 and
+  r.correct==42 and r.accuracy==100 and r.attempts==42,
+  string.format("Native full ANSI punctuation failed: %s entered=%s correct=%s",
+    layout,tostring(r.entered),tostring(r.correct)))
+local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct FROM sessions'",db)
+local pipe=assert(io.popen(cmd,"r"))
+local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
+assert(#rows==1 and rows[1].layout==layout
+  and rows[1].input_mode=="Emulated" and rows[1].test_mode=="custom"
+  and rows[1].entered==42 and rows[1].correct==42,
+  "Full ANSI session SQLite identity or score did not match")
+local file=assert(io.open(source,"rb"));local passage=assert(file:read("*a"));file:close()
+local sf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
+local settings=assert(sf:read("*a"));sf:close()
+assert(not settings:find(passage,1,true) and not settings:find(source,1,true),
+  "Native full ANSI private passage or path persisted")
+print("Native complete starter number/edge Shift layers PASS: "..layout..
+  " 42/42 in "..(os.getenv("XKB_CONFIG_ROOT") and "offline" or "XKB").." mode")
+LUA
+    import -window "$window" "typefinch-starter-full-$label.png"
+    stop_app
+    unset XKB_CONFIG_ROOT TYPEFINCH_QA_DURATION_SECONDS
+  done
+done
+echo 'All four native starter ANSI number/punctuation/Shift layers PASS (XKB + offline fallback)'

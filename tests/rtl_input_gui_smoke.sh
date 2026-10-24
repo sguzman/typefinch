@@ -190,6 +190,9 @@ print("Native X11 OS-layout RTL typing PASS: 4/4 after one corrected error, raw 
 LUA
   stop_app
 done
+# The isolated mixed-script screenshot scenario needs time to capture four
+# frames. Other native deadline QA retains the default synthetic 2 seconds.
+export TYPEFINCH_QA_DURATION_SECONDS=15
 # A single real scored custom passage spans three genuine OS XKB layouts.
 # Language switches come from isolated Xvfb test setup, never Typefinch.
 # The native reference remains in logical Unicode order while COSMIC shapes
@@ -253,7 +256,8 @@ local f=assert(io.open(assert(arg[1]),"rb"),"Mixed native X11 score missing")
 local r=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(r.synthetic and r.state=="finished"
   and r.entered==13 and r.correct==13 and r.accuracy==100,
-  "Native mixed Arabic/Latin/Hebrew text not scored in logical order")
+  string.format("Native mixed RTL score wrong: entered=%s correct=%s elapsed_ms=%s",
+    tostring(r.entered),tostring(r.correct),tostring(r.elapsed_ms)))
 local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local q=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct FROM sessions'",path)
 local p=assert(io.popen(q,"r"))

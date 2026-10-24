@@ -166,6 +166,10 @@ fn score_system_frame_event(session:&mut Session,preedit:&mut String,
     }
     score_system_committed_event(session,preedit,event)
 }
+fn synthetic_qa_duration(value:Option<&str>)->u64 {
+    let requested=value.and_then(|v|v.parse::<u64>().ok()).unwrap_or(2);
+    if matches!(requested,2|15|30|60|120){requested}else{2}
+}
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
 }
@@ -453,8 +457,11 @@ impl Typefinch {
         let settings_read_only=loaded.read_only;
         let startup_warning=loaded.warning.unwrap_or_default();
         if std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
-            // Opt-in synthetic GUI test process only, never persisted to a real profile.
-            prefs.duration_seconds = 2;
+            // Disposable GUI QA defaults to the two-second timing boundary.
+            // A screenshot-heavy synthetic fixture may explicitly request a
+            // normal bounded duration; ordinary users never read this knob.
+            prefs.duration_seconds=synthetic_qa_duration(
+                std::env::var("TYPEFINCH_QA_DURATION_SECONDS").ok().as_deref());
         }
         cc.egui_ctx.set_theme(match prefs.theme {
             Theme::System => egui::ThemePreference::System,
@@ -2678,6 +2685,14 @@ mod palette_tests {
             let offset=text.graphemes(true).take(2).map(str::len).sum();
             let shaped=shaping.render_with_caret(&spans,640,96,Some(offset)).unwrap();
             assert!(shaped.caret.is_some(),"committed RTL input must yield a shaped visual cursor");
+        }
+    }
+    #[test] fn synthetic_gui_duration_is_explicit_bounded_and_not_default_extended(){
+        assert_eq!(synthetic_qa_duration(None),2);
+        assert_eq!(synthetic_qa_duration(Some("15")),15);
+        assert_eq!(synthetic_qa_duration(Some("30")),30);
+        for invalid in ["","0","1","14","16","1000","-5","invalid"] {
+            assert_eq!(synthetic_qa_duration(Some(invalid)),2);
         }
     }
     #[test] fn paired_ime_and_text_events_score_once_but_real_repeats_survive(){

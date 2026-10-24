@@ -846,12 +846,24 @@ impl Typefinch {
             }
         }
     }
-    fn load_custom_file(&mut self,path:&std::path::Path) {
+    fn reset_custom_editor_history(ctx:&egui::Context) {
+        // Importing a new private passage is a document boundary, not a
+        // regular edit. An old egui Undo stack must never resurrect the
+        // previous imported text when the new passage is edited.
+        let id=egui::Id::new("custom_text_editor");
+        if let Some(mut state)=egui::TextEdit::load_state(ctx,id) {
+            state.clear_undoer();
+            state.cursor.set_char_range(None);
+            state.store(ctx,id);
+        }
+    }
+    fn load_custom_file(&mut self,path:&std::path::Path,ctx:&egui::Context) {
         if self.session.state==State::Running || self.prefs.test_mode!=TestMode::Custom {return;}
         match crate::engine::import_custom_file(path) {
             Ok(passage)=>{
                 let count=passage.graphemes(true).count();
                 self.custom_text=passage;
+                Self::reset_custom_editor_history(ctx);
                 self.rtl_raw_editor_open=false;
                 self.rebuild_session();
                 // Only an explicitly opted-in, synthetic CI process records
@@ -867,7 +879,7 @@ impl Typefinch {
         let files=ctx.input(|i|i.raw.dropped_files.clone());
         let Some(drop)=files.into_iter().next() else {return;};
         if let Some(path)=drop.path {
-            self.load_custom_file(&path);
+            self.load_custom_file(&path,ctx);
         } else {
             self.message="Drop a local file with a readable filesystem path.".into();
         }
@@ -1256,7 +1268,7 @@ impl Typefinch {
                 });
                 if load_requested {
                     let path=std::path::PathBuf::from(self.custom_import_path.trim());
-                    self.load_custom_file(&path);
+                    self.load_custom_file(&path,ctx);
                 }
                 if rtl_shaping::contains_rtl(&self.custom_text) {
                     // Imported RTL passages start with a shaped read-only
@@ -1588,6 +1600,7 @@ impl Typefinch {
     }
     fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
         self.custom_text=drill;
+        Self::reset_custom_editor_history(ctx);
         self.prefs.test_mode=TestMode::Custom;
         self.rebuild_session();
         self.save();

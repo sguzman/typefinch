@@ -391,6 +391,7 @@ pub struct Typefinch {
     rtl_caret:Option<(f32,f32)>,
     rtl_editor_texture:Option<egui::TextureHandle>,
     rtl_editor_signature:String,
+    rtl_raw_editor_open:bool,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -504,6 +505,7 @@ impl Typefinch {
             rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
             rtl_caret:None,
             rtl_editor_texture:None,rtl_editor_signature:String::new(),
+            rtl_raw_editor_open:false,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -746,6 +748,7 @@ impl Typefinch {
             Ok(passage)=>{
                 let count=passage.graphemes(true).count();
                 self.custom_text=passage;
+                self.rtl_raw_editor_open=false;
                 self.rebuild_session();
                 // Only an explicitly opted-in, synthetic CI process records
                 // coarse script metadata; ordinary imports never write text.
@@ -1152,27 +1155,40 @@ impl Typefinch {
                     self.load_custom_file(&path);
                 }
                 if rtl_shaping::contains_rtl(&self.custom_text) {
-                    // The egui 0.33 multiline editor cannot promise the
-                    // correct visual caret for mixed Hebrew/Arabic scripts.
-                    // Keep it available without making its mangled glyphs
-                    // the default representation of an imported RTL file.
-                    ui.collapsing("Edit raw RTL source (advanced)", |ui| {
-                        ui.small("Native multiline RTL editing remains unverified. The shaped preview below is read-only.");
+                    // Imported RTL passages start with a shaped read-only
+                    // preview. A manually composed RTL passage must *not*
+                    // collapse the editor during the first RTL keystroke.
+                    ui.add_enabled(self.session.state!=State::Running,
+                        egui::Checkbox::new(&mut self.rtl_raw_editor_open,
+                            "Edit raw RTL source (advanced)"));
+                    if self.rtl_raw_editor_open {
+                        ui.small("Native multiline RTL caret/selection remain unverified; compare with the shaped preview.");
                         let edit=ui.add_enabled(self.session.state!=State::Running,
                             egui::TextEdit::multiline(&mut self.custom_text)
+                                .id(egui::Id::new("custom_text_editor"))
                                 .desired_rows(4)
                                 .desired_width(ui.available_width())
                                 .hint_text("Edit private source text"));
                         if edit.changed(){self.rebuild_session();}
-                    });
+                    }
                     self.show_rtl_editor_preview(ui);
                 } else {
                     let edit=ui.add_enabled(self.session.state!=State::Running,
                         egui::TextEdit::multiline(&mut self.custom_text)
+                            .id(egui::Id::new("custom_text_editor"))
                             .desired_rows(4)
                             .desired_width(ui.available_width())
                             .hint_text("Paste or write text for your private typing test"));
-                    if edit.changed(){self.rebuild_session();}
+                    if edit.changed(){
+                        // Preserve the existing editing session when a
+                        // user first types an RTL grapheme into a blank box.
+                        if rtl_shaping::contains_rtl(&self.custom_text){
+                            self.rtl_raw_editor_open=true;
+                        } else {
+                            self.rtl_raw_editor_open=false;
+                        }
+                        self.rebuild_session();
+                    }
                 }
                 ui.small(format!("{} graphemes entered; only the first 4096 will be used. Text is not saved.", self.custom_text.graphemes(true).count()));
             }

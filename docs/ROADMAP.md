@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 86%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 87%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
@@ -224,11 +224,11 @@
 - 🐤 GitHub widget — `██████████ 100%`
 - 🔄 Publishing automation — `████████░░ 75%`
 
-## 🌎 M5 — Multilingual typing — `████████░░ 75%`
+## 🌎 M5 — Multilingual typing — `████████░░ 83%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `████████░░ 75%`
+### 🗣️ P8 — Languages and input methods — `████████░░ 83%`
 
 - 🧾 **T801** Language packs and corpora — `██████████ 100%`
   - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
@@ -238,9 +238,9 @@
   - [x] Grapheme segmentation — src/engine.rs and src/app.rs: unicode-segmentation counts/display/Backspace; Actions 39896389227 (59 tests)
   - [x] Normalization rules — src/engine.rs: NFC canonical comparison, combining-accent completion; Actions 39896389227
   - [x] Regression tests — src/engine.rs: decomposed accent, joined emoji, flag and whole-grapheme Backspace regressions; Actions 39896389227
-- ㊙️ **T803** CJK IME composition — `███████░░░ 67%`
+- ㊙️ **T803** CJK IME composition — `██████████ 100%`
   - [x] Committed text semantics — src/app.rs score_system_committed_event accepts system-mode egui::Event::Text and ImeEvent::Commit, excludes noncommitted IME events and Paste, and advertises a focused IME candidate rectangle; synthetic 你好世界 custom passage test validates four graphemes and no scoring of enable/disable/paste. GitHub Actions 40044338842 passed 159 Rust tests including ime_commits_score_once_while_noncommitted_events_do_not plus native X11 GUI suite. No live CJK/Fcitx/IBus integration, cross-script speed policy or RTL acceptance claimed.
-  - [ ] CJK integration tests
+  - [x] CJK integration tests — tests/fcitx_ime_gui_smoke.sh and .github/workflows/ime-probe.yml; GitHub Actions 40126249778: actual Fcitx5 Pinyin, Anthy, and Hangul X11/XIM sessions under isolated Xvfb/DBus passed one committed grapheme each (你, あ, 한) with zero premature preedit completion, 1/1 final score, exactly one attempt in SQLite, input_mode=OS and no passage/path persistence. This accepts CJK integration for three engines in virtual X11 only, not live Hyprland/Wayland, IBus, candidate-overlay positioning on hardware or all IMEs.
   - [x] Speed conventions — src/engine.rs Score.cpm counts correctly matched final Unicode grapheme clusters per elapsed minute, independently of raw IME keystrokes; tests cover corrected Chinese, Japanese kana, Korean Hangul, canonical accents and zero-duration bounds. src/app.rs displays corrected CPM separately from standardized WPM; docs/SCORING.md explicitly rejects cross-language equivalence and physical-key attribution. GitHub Actions 40048186051 passed 174 Rust tests and the complete native X11 graphical/compositor suite. Actual Fcitx/IBus CJK integration and RTL acceptance remain open.
 - 🪶 **T804** Arabic and Hebrew bidirectional input — `███░░░░░░░ 33%`
   - [ ] Shaping and caret
@@ -249,7 +249,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🌏 Languages — `███████░░░ 67%`
+- 🌏 Languages — `████████░░ 78%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
 ## 📦 M6 — Release quality — `████████░░ 75%`

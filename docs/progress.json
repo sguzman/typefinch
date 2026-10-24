@@ -1103,7 +1103,7 @@
               "id": "T803",
               "emoji": "㊙️",
               "name": "CJK IME composition",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Committed text semantics",
@@ -1112,7 +1112,8 @@
                 },
                 {
                   "text": "CJK integration tests",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "tests/fcitx_ime_gui_smoke.sh and .github/workflows/ime-probe.yml; GitHub Actions 40126249778: actual Fcitx5 Pinyin, Anthy, and Hangul X11/XIM sessions under isolated Xvfb/DBus passed one committed grapheme each (你, あ, 한) with zero premature preedit completion, 1/1 final score, exactly one attempt in SQLite, input_mode=OS and no passage/path persistence. This accepts CJK integration for three engines in virtual X11 only, not live Hyprland/Wayland, IBus, candidate-overlay positioning on hardware or all IMEs."
                 },
                 {
                   "text": "Speed conventions",

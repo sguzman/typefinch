@@ -15,7 +15,7 @@ Legacy English session identifiers remain `words`, `quotes`, `punctuation`, `par
 Comparison graphs match layout, input mode, content type plus language, duration, and scoring version. Dashboard high-water marks are still profile-wide benchmarks, not per-language records; they are displayed as overall records. Future leaderboard and publishing features must not present these as language-specific.
 
 ## Known limitations
-The engine compares canonically normalized Unicode extended grapheme clusters (scoring version 2), including composed/decomposed equivalents and whole-grapheme Backspace. A separate corrected CPM (matched display graphemes/minute) is exposed alongside standardized WPM for IME-oriented custom text; it is not a physical keystroke rate or a cross-language benchmark. Synthetic CJK committed-text and IME preedit tests exist, and CI verifies installed fallback fonts for representative CJK, Arabic and Hebrew glyphs. None of these establish live Fcitx/IBus composition, bidirectional shaping/caret correctness, or complete Unicode coverage. Spanish passages are intended for basic committed-text entry; retain native IME and RTL acceptance gates.
+The engine compares canonically normalized Unicode extended grapheme clusters (scoring version 2), including composed/decomposed equivalents and whole-grapheme Backspace. A separate corrected CPM (matched display graphemes/minute) is exposed alongside standardized WPM for IME-oriented custom text; it is not a physical keystroke rate or a cross-language benchmark. Synthetic CJK committed-text and IME preedit tests exist, and CI verifies installed fallback fonts for representative CJK, Arabic and Hebrew glyphs. Real Fcitx5 composition is accepted only for Pinyin, Anthy and Hangul under isolated native X11/XIM; this does not establish live Hyprland/Wayland, IBus composition, bidirectional editing/caret correctness, or complete Unicode coverage. Spanish passages are intended for basic committed-text entry; retain native IME and RTL acceptance gates.
 
 ## Active IME candidate navigation guard
 
@@ -27,6 +27,26 @@ scored session. Once preedit has ended, ordinary Backspace remains available.
 The guard applies only to the currently focused Typefinch typing surface;
 it does not capture background keys, implement an IME engine or certify
 native Fcitx/IBus candidate interaction. T201 and T803 remain incomplete.
+
+## Native CJK X11/XIM integration acceptance
+
+[CI run 40126249778](https://github.com/sguzman/typefinch/actions/runs/40126249778)
+passed three independent real Fcitx5 sessions with installed Pinyin,
+Japanese Anthy and Korean Hangul engines. Each disposable session loaded
+one synthetic custom Unicode grapheme (Chinese `你`, Japanese `あ`,
+Korean `한`), focused the regular scoring surface, sent the physical
+Roman-letter X11 events through the selected input method, and committed
+one character. Uncommitted IME text did not complete the test. Each score
+saved **one correct entered grapheme and exactly one SQLite attempt**, with
+`input_mode=OS` and isolated local settings/history. The imported source
+and temporary file path were not persisted.
+
+The actual input sequences were `ni` → `你` (Pinyin),
+`a` → `あ` (Anthy), and `gks` → `한` (Hangul). This accepts the
+T803 CJK integration-test criterion on **virtual native X11/XIM**,
+not all CJK methods or desktop environments. Live Fcitx/IBus on
+Hyprland/Wayland, native IME candidate popup position, physical key
+routing, and bidirectional editing remain separately unaccepted.
 
 ## Future corpus governance
 Store future corpora as independently versioned, attributed, redistributable data assets, with provenance/license metadata, difficulty annotations, and language-specific speed conventions. Do not claim a comprehensive language corpus from the small initial phrase set.

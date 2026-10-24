@@ -69,15 +69,28 @@ fn reference_pair_at(target:&str,position:usize)->Option<String> {
 /// Both drag-and-drop and the keyboard-operated path field use the same
 /// strict local file import route. No selected path or content is persisted.
 pub fn import_custom_file(path:&std::path::Path)->Result<String,String> {
-    use std::io::Read;
-    let metadata=std::fs::symlink_metadata(path).map_err(|e|e.to_string())?;
+    use std::{io::Read,os::unix::fs::OpenOptionsExt};
+    // A path metadata check followed by File::open had a TOCTOU gap: an
+    // adversarial local process could exchange a checked regular file for a
+    // symbolic link or FIFO. Open once with no-follow and nonblocking flags;
+    // check the exact opened descriptor before reading *any* contents.
+    // O_NONBLOCK has no effect on ordinary regular files, but makes a
+    // substituted named pipe or device safe to refuse without hanging.
+    let mut options=std::fs::OpenOptions::new();
+    options.read(true).custom_flags(libc::O_NOFOLLOW|libc::O_NONBLOCK);
+    let mut file=options.open(path).map_err(|e|{
+        if e.raw_os_error()==Some(libc::ELOOP) {
+            "Choose a regular file (not a symbolic link)".into()
+        } else {e.to_string()}
+    })?;
+    let metadata=file.metadata().map_err(|e|e.to_string())?;
     if !metadata.file_type().is_file() {
         return Err("Choose a regular file (not a directory, device or symbolic link)".into());
     }
     if metadata.len()>65_536 {return Err("Text file exceeds 64 KiB".into());}
     let mut bytes=Vec::new();
-    std::fs::File::open(path).map_err(|e|e.to_string())?
-        .take(65_537).read_to_end(&mut bytes).map_err(|e|e.to_string())?;
+    file.by_ref().take(65_537).read_to_end(&mut bytes)
+        .map_err(|e|e.to_string())?;
     import_custom_passage(&bytes)
 }
 pub fn import_custom_passage(bytes:&[u8])->Result<String,String> {
@@ -517,6 +530,35 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os="linux")]
+    #[test] fn local_import_rejects_fifo_without_waiting_for_a_writer() {
+        use std::{process::Command,time::{Duration,Instant}};
+        let path=std::env::temp_dir().join(format!(
+            "typefinch-import-fifo-{}",uuid::Uuid::new_v4()));
+        let outcome=Command::new("mkfifo").arg(&path).status().unwrap();
+        assert!(outcome.success(),"Linux fixture must create a real FIFO");
+        let started=Instant::now();
+        let result=import_custom_file(&path);
+        let _=std::fs::remove_file(&path);
+        assert!(result.is_err(),"a FIFO is never a regular text passage");
+        assert!(started.elapsed()<Duration::from_secs(2),
+            "FIFO import must not block on a missing writer");
+    }
+    #[cfg(target_os="linux")]
+    #[test] fn local_import_never_follows_symlink_to_oversized_target(){
+        use std::os::unix::fs::symlink;
+        let dir=std::env::temp_dir().join(format!(
+            "typefinch-import-nofollow-{}",uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let source=dir.join("source.txt");
+        let link=dir.join("link.txt");
+        std::fs::write(&source,"safe passage").unwrap();
+        symlink(&source,&link).unwrap();
+        let result=import_custom_file(&link);
+        assert!(result.is_err(),"a legal target does not make a symlink import legal");
+        assert_eq!(import_custom_file(&source).unwrap(),"safe passage");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
     #[test] fn cjk_display_units_do_not_change_latin_or_rtl_layout_defaults() {
         for text in ["你好","きょう","カタカナ","한글","Mixed 你好"] {
             let s=Session::new_with_custom(0,TestMode::Custom,text);

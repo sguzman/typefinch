@@ -1263,7 +1263,7 @@ impl Typefinch {
                         egui::Checkbox::new(&mut self.rtl_raw_editor_open,
                             "Edit raw RTL source (advanced)"));
                     if self.rtl_raw_editor_open {
-                        ui.small("Native multiline RTL caret/selection remain unverified; compare with the shaped preview.");
+                        ui.small("Basic RTL caret and grapheme selection are tested on X11 and virtual Wayland; full BiDi/IME behavior and physical Hyprland remain unverified.");
                         let editor_id=egui::Id::new("custom_text_editor");
                         let shift_arrow=ui.input(|i|i.events.iter().any(|event|
                             matches!(event,egui::Event::Key {
@@ -1677,7 +1677,7 @@ impl Typefinch {
             }
             let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
                 self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
-            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Editing stays in the native field above. The shaped preview colors selected glyphs, but native BiDi selection/IME remains unverified.",
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Editing stays in the native field above. The shaped preview colors selected glyphs; complete BiDi/IME editing remains unverified.",
                 first.saturating_add(1),last));
         }
     }

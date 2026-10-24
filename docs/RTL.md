@@ -265,6 +265,49 @@ different paragraphs, without adding a selection or modifying the source.
 This accepts those two X11 mouse-hit-test points, not arbitrary BiDi
 hit-testing, drag selection, physical keyboards or Wayland IMEs.
 
+## Native grapheme editing, pointer dragging and virtual Wayland
+
+[CI 40132824689](https://github.com/sguzman/typefinch/actions/runs/40132824689)
+passed 222 Rust tests and the native GUI suite, including real
+**selection → Backspace → Undo** of the first marked grapheme in the
+ordinary Arabic and Hebrew source editors. The separate shaped audit
+measured grapheme counts **17 → 16 → 17** (Arabic) and
+**15 → 14 → 15** (Hebrew), preserving a single whole-grapheme
+selection and an unselected logical anchor after deletion. This validates
+the tested deletion/Undo sequence, not every edit-history transition.
+
+[CI 40133438367](https://github.com/sguzman/typefinch/actions/runs/40133438367)
+also passed 222 Rust tests and the complete native X11 GUI suite. Real
+pointer down/move/up gestures selected **15 logical graphemes** between
+the Latin paragraph and the mixed Hebrew/Arabic paragraph in both
+directions; the shaped caret reached rows **60 and 30 pixels**.
+Both archived full-frame drag screenshots were inspected: the raw
+multiline editor and separate shaped preview show the expected selected
+middle paragraph and differing active-caret locations. These are two
+specific bidirectional pointer ranges, not a general guarantee for every
+visual or logical edit position.
+
+[CI 40133580017](https://github.com/sguzman/typefinch/actions/runs/40133580017)
+passed the **entire native CI suite (222 Rust tests)** and new authentic
+Wayland/wl_keyboard input checks. A disposable Weston compositor receives
+synthetic hardware keyboard events from its X11 parent and delivers
+them to the unmodified Typefinch Wayland surface. Both imported
+Arabic and Hebrew marked-text fixtures passed single-grapheme
+**Shift+Arrow selection and opposite-direction retraction**
+(0 → 1 → 0), with no source passage or local path saved to settings.
+The two archived Weston screenshots were opened and inspected; they
+show script-specific selection in the native editable field and the
+separate shaped preview. This is **virtual Wayland**, not physical
+Hyprland, real Fcitx/IBus candidate interaction or multi-device hardware
+routing.
+
+An earlier [CI 40133277469](https://github.com/sguzman/typefinch/actions/runs/40133277469)
+passed the Arabic Wayland case but failed when Weston 13's X11 backend
+crashed during rapid client teardown before the Hebrew case. The accepted
+fixture reuses one live Wayland client for both sequential imports,
+instead of misclassifying that compositor lifecycle crash as a typing
+engine result.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.

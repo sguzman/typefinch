@@ -1,7 +1,10 @@
 name: Typefinch CI
 concurrency:
   group: typefinch-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve running acceptance evidence when several directors push main.
+  # GitHub retains the newest pending run; completed running runs are never
+  # interrupted merely because a newer commit entered the queue.
+  cancel-in-progress: false
 on:
   push:
     branches: [main]

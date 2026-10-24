@@ -5,6 +5,13 @@
 use cosmic_text::{Attrs,Buffer,Color,FontSystem,Metrics,Shaping,SwashCache};
 use eframe::egui::{self,Color32};
 
+/// Script-triggered preview only, not a language classifier. Unicode
+/// text order remains logical; COSMIC Text handles visual bidi placement.
+pub fn contains_rtl(text:&str)->bool {
+    text.chars().any(|ch|matches!(ch as u32,
+        0x0590..=0x08FF | 0xFB1D..=0xFDFF | 0xFE70..=0xFEFF
+        | 0x10E60..=0x10E7F | 0x1EE00..=0x1EEFF))
+}
 pub struct Renderer {
     fonts:FontSystem,
     cache:SwashCache,
@@ -73,6 +80,14 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn rtl_detection_uses_script_not_unrelated_cjk_or_latin_text(){
+        for passage in ["سَلَام","שָׁלוֹם","English سلام","فارسی"] {
+            assert!(contains_rtl(passage));
+        }
+        for passage in ["English text","你好世界","きょう","한글","🙂"] {
+            assert!(!contains_rtl(passage));
+        }
+    }
     #[test] fn independent_bidi_shaper_recognizes_rtl_base_direction(){
         let mut renderer=Renderer::new();
         for passage in ["سَلَام بالعربية","שָׁלוֹם בעברית"] {

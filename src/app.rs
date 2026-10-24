@@ -15,6 +15,7 @@ use crate::{
     preferences::{Preferences, Profile, Theme, CardTheme, CardFont,CardTemplate},
     publish,
     registry::{self, InstalledLayout},
+    rtl_shaping,
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
@@ -384,6 +385,9 @@ pub struct Typefinch {
     publish_last_card:String,
     publish_feedback:String,
     pending_publish:Option<Receiver<Result<String,String>>>,
+    rtl_renderer:Option<rtl_shaping::Renderer>,
+    rtl_texture:Option<egui::TextureHandle>,
+    rtl_signature:String,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -493,7 +497,9 @@ impl Typefinch {
             backup_check_result:String::new(),
             publish_repository:String::new(),publish_consent:false,
             publish_last_card:String::new(),publish_feedback:String::new(),
-            pending_publish:None,preview_layer:PreviewLayer::Base,
+            pending_publish:None,
+            rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
+            preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>,focused:bool) {
@@ -1340,6 +1346,39 @@ impl Typefinch {
         self.start_test(ctx);
         self.message="Practice drill started using missed reference patterns. Text stays in memory only.".into();
     }
+    /// Recompute only when reference window, score colors or input changes.
+    /// No screenshot or entered text leaves the in-memory native widget.
+    /// On render failure, the existing regular egui reference stays visible.
+    fn shape_rtl_reference(&mut self,ctx:&egui::Context,width:usize,
+        first:usize,last:usize,dark:bool)->Option<egui::TextureId> {
+        if !rtl_shaping::contains_rtl(&self.session.target){return None;}
+        let width=width.clamp(128,1600);
+        let runs=reference_runs(&self.session.target,&self.session.typed,
+            first,last,self.session.state==State::Running);
+        let spans=runs.iter().map(|run|{
+            let color=match run.feedback {
+                ReferenceFeedback::Correct=>correct_ink(dark),
+                ReferenceFeedback::Error=>error_ink(dark),
+                ReferenceFeedback::Cursor=>accent_ink(dark),
+                ReferenceFeedback::Unentered=>reference_ink(dark),
+            };
+            (run.text.clone(),color)
+        }).collect::<Vec<_>>();
+        let signature=format!("{width}:{first}:{last}:{dark}:{}:{}:{}",
+            self.session.state==State::Running,self.session.target,self.session.typed);
+        if signature!=self.rtl_signature || self.rtl_texture.is_none() {
+            let rendered=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
+                .render(&spans,width,102)?;
+            if let Some(texture)=self.rtl_texture.as_mut(){
+                texture.set(rendered,egui::TextureOptions::LINEAR);
+            } else {
+                self.rtl_texture=Some(ctx.load_texture("typefinch-rtl-reference",
+                    rendered,egui::TextureOptions::LINEAR));
+            }
+            self.rtl_signature=signature;
+        }
+        self.rtl_texture.as_ref().map(|texture|texture.id())
+    }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
@@ -1411,13 +1450,22 @@ impl Typefinch {
         let entered = self.session.typed.graphemes(true).count();
         let total = self.session.target.graphemes(true).count();
         let (first, last) = crate::engine::viewport(total, entered, 230);
-        let job=reference_layout_job(&self.session.target,&self.session.typed,
-            first,last,self.session.state==State::Running,ui.visuals().dark_mode);
+        let dark=ui.visuals().dark_mode;
+        let render_width=(ui.available_width()-36.0).floor().max(128.0) as usize;
+        let rtl_texture=self.shape_rtl_reference(ctx,render_width,first,last,dark);
+        let job=rtl_texture.is_none().then(||reference_layout_job(
+            &self.session.target,&self.session.typed,first,last,
+            self.session.state==State::Running,dark));
         let typing_area = egui::Frame::group(ui.style())
             .inner_margin(egui::Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
-                ui.label(job);
+                if let Some(texture)=rtl_texture {
+                    ui.add(egui::Image::new((texture,egui::vec2(render_width as f32,102.0))));
+                    ui.small("RTL reference: Unicode bidi + system-font shaping. Physical caret and IME placement are not yet verified.");
+                } else if let Some(job)=job {
+                    ui.label(job);
+                }
                 if !self.ime_preedit.is_empty() && self.session.state==State::Running
                     && self.mode==Mode::System {
                     ui.colored_label(accent_ink(ui.visuals().dark_mode),

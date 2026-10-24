@@ -257,6 +257,49 @@ LUA
       exit 1
     }
     echo "Native $name plain Arrow grapheme navigation PASS: 0 -> 1 -> 0"
+    # Real source mutation, not only caret painting. Select the first marked
+    # script grapheme, Backspace it, then undo. Both the original and the
+    # restored passage must have exactly the same grapheme counts; no fixture
+    # text or input path enters the QA report or persisted profile.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.15
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-before-delete.json"
+    xdotool key --clearmodifiers "shift+$selected_direction"
+    sleep 0.25
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-before-backspace.json"
+    xdotool key --clearmodifiers BackSpace
+    sleep 0.5
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-after-backspace.json"
+    import -window "$window" "$tmp/rtl-$name-editor-after-backspace.png"
+    xdotool key --clearmodifiers ctrl+z
+    sleep 0.5
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/editor-after-undo.json"
+    import -window "$window" "$tmp/rtl-$name-editor-after-undo.png"
+    lua5.4 - "$tmp/$name/editor-before-delete.json" \
+      "$tmp/$name/editor-before-backspace.json" \
+      "$tmp/$name/editor-after-backspace.json" \
+      "$tmp/$name/editor-after-undo.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing synthetic RTL source editing audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  assert(type(d.total)=="number" and type(d.index)=="number")
+  return d
+end
+local original,selected,deleted,restored=read(arg[1]),read(arg[2]),read(arg[3]),read(arg[4])
+assert(original.selected_graphemes==0 and original.index==0,
+  "RTL mutation did not start at the logical source boundary")
+assert(selected.total==original.total and selected.selected_graphemes==1
+  and selected.index==1, "Could not select one marked RTL grapheme")
+assert(deleted.total==original.total-1 and deleted.index==0
+  and deleted.selected_graphemes==0,
+  "Backspace did not delete one entire marked RTL grapheme")
+assert(restored.total==original.total and restored.selected_graphemes==0,
+  "Undo did not restore the original native marked-grapheme source length")
+print("Native marked RTL grapheme editing PASS: "..original.total.." -> "
+  ..deleted.total.." -> "..restored.total.." after selection, Backspace and Undo")
+LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi

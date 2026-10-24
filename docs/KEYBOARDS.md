@@ -30,6 +30,27 @@ Acceptance: hotplug two keyboards; map both with differing layouts; verify focus
 
 [Wayland keyboard protocol](https://wayland.app/protocols/wayland) · [Hyprland devices](https://wiki.hypr.land/configuring/core/devices/) · [Hyprland keyboard-layout documentation](https://wiki.hypr.land/configuring/core/binds/keyboard-layouts/).
 
+## Native JIS 109 and Menu-key reference geometry acceptance
+
+[CI 40121775319](https://github.com/sguzman/typefinch/actions/runs/40121775319)
+passed Rust source tests and the full native X11/Wayland GUI regression suite.
+The keyboard preview now retains physical-reference Left/Right Super and Menu
+positions on its JIS 109 model, and Menu on the ANSI, ISO and split main
+blocks. The JIS bottom row models Ctrl, Super, Alt, Muhenkan, Space, Henkan,
+Kana, Alt, Super, Menu, Ctrl in explicit physical order; no modifier or
+conversion key is synthesized into scored input. The three Japanese
+conversion keys have readable `Non`, `Conv` and `Kana` fallback labels
+when installed XKB provides no printable character.
+
+Archived `typefinch-geometry-jis.png`, `typefinch-geometry-iso.png` and
+`typefinch-geometry-split.png` from that successful CI run were opened and
+visually inspected: keys are visible within the native preview, with no
+bottom-row clipping. The Lua native GUI fixture checks the revised slot,
+modifier and control counts, including shape cycling and Spanish-ISO
+selection. These are **illustrated, unscored layout references**, not
+physical ISO/JIS event routing or complete modifier/IME acceptance.
+T305's remaining acceptance checks stay open.
+
 ## Nested Weston native Wayland GUI acceptance
 
 [CI 40119656114](https://github.com/sguzman/typefinch/actions/runs/40119656114)

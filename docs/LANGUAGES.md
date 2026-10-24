@@ -17,6 +17,17 @@ Comparison graphs match layout, input mode, content type plus language, duration
 ## Known limitations
 The engine compares canonically normalized Unicode extended grapheme clusters (scoring version 2), including composed/decomposed equivalents and whole-grapheme Backspace. A separate corrected CPM (matched display graphemes/minute) is exposed alongside standardized WPM for IME-oriented custom text; it is not a physical keystroke rate or a cross-language benchmark. Synthetic CJK committed-text and IME preedit tests exist, and CI verifies installed fallback fonts for representative CJK, Arabic and Hebrew glyphs. None of these establish live Fcitx/IBus composition, bidirectional shaping/caret correctness, or complete Unicode coverage. Spanish passages are intended for basic committed-text entry; retain native IME and RTL acceptance gates.
 
+## Active IME candidate navigation guard
+
+[CI 40120935121](https://github.com/sguzman/typefinch/actions/runs/40120935121)
+passed a regression for focused OS-input sessions: Backspace while a native
+IME preedit is active no longer deletes committed, scored graphemes;
+Escape dismisses the local candidate preview instead of cancelling the
+scored session. Once preedit has ended, ordinary Backspace remains available.
+The guard applies only to the currently focused Typefinch typing surface;
+it does not capture background keys, implement an IME engine or certify
+native Fcitx/IBus candidate interaction. T201 and T803 remain incomplete.
+
 ## Future corpus governance
 Store future corpora as independently versioned, attributed, redistributable data assets, with provenance/license metadata, difficulty annotations, and language-specific speed conventions. Do not claim a comprehensive language corpus from the small initial phrase set.
 

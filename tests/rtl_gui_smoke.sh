@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Native X11 rendering smoke for synthetic Arabic and Hebrew custom passages.
-# Not an acceptance test for BiDi shaping, caret, IMEs or physical RTL typing.
+# Tests actual shaped idle/active X11 frames, but not physical RTL keyboard
+# typing, live compositor IMEs or complete keyboard editor caret behavior.
 set -Eeuo pipefail
 export LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=x11 XDG_SESSION_TYPE=x11
 tmp="$(mktemp -d)"
@@ -69,9 +70,28 @@ for name in arabic hebrew;do
     echo "RTL $name fixture did not alter rendered frame: $delta" >&2;exit 1;
   }
   echo "Native $name fixture rendered: $delta changed pixels (not BiDi QA)"
+  # The real app enters active typing mode with F5; capture COSMIC Text's
+  # shaped caret position with no synthetic private text or physical key
+  # attribution. Immediately cancel so the next fixture can import safely.
+  focus_window
+  xdotool key --clearmodifiers F5
+  sleep 0.3
+  xdotool key --clearmodifiers F2
+  sleep 0.2
+  import -window "$window" "$tmp/rtl-$name-running.png"
+  [[ -s "$tmp/rtl-$name-running.png" ]] || {
+    echo "No active RTL caret screenshot: $name" >&2;exit 1;
+  }
+  active_delta="$(compare -metric AE "$tmp/rtl-$name.png" "$tmp/rtl-$name-running.png" null: 2>&1 || true)"
+  [[ "$active_delta" =~ ^[0-9]+$ && "$active_delta" -gt 100 ]] || {
+    echo "RTL active frame never changed: $name / $active_delta" >&2;exit 1;
+  }
+  xdotool key --clearmodifiers Escape
+  sleep 0.25
+  echo "Native $name active typing frame captured: $active_delta changed pixels"
 done
 different="$(compare -metric AE "$tmp/rtl-arabic.png" "$tmp/rtl-hebrew.png" null: 2>&1 || true)"
 [[ "$different" =~ ^[0-9]+$ && "$different" -gt 400 ]] || {
   echo "Arabic/Hebrew fixture screenshots indistinguishable: $different" >&2;exit 1;
 }
-echo 'RTL rendering fixture PASS (not shaping, caret or physical input acceptance)'
+echo 'RTL native shaped idle/active frames PASS (not hardware or live IME acceptance)'

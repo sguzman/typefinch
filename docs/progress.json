@@ -1213,11 +1213,12 @@
               "id": "T903",
               "emoji": "♿",
               "name": "Accessibility review",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Keyboard-only audit",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs native keyboard controls include Ctrl+N profile editor focus, Tab/Shift+Tab/Enter validated creation, Ctrl+Shift+T System/Light/Dark cycle, F1 guide, F2/F5 typing, F3/F4/F10 preview, F6–F9 exports and F11/F12 local imports. tests/keyboard_navigation_smoke.sh and existing GUI/import/goal tests drive real X11 egui controls: CI 40047465930 passed 171 Rust tests, keyboard-created profile, F1 107868-pixel guide delta, saved system/light/dark/system sequence and complete native X11 smoke. Scope is core keyboard-only workflows, not assistive screen reader, actual Hyprland keyboard or RTL caret testing."
                 },
                 {
                   "text": "Contrast/reduced motion",

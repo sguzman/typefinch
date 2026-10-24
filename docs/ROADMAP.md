@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 81%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 82%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
@@ -251,11 +251,11 @@
 - 🌏 Languages — `████░░░░░░ 44%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
-## 📦 M6 — Release quality — `███████░░░ 67%`
+## 📦 M6 — Release quality — `████████░░ 75%`
 
 **Acceptance gate:** Automated regression, live QA and reproducible Linux packages.
 
-### 🧪 P9 — Acceptance and release — `███████░░░ 67%`
+### 🧪 P9 — Acceptance and release — `████████░░ 75%`
 
 - 🧪 **T901** CI and acceptance-ledger validation — `██████████ 100%`
   - [x] Workflow authored — .github/workflows/ci.yml
@@ -265,8 +265,8 @@
   - [x] Headless run — Xvfb + Openbox + Mesa launched native egui app, typed 33 chars and captured screenshot; Actions 39870050679
   - [ ] Keyboard/input QA
   - [ ] Theme/layout screenshots
-- ♿ **T903** Accessibility review — `███████░░░ 67%`
-  - [ ] Keyboard-only audit
+- ♿ **T903** Accessibility review — `██████████ 100%`
+  - [x] Keyboard-only audit — src/app.rs native keyboard controls include Ctrl+N profile editor focus, Tab/Shift+Tab/Enter validated creation, Ctrl+Shift+T System/Light/Dark cycle, F1 guide, F2/F5 typing, F3/F4/F10 preview, F6–F9 exports and F11/F12 local imports. tests/keyboard_navigation_smoke.sh and existing GUI/import/goal tests drive real X11 egui controls: CI 40047465930 passed 171 Rust tests, keyboard-created profile, F1 107868-pixel guide delta, saved system/light/dark/system sequence and complete native X11 smoke. Scope is core keyboard-only workflows, not assistive screen reader, actual Hyprland keyboard or RTL caret testing.
   - [x] Contrast/reduced motion — src/app.rs: WCAG-oriented contrast palette tests and reduce-motion timing tests; native light/dark screenshot QA, Actions 39967868689
   - [x] Unicode fonts — src/fonts.rs: read-only installed system Noto CJK/Arabic/Hebrew fallbacks with size/type guards and egui font glyph coverage; GitHub Actions 40046042312 green, including dedicated TYPEFINCH_QA_UNICODE_FONTS test, compilation and full X11 QA. Glyph availability only: native shaping, RTL caret, and real IME acceptance remain open.
 - 🚀 **T904** Reproducible Linux release — `███████░░░ 67%`
@@ -277,5 +277,5 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🧪 Automated QA — `███████░░░ 67%`
-- 🚀 Release readiness — `███████░░░ 67%`
+- 🚀 Release readiness — `████████░░ 84%`
 

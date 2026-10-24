@@ -197,12 +197,38 @@ that result was **not** used as first-script-grapheme acceptance.
 [CI 40127603470](https://github.com/sguzman/typefinch/actions/runs/40127603470)
 found that one native Shift+Arrow step could stop *inside* an Arabic marked
 grapheme, yielding zero complete selected graphemes in the shaped preview.
-The accepted test advances a bounded number of scalar cursor positions
-and requires the complete grapheme to be selected. This confirms the
-selection feedback but also documents an ergonomic gap: **the native editor
-does not yet guarantee one physical arrow press per grapheme**. Mixed-run
-BiDi hit-testing and full editing/IME behavior remain unverified.
-T804 stays below 100%.
+That earlier test advanced a bounded number of scalar cursor positions
+before accepting a whole grapheme. A later application correction in
+[CI 40128888077](https://github.com/sguzman/typefinch/actions/runs/40128888077)
+now snaps a **single native Shift+Arrow** to the complete marked cluster.
+The test passed **221 Rust tests** and confirmed the first Arabic and Hebrew
+script graphemes in the actual native editor and shaped preview, changing
+191 and 224 preview pixels respectively.
+
+[CI 40129503350](https://github.com/sguzman/typefinch/actions/runs/40129503350)
+also passed 221 Rust tests and the full native GUI suite after correcting
+the **opposite-direction Shift+Arrow** path. The earlier helper chose a
+grapheme boundary based only on the selection anchor, potentially trapping
+reverse navigation at the same selected cluster. The corrected helper uses
+the active cursor position *before and after* the native key event, preserves
+the native selection anchor and horizontal position, and snaps in the actual
+movement direction. Both real Arabic and Hebrew sessions selected exactly
+one initial grapheme and then retracted to zero selected graphemes with one
+opposite Shift+Arrow. Native focus and IME events are not intercepted.
+
+[CI 40129044449](https://github.com/sguzman/typefinch/actions/runs/40129044449)
+additionally exercised the actual editable control on three *mixed*
+Arabic, Latin and Hebrew paragraphs. Moving from Ctrl+Home to Ctrl+End
+preserved the logical cursor bounds (0 to 54 graphemes), with the separate
+shaped visual caret moving from vertical pixel 0 to 60. Both archived
+full-frame mixed-editor screenshots were inspected: the caret appears in
+the first and last paragraph respectively, without text loss or a
+selection. This is **specific X11 input evidence**, not proof of arbitrary
+mixed-direction mouse hit-testing or physical Wayland correctness.
+
+T804 remains incomplete: arbitrary native BiDi selection/range motion,
+candidate overlays, hardware focus changes and full IME interaction are
+still unaccepted.
 
 ## Unaccepted scope
 

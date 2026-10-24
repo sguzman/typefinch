@@ -31,31 +31,19 @@ jobs:
         run: lua5.4 tools/roadmap.lua --check
       - name: Audit brand swatch and semantic accent contrast
         run: lua5.4 tools/color_audit.lua --check
-      - name: Build
-        run: cargo check --all-targets
-      - name: Test
-        run: cargo test --all-targets
-      # Bootstrap the actual Cargo resolution once so the resulting
-      # application dependency graph can be committed and locked in source.
-      # Do not infer package checksums or version choices from job logs.
-      - name: Export resolved Cargo lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: typefinch-cargo-lock
-          path: Cargo.lock
-          if-no-files-found: error
-      # One-time transport of PUBLIC dependency checksums through the
-      # existing GitHub log interface for the source-control steward.
-      # No user passages, settings, tokens or profile data are included.
-      - name: Emit public dependency lock bytes for source tracking
+      - name: Assert tracked dependency resolution
         run: |
-          echo TYPEFINCH_PUBLIC_LOCK_BEGIN
-          base64 --wrap=120 Cargo.lock
-          echo TYPEFINCH_PUBLIC_LOCK_END
+          git ls-files --error-unmatch Cargo.lock
+          test -s Cargo.lock
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+      - name: Build
+        run: cargo check --locked --all-targets
+      - name: Test
+        run: cargo test --locked --all-targets
       - name: Installed Unicode font coverage (CJK, Arabic, Hebrew)
         run: TYPEFINCH_QA_UNICODE_FONTS=1 cargo test fonts::tests::system_noto_fallbacks_render_required_glyphs -- --nocapture
       - name: Build graphical executable
-        run: cargo build
+        run: cargo build --locked
       - name: Verify headless version and help flags
         run: |
           ./target/debug/typefinch --version | grep -Fx "typefinch $(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"
@@ -98,6 +86,9 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/altgr_gui_smoke.sh
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
+      - name: Verify CI did not rewrite Cargo.lock
+        if: always()
+        run: git diff --exit-code -- Cargo.lock
       - name: Build optimized Linux preview
         if: contains(github.event.head_commit.message, '[package]') || github.event_name == 'workflow_dispatch'
         run: cargo build --release --locked

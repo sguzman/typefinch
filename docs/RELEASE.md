@@ -47,6 +47,14 @@ An existing unmanaged `bin/typefinch` is never overwritten. App settings
 and the SQLite database are **not** rolled back with the binary: use the in-app
 F8 full backup before experimenting with newer builds.
 
+The tracked `Cargo.lock` pins the dependency resolver's crate versions and
+checksums, and `rust-toolchain.toml` specifies Rust 1.99.1, the actual
+toolchain verified by CI on 2026-10-24. Normal CI builds/tests and preview
+packaging now use Cargo's `--locked` mode, and the workflow fails if a
+command rewrites the committed lockfile. This controls source dependencies,
+not the host C library, graphics drivers, linker or every build timestamp;
+a bit-identical executable across different machines is **not yet proven**.
+
 Maintainers can build with `cargo build --release --locked` and run
 `lua5.4 tools/package_release.lua VERSION COMMIT_SHA` followed by
 `bash tests/release_smoke.sh`. The explicit file allowlist excludes private

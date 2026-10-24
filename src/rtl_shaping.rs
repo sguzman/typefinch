@@ -2,7 +2,7 @@
 //! passages. Scoring remains in src/engine.rs at *logical* grapheme positions.
 //! Glyphs and screenshots are never saved except in explicit synthetic CI.
 //! This renderer does not subscribe to any keyboard input or mutate a layout.
-use cosmic_text::{Attrs,Buffer,Color,FontSystem,Metrics,Shaping,SwashCache};
+use cosmic_text::{Attrs,Buffer,Color,Cursor,FontSystem,Metrics,Shaping,SwashCache};
 use eframe::egui::{self,Color32};
 
 /// Script-triggered preview only, not a language classifier. Unicode
@@ -11,6 +11,12 @@ pub fn contains_rtl(text:&str)->bool {
     text.chars().any(|ch|matches!(ch as u32,
         0x0590..=0x08FF | 0xFB1D..=0xFDFF | 0xFE70..=0xFEFF
         | 0x10E60..=0x10E7F | 0x1EE00..=0x1EEFF))
+}
+pub struct ShapedImage {
+    pub image:egui::ColorImage,
+    /// Visual caret origin in texture-local points/pixels; no physical
+    /// keyboard attribution or IME event subscription is involved.
+    pub caret:Option<(f32,f32)>,
 }
 pub struct Renderer {
     fonts:FontSystem,
@@ -25,6 +31,14 @@ impl Renderer {
     /// Resource caps forbid allocating arbitrarily large passages or images.
     pub fn render(&mut self,spans:&[(String,Color32)],width:usize,height:usize)
         ->Option<egui::ColorImage> {
+        self.render_with_caret(spans,width,height,None).map(|result|result.image)
+    }
+    /// The cursor index refers to a byte boundary of the *logical visible*
+    /// reference text. COSMIC Text maps it through BiDi layout into visual
+    /// coordinates. Caller owns the focus and IME policy.
+    pub fn render_with_caret(&mut self,spans:&[(String,Color32)],
+        width:usize,height:usize,cursor_byte:Option<usize>)
+        ->Option<ShapedImage> {
         if width==0 || height==0 || width>2048 || height>256
             || spans.len()>512
             || spans.iter().map(|(text,_)|text.len()).sum::<usize>()>16_384 {
@@ -41,6 +55,11 @@ impl Renderer {
             )),
             &Attrs::new(),Shaping::Advanced,None,
         );
+        let visible_bytes=spans.iter().map(|(text,_)|text.len()).sum::<usize>();
+        borrowed.shape_until_scroll(false);
+        let caret=cursor_byte.filter(|index|*index<=visible_bytes)
+            .and_then(|byte|borrowed.cursor_position(&Cursor::new(0,byte)))
+            .filter(|(x,y)|x.is_finite() && y.is_finite());
         borrowed.draw(&mut self.cache,Color::rgb(255,255,255),|x,y,w,h,color|{
             let (red,green,blue,alpha)=color.as_rgba_tuple();
             if alpha==0{return;}
@@ -65,7 +84,10 @@ impl Renderer {
                 }
             }
         });
-        Some(egui::ColorImage::from_rgba_unmultiplied([width,height],&pixels))
+        Some(ShapedImage{
+            image:egui::ColorImage::from_rgba_unmultiplied([width,height],&pixels),
+            caret,
+        })
     }
     /// Read-only diagnostics from the actual shaping library. A line's base
     /// direction is not inferred from font availability or string reversal.
@@ -98,6 +120,23 @@ mod tests {
         }
         assert!(renderer.paragraph_directions("English reference").iter()
             .all(|rtl|!*rtl));
+    }
+    #[test] fn native_bidi_cursor_maps_logical_byte_offset_to_visual_position(){
+        let mut renderer=Renderer::new();
+        for passage in ["سلام","שלום"] {
+            let style=vec![(passage.to_owned(),Color32::WHITE)];
+            let initial=renderer.render_with_caret(&style,640,96,Some(0)).unwrap();
+            let next=renderer.render_with_caret(&style,640,96,
+                Some(passage.chars().next().unwrap().len_utf8())).unwrap();
+            let first=initial.caret.expect("initial caret must be placed by shaper");
+            let second=next.caret.expect("following caret must have a visual position");
+            assert!(first.0>=0.0 && first.0<=640.0 && first.1>=0.0 && first.1<=96.0);
+            assert!(second.0>=0.0 && second.0<=640.0 && second.1>=0.0 && second.1<=96.0);
+            assert!((first.0-second.0).abs()>1.0,
+                "advancing logical RTL text must move the visual caret");
+            assert!(renderer.render_with_caret(&style,640,96,Some(passage.len()+1))
+                .unwrap().caret.is_none(),"out-of-bounds caret is not guessed");
+        }
     }
     #[test] fn shaped_rtl_output_is_bounded_nonblank_and_transparent(){
         let mut renderer=Renderer::new();

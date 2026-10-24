@@ -388,6 +388,7 @@ pub struct Typefinch {
     rtl_renderer:Option<rtl_shaping::Renderer>,
     rtl_texture:Option<egui::TextureHandle>,
     rtl_signature:String,
+    rtl_caret:Option<(f32,f32)>,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -499,6 +500,7 @@ impl Typefinch {
             publish_last_card:String::new(),publish_feedback:String::new(),
             pending_publish:None,
             rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
+            rtl_caret:None,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -1367,13 +1369,19 @@ impl Typefinch {
         let signature=format!("{width}:{first}:{last}:{dark}:{}:{}:{}",
             self.session.state==State::Running,self.session.target,self.session.typed);
         if signature!=self.rtl_signature || self.rtl_texture.is_none() {
+            let logical_cursor=self.session.typed.graphemes(true).count()
+                .saturating_sub(first).min(last.saturating_sub(first));
+            let cursor_byte=self.session.target.graphemes(true).skip(first)
+                .take(logical_cursor).map(str::len).sum::<usize>();
             let rendered=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
-                .render(&spans,width,102)?;
+                .render_with_caret(&spans,width,102,
+                    (self.session.state==State::Running).then_some(cursor_byte))?;
+            self.rtl_caret=rendered.caret;
             if let Some(texture)=self.rtl_texture.as_mut(){
-                texture.set(rendered,egui::TextureOptions::LINEAR);
+                texture.set(rendered.image,egui::TextureOptions::LINEAR);
             } else {
                 self.rtl_texture=Some(ctx.load_texture("typefinch-rtl-reference",
-                    rendered,egui::TextureOptions::LINEAR));
+                    rendered.image,egui::TextureOptions::LINEAR));
             }
             self.rtl_signature=signature;
         }
@@ -1451,18 +1459,28 @@ impl Typefinch {
         let total = self.session.target.graphemes(true).count();
         let (first, last) = crate::engine::viewport(total, entered, 230);
         let dark=ui.visuals().dark_mode;
-        let render_width=(ui.available_width()-36.0).floor().max(128.0) as usize;
+        let render_width=(ui.available_width()-36.0).floor().clamp(128.0,1600.0) as usize;
         let rtl_texture=self.shape_rtl_reference(ctx,render_width,first,last,dark);
         let job=rtl_texture.is_none().then(||reference_layout_job(
             &self.session.target,&self.session.typed,first,last,
             self.session.state==State::Running,dark));
+        let mut rtl_image_rect=None;
         let typing_area = egui::Frame::group(ui.style())
             .inner_margin(egui::Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
                 if let Some(texture)=rtl_texture {
-                    ui.add(egui::Image::new((texture,egui::vec2(render_width as f32,102.0))));
-                    ui.small("RTL reference: Unicode bidi + system-font shaping. Physical caret and IME placement are not yet verified.");
+                    let response=ui.add(egui::Image::new((texture,
+                        egui::vec2(render_width as f32,102.0))));
+                    rtl_image_rect=Some(response.rect);
+                    if self.session.state==State::Running {
+                        if let Some((x,y))=self.rtl_caret {
+                            let origin=response.rect.min+egui::vec2(x,y);
+                            ui.painter().line_segment([origin,origin+egui::vec2(0.0,27.0)],
+                                egui::Stroke::new(1.5,accent_ink(dark)));
+                        }
+                    }
+                    ui.small("RTL preview: shaped visual caret from logical reference positions; real IME selection and hardware QA remain open.");
                 } else if let Some(job)=job {
                     ui.label(job);
                 }
@@ -1486,9 +1504,12 @@ impl Typefinch {
             // even though it is not an editable TextEdit widget. IME popup
             // positioning is approximate until caret/RTL QA is accepted.
             let rect=typing_area.response.rect;
-            let cursor=egui::Rect::from_min_size(
-                rect.left_top()+egui::vec2(16.0,16.0),
-                egui::vec2(1.0,22.0));
+            let cursor=rtl_image_rect.and_then(|image|self.rtl_caret.map(|(x,y)|
+                egui::Rect::from_min_size(image.min+egui::vec2(x,y),
+                    egui::vec2(1.0,27.0))))
+                .unwrap_or_else(||egui::Rect::from_min_size(
+                    rect.left_top()+egui::vec2(16.0,16.0),
+                    egui::vec2(1.0,22.0)));
             ctx.output_mut(|out|out.ime=Some(egui::output::IMEOutput{
                 rect,cursor_rect:cursor
             }));

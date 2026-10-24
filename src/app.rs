@@ -45,6 +45,37 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 // safely labeled as physical repeat or uniquely attributed to hardware.
 // Keep provisional IME text *only in memory*, bounded to the visible
 // candidate preview. Never mistake it for a committed scoring event.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+enum ReferenceFeedback {Correct,Error,Cursor,Unentered}
+#[derive(Debug,PartialEq,Eq)]
+struct ReferenceRun {text:String,feedback:ReferenceFeedback}
+/// Group adjacent equally styled *logical* reference graphemes, without
+/// reversing or slicing UTF-8. In particular, keep unentered Arabic words in
+/// one shaping run rather than splitting every connected letter into a
+/// separate egui text section. This is not a complete BiDi renderer.
+fn reference_runs(target:&str,typed:&str,start:usize,end:usize,running:bool)
+    ->Vec<ReferenceRun> {
+    let entered=typed.graphemes(true).count();
+    let reference=target.graphemes(true).skip(start).take(end.saturating_sub(start));
+    let typed_at=typed.graphemes(true).skip(start).collect::<Vec<_>>();
+    let mut runs=Vec::<ReferenceRun>::new();
+    for (index,reference_grapheme) in reference.enumerate() {
+        let position=start+index;
+        let feedback=match typed_at.get(index) {
+            Some(actual) if crate::engine::canonically_equal(actual,reference_grapheme)
+                =>ReferenceFeedback::Correct,
+            Some(_)=>ReferenceFeedback::Error,
+            None if running && position==entered=>ReferenceFeedback::Cursor,
+            None=>ReferenceFeedback::Unentered,
+        };
+        if let Some(last)=runs.last_mut().filter(|last|last.feedback==feedback) {
+            last.text.push_str(reference_grapheme);
+        } else {
+            runs.push(ReferenceRun{text:reference_grapheme.to_owned(),feedback});
+        }
+    }
+    runs
+}
 const MAX_IME_PREEDIT_GRAPHEMES:usize=64;
 const MAX_IME_PREEDIT_BYTES:usize=4096;
 fn limited_ime_preedit(text:&str)->String {
@@ -1332,19 +1363,18 @@ impl Typefinch {
         let entered = self.session.typed.graphemes(true).count();
         let total = self.session.target.graphemes(true).count();
         let (first, last) = crate::engine::viewport(total, entered, 230);
-        let expected:Vec<&str> = self.session.target.graphemes(true).skip(first).take(last-first).collect();
-        let actual:Vec<&str> = self.session.typed.graphemes(true).skip(first).collect();
-        let mut job = egui::text::LayoutJob::default();
-        for (i, ch) in expected.iter().enumerate() {
-            let position = first + i;
-            let color = match actual.get(i) {
-                Some(c) if crate::engine::canonically_equal(c,ch) => correct_ink(ui.visuals().dark_mode),
-                Some(_) => error_ink(ui.visuals().dark_mode),
-                None if position == entered && self.session.state == State::Running => accent_ink(ui.visuals().dark_mode),
-                None => reference_ink(ui.visuals().dark_mode),
+        let runs=reference_runs(&self.session.target,&self.session.typed,first,last,
+            self.session.state==State::Running);
+        let mut job=egui::text::LayoutJob::default();
+        for run in runs {
+            let color=match run.feedback {
+                ReferenceFeedback::Correct=>correct_ink(ui.visuals().dark_mode),
+                ReferenceFeedback::Error=>error_ink(ui.visuals().dark_mode),
+                ReferenceFeedback::Cursor=>accent_ink(ui.visuals().dark_mode),
+                ReferenceFeedback::Unentered=>reference_ink(ui.visuals().dark_mode),
             };
-            job.append(ch, 0.0, egui::TextFormat {
-                font_id: egui::FontId::monospace(21.0),
+            job.append(&run.text,0.0,egui::TextFormat{
+                font_id:egui::FontId::monospace(21.0),
                 color,
                 ..Default::default()
             });
@@ -2107,6 +2137,40 @@ mod palette_tests {
     fn contrast(a:Color32,b:Color32)->f64 {
         let x=brightness(a);let y=brightness(b);
         (x.max(y)+0.05)/(x.min(y)+0.05)
+    }
+    #[test] fn rtl_reference_feedback_retains_logical_order_and_clusters() {
+        // The same normalization policy applies to Arabic vowel marks and
+        // Hebrew niqqud without interpreting display order as input order.
+        let arabic="سَلَام بالعربية";
+        let base=reference_runs(arabic,"",0,arabic.graphemes(true).count(),false);
+        assert_eq!(base.len(),1,"unentered connected script must be one text section");
+        assert_eq!(base[0].text,arabic);
+        assert_eq!(base[0].feedback,ReferenceFeedback::Unentered);
+        let hebrew="שָׁלוֹם שלום";
+        let partial="שָׁלוֹם ש";
+        let runs=reference_runs(hebrew,partial,0,hebrew.graphemes(true).count(),true);
+        assert_eq!(runs.iter().map(|r|r.text.as_str()).collect::<String>(),hebrew);
+        assert_eq!(runs.first().unwrap().feedback,ReferenceFeedback::Correct);
+        assert!(runs.iter().any(|r|r.feedback==ReferenceFeedback::Cursor));
+        let decomposed="שָׁ";
+        let composed=decomposed.nfc().collect::<String>();
+        assert!(crate::engine::canonically_equal(decomposed,&composed));
+    }
+    #[test] fn mixed_script_errors_and_windows_never_reverse_reference() {
+        let target="abc سلام שלום xyz";
+        let erroneous="abc سx";
+        let total=target.graphemes(true).count();
+        let all=reference_runs(target,erroneous,0,total,true);
+        assert_eq!(all.iter().map(|r|r.text.as_str()).collect::<String>(),target);
+        assert!(all.iter().any(|r|r.feedback==ReferenceFeedback::Error));
+        assert!(all.iter().any(|r|r.feedback==ReferenceFeedback::Cursor));
+        assert_eq!(all.first().unwrap().feedback,ReferenceFeedback::Correct);
+        let (start,end)=crate::engine::viewport(total,9,6);
+        let subset=reference_runs(target,erroneous,start,end,true);
+        let expected=target.graphemes(true).skip(start).take(end-start).collect::<String>();
+        assert_eq!(subset.iter().map(|r|r.text.as_str()).collect::<String>(),expected);
+        assert!(subset.iter().all(|r|!r.text.is_empty()));
+        assert!(reference_runs(target,"",0,0,true).is_empty());
     }
     #[test] fn preview_modifier_cycle_is_deterministic_and_only_presentation() {
         let mut layer=PreviewLayer::Base;

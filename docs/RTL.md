@@ -176,6 +176,34 @@ selection motion across mixed RTL/LTR runs, arbitrary partial selections,
 platform IME preedit overlays and physical Hyprland keyboard QA remain
 unaccepted. T804 retains its existing acceptance percentage.
 
+## Native first-script-grapheme selection acceptance
+
+[CI 40127907188](https://github.com/sguzman/typefinch/actions/runs/40127907188)
+passed the complete Rust and native graphical suite, including
+keyboard-operated **partial selection of the first actual Arabic and Hebrew
+script grapheme** in the editable egui source field. The source is disposable
+test text with combining vowel marks and later Latin digits. The fixture
+requires exactly one *logical extended grapheme* to be selected and its
+cursor at logical index 1, rather than accepting selection of the trailing
+ASCII digit. The independent COSMIC Text preview then changes **191 pixels
+for Arabic and 224 for Hebrew** relative to the same unselected starting
+caret. Both resulting `rtl-*-editor-partial.png` screenshots were opened
+and visually inspected: the correct initial right-to-left script glyph is
+highlighted in the shaped preview.
+
+The earlier [CI 40126877549](https://github.com/sguzman/typefinch/actions/runs/40126877549)
+passed a weaker partial-selection test that only selected the final numeral;
+that result was **not** used as first-script-grapheme acceptance.
+[CI 40127603470](https://github.com/sguzman/typefinch/actions/runs/40127603470)
+found that one native Shift+Arrow step could stop *inside* an Arabic marked
+grapheme, yielding zero complete selected graphemes in the shaped preview.
+The accepted test advances a bounded number of scalar cursor positions
+and requires the complete grapheme to be selected. This confirms the
+selection feedback but also documents an ergonomic gap: **the native editor
+does not yet guarantee one physical arrow press per grapheme**. Mixed-run
+BiDi hit-testing and full editing/IME behavior remain unverified.
+T804 stays below 100%.
+
 ## Unaccepted scope
 
 T804 is not automatically complete because shaped screenshots are legible.

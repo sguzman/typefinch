@@ -6,6 +6,12 @@
 
 **Project color:** `#8696F5` · `oklch(70.123% 0.14003 274.97)` ([decision](docs/COLOR.md)). **Theme:** System by default, or explicit ☀ Light / 🌙 Dark.
 
+**GitHub profile card example (synthetic CI fixture, not real user statistics):**
+
+![Typefinch synthetic example profile card](assets/typefinch-card-demo.svg)
+
+The app exports this style of self-contained, script-free SVG together with Markdown for optional manual publication. No profile data is automatically uploaded.
+
 > **Development preview, not an accepted MVP:** CI builds and tests the application under native X11, but real Hyprland hardware, physical keyboard attribution, complete IME/RTL input, and release acceptance remain open.
 
 ## Currently implemented in source

@@ -389,6 +389,8 @@ pub struct Typefinch {
     rtl_texture:Option<egui::TextureHandle>,
     rtl_signature:String,
     rtl_caret:Option<(f32,f32)>,
+    rtl_editor_texture:Option<egui::TextureHandle>,
+    rtl_editor_signature:String,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -501,6 +503,7 @@ impl Typefinch {
             pending_publish:None,
             rtl_renderer:None,rtl_texture:None,rtl_signature:String::new(),
             rtl_caret:None,
+            rtl_editor_texture:None,rtl_editor_signature:String::new(),
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -1146,6 +1149,7 @@ impl Typefinch {
                 );
                 if edit.changed() { self.rebuild_session(); }
                 ui.small(format!("{} graphemes entered; only the first 4096 will be used. Text is not saved.", self.custom_text.graphemes(true).count()));
+                self.show_rtl_editor_preview(ui);
             }
             ui.add_space(6.0);
             ui.label("Theme");
@@ -1386,6 +1390,36 @@ impl Typefinch {
             self.rtl_signature=signature;
         }
         self.rtl_texture.as_ref().map(|texture|texture.id())
+    }
+    /// Keep the ordinary multiline input editable, but show a separately
+    /// shaped, read-only RTL preview because egui's editor does not yet
+    /// provide fully correct mixed-script visual cursor behavior.
+    fn show_rtl_editor_preview(&mut self,ui:&mut egui::Ui){
+        if !rtl_shaping::contains_rtl(&self.custom_text){return;}
+        let preview=self.custom_text.graphemes(true).take(160).collect::<String>();
+        let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
+        let dark=ui.visuals().dark_mode;
+        let signature=format!("{width}:{dark}:{preview}");
+        if signature!=self.rtl_editor_signature || self.rtl_editor_texture.is_none(){
+            let spans=vec![(preview,reference_ink(dark))];
+            let Some(image)=self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
+                .render(&spans,width,96) else {
+                ui.small("RTL preview unavailable; editable source text is preserved.");
+                return;
+            };
+            if let Some(texture)=self.rtl_editor_texture.as_mut(){
+                texture.set(image,egui::TextureOptions::LINEAR);
+            }else{
+                self.rtl_editor_texture=Some(ui.ctx().load_texture("typefinch-rtl-editor-preview",
+                    image,egui::TextureOptions::LINEAR));
+            }
+            self.rtl_editor_signature=signature;
+        }
+        if let Some(texture)=self.rtl_editor_texture.as_ref(){
+            ui.label(RichText::new("RTL shaped preview (read-only)").strong());
+            ui.add(egui::Image::new((texture.id(),egui::vec2(width as f32,96.0))));
+            ui.small("First 160 graphemes. Edit in the field above; native RTL selection and caret behavior remain unverified.");
+        }
     }
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());

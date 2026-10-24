@@ -31,6 +31,10 @@ cleanup(){
 trap cleanup EXIT
 printf '%s' 'سَلَام بالعربية 123' > "$tmp/arabic.txt"
 printf '%s' 'שָׁלוֹם בעברית 123' > "$tmp/hebrew.txt"
+# Long original synthetic fixture, with enough connected RTL words to test
+# responsive wrapping, a forced newline and a narrow reference viewport.
+for _ in $(seq 1 24);do printf '%s' 'שלום עולם ' >> "$tmp/hebrew-long.txt";done
+printf '\nסוף 123' >> "$tmp/hebrew-long.txt"
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm_pid=$!
 sleep 0.4
@@ -65,7 +69,7 @@ stop_app(){
   window=""
   sleep 0.3
 }
-for name in arabic hebrew;do
+for name in arabic hebrew hebrew-long;do
   mkdir -p "$tmp/$name"
   start_app "$name"
   import -window "$window" "$tmp/rtl-$name-baseline.png"
@@ -79,7 +83,8 @@ for name in arabic hebrew;do
   sleep 0.65
   # Strong fixture-identity assertion. The app emits only a synthetic script
   # category and reference grapheme count, never text or a private file path.
-  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$name" <<'LUA'
+  expected_script="${name%%-*}"
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected_script" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(arg[1],"rb"),"No import audit file")
 local r=assert(json.decode(f:read("*a")))
@@ -130,4 +135,4 @@ different="$(compare -metric AE "$tmp/rtl-arabic.png" "$tmp/rtl-hebrew.png" null
 [[ "$different" =~ ^[0-9]+$ && "$different" -gt 400 ]] || {
   echo "Distinct imported RTL scripts rendered identical frames: $different" >&2;exit 1;
 }
-echo 'Independent Arabic and Hebrew native X11 fixture PASS; real IME/Hyprland QA pending'
+echo 'Independent Arabic/Hebrew native X11 fixtures (including long RTL wrapping) PASS; real IME/Hyprland QA pending'

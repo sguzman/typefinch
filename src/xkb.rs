@@ -144,6 +144,21 @@ mod tests {
         let colemak=Emulator::compile("us(colemak)").unwrap();
         assert_eq!(colemak.translate(Key::E,false).as_deref(),Some("f"));
     }
+    #[test] fn actual_arabic_and_hebrew_word_sequences_translate_logically(){
+        let arabic=Emulator::compile("ara").unwrap();
+        let hebrew=Emulator::compile("il").unwrap();
+        // These are XKB physical ANSI positions, not transliteration
+        // guesses or platform IME composition.
+        for (emulator,keys,expected) in [
+            (&arabic,[Key::S,Key::G,Key::H,Key::L],"سلام"),
+            (&hebrew,[Key::A,Key::K,Key::U,Key::O],"שלום"),
+        ]{
+            let typed=keys.into_iter().map(|key|
+                emulator.translate(key,false).expect("XKB position must emit text"))
+                .collect::<String>();
+            assert_eq!(typed,expected,"RTL native emulated keyboard word");
+        }
+    }
     #[test] fn xkb_level_three_is_distinct_from_shift_and_base() {
         let de=Emulator::compile("de").unwrap();
         assert_eq!(de.translate_layer(Key::E,false,false).as_deref(),Some("e"));

@@ -50,12 +50,12 @@ stop_app(){
 for layout in ara il;do
   if [[ "$layout" == ara ]];then
     expected=arabic
-    key=q
-    printf '%s' 'ض' >"$tmp/$layout-passage.txt"
+    keys=(s g h l)
+    printf '%s' 'سلام' >"$tmp/$layout-passage.txt"
   else
     expected=hebrew
-    key=a
-    printf '%s' 'ש' >"$tmp/$layout-passage.txt"
+    keys=(a k u o)
+    printf '%s' 'שלום' >"$tmp/$layout-passage.txt"
   fi
   start_app "$layout"
   # Native F11 creates a real, versioned settings file and chooses Custom.
@@ -89,21 +89,24 @@ local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"),"No explicit synthetic import evidence")
 local data=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(data.synthetic and data.state=="custom-import" and data.script==arg[2]
-  and data.graphemes==1,"RTL XKB fixture identity mismatch")
+  and data.graphemes==4,"RTL XKB fixture identity mismatch")
 LUA
   xdotool windowfocus --sync "$window"
   xdotool key --clearmodifiers F5
   sleep 0.3
   xdotool key --clearmodifiers F2
   sleep 0.25
-  xdotool key --clearmodifiers "$key"
+  for key in "${keys[@]}";do
+    xdotool key --clearmodifiers "$key"
+    sleep 0.08
+  done
   sleep 0.8
   lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" <<'LUA'
 local json=require("dkjson")
 local report,layout=assert(arg[1]),assert(arg[2])
 local f=assert(io.open(report,"rb"),"No scored RTL native XKB output")
 local r=assert(json.decode(assert(f:read("*a"))));f:close()
-assert(r.synthetic and r.state=="finished" and r.entered==1 and r.correct==1
+assert(r.synthetic and r.state=="finished" and r.entered==4 and r.correct==4
   and r.accuracy==100,"Physical-position XKB event did not score RTL character")
 local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local sql=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct FROM sessions'",path)
@@ -111,9 +114,9 @@ local pipe=assert(io.popen(sql,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))))
 assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout and rows[1].input_mode=="Emulated"
-  and rows[1].test_mode=="custom" and rows[1].entered==1 and rows[1].correct==1,
+  and rows[1].test_mode=="custom" and rows[1].entered==4 and rows[1].correct==4,
   "RTL XKB scored SQLite record did not come from expected emulation")
-print("Native X11 RTL XKB key event PASS: "..layout..", 1/1 correct, Emulated")
+print("Native X11 RTL XKB key events PASS: "..layout..", 4/4 correct, Emulated")
 LUA
   stop_app
   unset TYPEFINCH_QA_XKB_COMPOSE

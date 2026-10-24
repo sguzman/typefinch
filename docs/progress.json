@@ -419,7 +419,7 @@
               "id": "T302",
               "emoji": "🔀",
               "name": "Starter software emulation",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Four initial ANSI row mappings coded",
@@ -438,7 +438,8 @@
                 },
                 {
                   "text": "Full modifiers and punctuation layers",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/layouts.rs all four 48-position English ANSI base/Shift symbol tables cross-checked against installed XKB; tests/starter_layout_gui_smoke.sh 8 real Xvfb/winit/egui native UI scoring cases: US QWERTY, Dvorak, Colemak and Colemak-DH each 42/42 with installed XKB and forced-offline fallback, including punctuation, Shift and negative Ctrl/left-Alt shortcut presses. SQLite layout/input mode/test mode/attempt counts and source non-persistence audited. GitHub Actions 40143940280: 230 Rust tests and entire graphical suite passed. Eight screenshots archived, sample US/Dvorak/Colemak/Colemak-DH frames inspected. This is starter ANSI software emulation, not native Hyprland hardware or trustworthy physical AltGr routing (T303/T305)."
                 }
               ]
             },

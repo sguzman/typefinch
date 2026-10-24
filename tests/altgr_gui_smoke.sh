@@ -85,3 +85,74 @@ assert(not saved:find("shift-altgr.txt",1,true),"Private fixture path persisted"
 assert(not saved:find("! €",1,true),"Private custom text persisted")
 print("Native X11 OS Shift+1 and RightAlt+E PASS: !, space, euro; 3/3 correct")
 LUA
+
+# A second disposable app/session verifies a real OS dead-acute sequence.
+# Sending raw keycodes avoids mapping an apostrophe keysym onto the wrong
+# XKB layout slot. The accent itself must never inflate scored attempts.
+kill "$pid" 2>/dev/null || true
+wait "$pid" 2>/dev/null || true
+pid=""
+mkdir -p "$tmp/config-es"
+export XDG_CONFIG_HOME="$tmp/config-es"
+export TYPEFINCH_QA_REPORT="$tmp/spanish-score.json"
+export TYPEFINCH_QA_IMPORT_REPORT="$tmp/spanish-import.json"
+setxkbmap -layout us
+printf '%s' 'é' >"$tmp/spanish-dead-acute.txt"
+./target/debug/typefinch >"$tmp/spanish-app.log" 2>&1 &
+pid=$!
+window=""
+for _ in $(seq 1 200);do
+  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+  [[ -z "$window" ]] || break
+  kill -0 "$pid" 2>/dev/null || { echo 'Native Spanish dead-key app exited' >&2;exit 1; }
+  sleep 0.25
+done
+[[ -n "$window" ]] || { echo 'Native Spanish dead-key GUI missing' >&2;exit 1; }
+xdotool windowactivate --sync "$window" 2>/dev/null || true
+xdotool windowfocus --sync "$window"
+sleep 0.4
+xdotool key --clearmodifiers F11
+sleep 0.4
+xdotool type --clearmodifiers --delay 20 "$tmp/spanish-dead-acute.txt"
+xdotool key --clearmodifiers Return
+sleep 0.45
+lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="custom-import" and r.graphemes==1,
+  "Real Spanish native dead-key fixture not loaded")
+LUA
+setxkbmap -layout es
+setxkbmap -query | grep -Eq '^layout:[[:space:]]+es$' || {
+  echo 'Spanish X11 layout not applied' >&2;exit 1;
+}
+xdotool windowfocus --sync "$window"
+xdotool key --clearmodifiers F5
+sleep 0.2
+xdotool key --clearmodifiers F2
+sleep 0.2
+xdotool key --clearmodifiers 48
+sleep 0.16
+[[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
+  echo 'Uncommitted Spanish accent created a score' >&2;exit 1;
+}
+xdotool key --clearmodifiers 26
+sleep 0.65
+lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"),"No native Spanish dead-key score")
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="finished" and r.correct==1
+  and r.entered==1 and r.accuracy==100,
+  string.format("Native Spanish OS dead acute not composed: entered=%s correct=%s",
+    tostring(r.entered),tostring(r.correct)))
+local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local cmd=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,attempts,entered,correct FROM sessions'",path)
+local pipe=assert(io.popen(cmd,"r"))
+local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
+assert(#rows==1 and rows[1].input_mode=="OS" and rows[1].test_mode=="custom"
+  and rows[1].attempts==1 and rows[1].entered==1 and rows[1].correct==1,
+  "Native Spanish OS dead-acute must produce exactly one scored grapheme")
+print("Native Spanish X11 OS dead-acute + E PASS: one é grapheme, one scored attempt")
+LUA

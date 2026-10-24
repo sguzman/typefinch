@@ -38,7 +38,7 @@ if(image.complete)check();
 HTML
 flags=(--headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage
   --no-first-run --no-default-browser-check --virtual-time-budget=12000)
-timeout 65s "$browser" "${flags[@]}" --user-data-dir="$tmp/browser-dom"
+timeout 65s "$browser" "${flags[@]}" --user-data-dir="$tmp/browser-dom" \
   --dump-dom "file://$tmp/fixture.html" > "$tmp/dom.html" 2>"$tmp/browser.err" || {
   echo 'GitHub card browser DOM check failed' >&2
   tail -n 25 "$tmp/browser.err" >&2 || true
@@ -52,7 +52,7 @@ grep -Fq 'data-card-loaded="550x145"' "$tmp/dom.html" || {
 # A screenshot of a real decoded browser image is archived separately from
 # Typefinch's local resvg output. It can be visually reviewed on GitHub.
 screenshot="$PWD/typefinch-github-card-browser.png"
-timeout 65s "$browser" "${flags[@]}" --user-data-dir="$tmp/browser-screenshot"
+timeout 65s "$browser" "${flags[@]}" --user-data-dir="$tmp/browser-screenshot" \
   --window-size=650,300 --screenshot="$screenshot"
   "file://$tmp/fixture.html" >"$tmp/screenshot.log" 2>>"$tmp/browser.err" || {
   echo 'GitHub card browser screenshot failed' >&2

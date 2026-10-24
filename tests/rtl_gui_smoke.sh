@@ -100,6 +100,25 @@ assert(type(r.graphemes)=="number" and r.graphemes>=10,
   "Imported reference missing or truncated")
 print("Native RTL import identity PASS: "..r.script.."; "..r.graphemes.." graphemes")
 LUA
+  if [[ "$name" == arabic || "$name" == hebrew ]];then
+    # Keyboard-only switch into the ordinary writable egui editor. The
+    # visual COSMIC preview caret must move when its primary cursor moves.
+    focus_window
+    xdotool key --clearmodifiers ctrl+e
+    sleep 0.4
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.3
+    import -window "$window" "$tmp/rtl-$name-editor-start.png"
+    xdotool key --clearmodifiers ctrl+End
+    sleep 0.3
+    import -window "$window" "$tmp/rtl-$name-editor-end.png"
+    editor_delta="$(compare -metric AE "$tmp/rtl-$name-editor-start.png" "$tmp/rtl-$name-editor-end.png" null: 2>&1 || true)"
+    [[ "$editor_delta" =~ ^[0-9]+$ && "$editor_delta" -gt 30 ]] || {
+      echo "Native RTL source editor caret/preview did not move: $name / $editor_delta" >&2
+      exit 1
+    }
+    echo "Native $name writable editor cursor and shaped preview moved ($editor_delta pixels)"
+  fi
   focus_window
   import -window "$window" "$tmp/rtl-$name.png"
   [[ -s "$tmp/rtl-$name.png" ]] || { echo "Missing $name screenshot" >&2;exit 1; }

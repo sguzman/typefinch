@@ -1198,6 +1198,9 @@ impl Typefinch {
                                 .desired_width(ui.available_width())
                                 .hint_text("Edit private source text"));
                         if edit.changed(){self.rebuild_session();}
+                        if edit.has_focus() {
+                            ui.scroll_to_rect(edit.rect,Some(egui::Align::Center));
+                        }
                         self.rtl_editor_cursor_byte=if edit.has_focus(){
                             egui::TextEdit::load_state(ui.ctx(),egui::Id::new("custom_text_editor"))
                                 .and_then(|state|state.cursor.char_range())
@@ -2229,6 +2232,15 @@ impl eframe::App for Typefinch {
             ctx.memory_mut(|memory|
                 memory.request_focus(egui::Id::new("custom_import_path")));
             self.message="Enter a local UTF-8 file path and press Enter to import. The passage remains in memory only.".into();
+        }
+        let ctrl_e=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::E)
+            .is_some_and(|modifiers|modifiers.ctrl && !modifiers.shift));
+        if ctrl_e && self.session.state!=State::Running
+            && self.prefs.test_mode==TestMode::Custom && !self.settings_read_only {
+            // Open the actual native source editor; the shaped preview follows
+            // its logical cursor but never substitutes for editing or IME.
+            self.rtl_raw_editor_open=true;
+            ctx.memory_mut(|mem|mem.request_focus(egui::Id::new("custom_text_editor")));
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.show_keyboard_help=!self.show_keyboard_help;

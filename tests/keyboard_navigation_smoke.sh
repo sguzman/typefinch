@@ -10,8 +10,14 @@ cleanup(){
     echo "Keyboard navigation QA app log:" >&2
     tail -n 60 "$tmp/app.log" >&2 || true
   fi
-  [[ -z "$app_pid" ]] || {kill "$app_pid" 2>/dev/null || true;wait "$app_pid" 2>/dev/null || true;}
-  [[ -z "$wm_pid" ]] || {kill "$wm_pid" 2>/dev/null || true;wait "$wm_pid" 2>/dev/null || true;}
+  if [[ -n "$app_pid" ]]; then
+    kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$wm_pid" ]]; then
+    kill "$wm_pid" 2>/dev/null || true
+    wait "$wm_pid" 2>/dev/null || true
+  fi
   rm -rf "$tmp"
 }
 trap cleanup EXIT

@@ -210,7 +210,7 @@ assert(r.synthetic and r.state=="finished" and r.entered==42 and
   string.format("Native full ANSI punctuation failed: %s entered=%s correct=%s",
     layout,tostring(r.entered),tostring(r.correct)))
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
-local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct FROM sessions'",db)
+local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",db)
 local pipe=assert(io.popen(cmd,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout

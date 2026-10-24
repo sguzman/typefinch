@@ -194,16 +194,16 @@
 - 📊 Statistics — `██████████ 100%`
 - 🏆 Achievements — `██████████ 100%`
 
-## 🎨 M4 — Profile card studio — `███████░░░ 69%`
+## 🎨 M4 — Profile card studio — `████████░░ 75%`
 
 **Acceptance gate:** Accessible exportable SVG and Markdown cards with a friendly finch identity.
 
-### 🐤 P7 — Widgets and publishing — `███████░░░ 69%`
+### 🐤 P7 — Widgets and publishing — `████████░░ 75%`
 
-- 🪄 **T701** GitHub-safe SVG card — `████████░░ 75%`
+- 🪄 **T701** GitHub-safe SVG card — `██████████ 100%`
   - [x] SVG generator coded — src/export.rs
   - [x] XML escaping and test authored — src/export.rs
-  - [ ] Rendered validation on GitHub
+  - [x] Rendered validation on GitHub — assets/typefinch-card-demo.svg is an author-owned synthetic, script-free 550x145 compact card embedded in README. Native CI 40051764866 test tests/github_card_browser_smoke.sh fetched exact SHA from raw.githubusercontent.com, byte-compared against repo source, and loaded the public SVG in headless Chromium: decoded natural dimensions 550x145; browser screenshot typefinch-github-card-browser.png inspected and shows legible bird, labels, numerals and footer. Not real user data and not auto-upload of private profiles.
   - [x] Filesystem export test passes — GitHub Actions run 39873211637: F6 native GUI writes valid SVG and paired Markdown, parsed by XML validator
 - 🎛️ **T702** Widget designer — `██████████ 100%`
   - [x] Template system — src/export.rs Classic 550×205 and Compact 550×145 versioned templates, live egui preview and native PNG/SVG export; CI 39949282753 (70 tests and X11 verification)
@@ -220,7 +220,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🐤 GitHub widget — `█████████░ 92%`
+- 🐤 GitHub widget — `██████████ 100%`
 - 🔄 Publishing automation — `░░░░░░░░░░ 0%`
 
 ## 🌎 M5 — Multilingual typing — `███████░░░ 67%`

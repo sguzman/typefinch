@@ -923,7 +923,7 @@
               "id": "T701",
               "emoji": "🪄",
               "name": "GitHub-safe SVG card",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "SVG generator coded",
@@ -937,7 +937,8 @@
                 },
                 {
                   "text": "Rendered validation on GitHub",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "assets/typefinch-card-demo.svg is an author-owned synthetic, script-free 550x145 compact card embedded in README. Native CI 40051764866 test tests/github_card_browser_smoke.sh fetched exact SHA from raw.githubusercontent.com, byte-compared against repo source, and loaded the public SVG in headless Chromium: decoded natural dimensions 550x145; browser screenshot typefinch-github-card-browser.png inspected and shows legible bird, labels, numerals and footer. Not real user data and not auto-upload of private profiles."
                 },
                 {
                   "text": "Filesystem export test passes",

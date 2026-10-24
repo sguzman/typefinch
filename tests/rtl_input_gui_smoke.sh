@@ -13,8 +13,8 @@ cleanup(){
       [[ ! -s "$log" ]] || tail -n 65 "$log" >&2 || true
     done
   fi
-  [[ -z "$app_pid" ]] || {kill "$app_pid" 2>/dev/null || true;wait "$app_pid" 2>/dev/null || true;}
-  [[ -z "$wm_pid" ]] || {kill "$wm_pid" 2>/dev/null || true;wait "$wm_pid" 2>/dev/null || true;}
+  [[ -z "$app_pid" ]] || { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
+  [[ -z "$wm_pid" ]] || { kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; }
   rm -rf "$tmp"
 }
 trap cleanup EXIT
@@ -36,7 +36,7 @@ start_app(){
     kill -0 "$app_pid" 2>/dev/null || { echo "Typefinch RTL XKB app exited" >&2;exit 1; }
     sleep 0.25
   done
-  [[ -n "$window" ]] || {echo "No RTL XKB window" >&2;exit 1;}
+  [[ -n "$window" ]] || { echo "No RTL XKB window" >&2; exit 1; }
   xdotool windowactivate --sync "$window" 2>/dev/null || true
   xdotool windowfocus --sync "$window"
   sleep 0.35

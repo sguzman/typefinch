@@ -320,6 +320,9 @@ impl Session {
         if !single {self.last_key_at=None;}
         let total=grapheme_count(&self.target);
         for ch in text.chars().filter(|c|allowed(*c)) {
+            // Compositor Text/IME streams can represent an unrelated Enter
+            // as committed LF. Only an expected custom hard break is typable.
+            if ch=='\n' && !self.awaits_newline() {continue;}
             let cursor=grapheme_count(&self.typed);
             // Allow a combining mark to extend the final grapheme, including
             // when its base character arrived in a separate Text event.
@@ -820,6 +823,22 @@ mod tests {
         s.type_text("b");
         assert_eq!(s.state,State::Finished);
         assert_eq!(s.score().correct,3);
+    }
+    #[test] fn unrelated_committed_newline_is_not_a_scored_attempt(){
+        let mut single=Session::new_with_custom(0,TestMode::Custom,"abc");
+        single.begin();
+        single.type_text("\n\r\t");
+        assert!(single.typed.is_empty());
+        assert_eq!(single.attempts,0);
+        single.type_text("a\nbc");
+        assert_eq!(single.typed,"abc");
+        assert_eq!(single.score().accuracy,100.0);
+        let mut multi=Session::new_with_custom(0,TestMode::Custom,"a\nb");
+        multi.begin();
+        multi.type_text("\na\n\nb");
+        assert_eq!(multi.typed,"a\nb");
+        assert_eq!(multi.attempts,3);
+        assert_eq!(multi.score().correct,3);
     }
     #[test] fn viewport_follows_cursor_and_stays_in_range() {
         assert_eq!(viewport(0,0,230), (0,0));

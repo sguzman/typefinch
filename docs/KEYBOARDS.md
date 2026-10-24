@@ -297,3 +297,17 @@ Do not keep repeating it on the same GPU-less hosted runner. A next attempt
 needs a functioning renderer (or an authorized graphical Hyprland test runner)
 and must preserve independent screenshots, keyboard and focus evidence without
 touching the user's active workspace, global input devices or private data.
+
+## Explicit XKB Level-3 Compose path (pending CI)
+
+Commit [`a2094fc`](https://github.com/sguzman/typefinch/commit/a2094fc82b6bea8e2afc5a3de82a2a691fa0fcf1)
+adds `Emulator::translate_composed_layer` for an **explicitly supplied**
+Level-3 modifier state, while the existing scored egui input path retains
+its conservative non-Level-3 wrapper. Source regression cases translate
+German E/Q at Level 3 to the euro/at symbols and exercise one score with
+four distinct graphemes. CI has not yet accepted this new test.
+
+This does **not** infer a Right-Alt press from egui's generic `alt` flag:
+that flag may represent Left Alt or AltGr depending on the compositor.
+Reliable physical Right-Alt/AltGr event attribution, native in-app modifier
+routing and T303's full Shift/AltGr/dead-key acceptance remain open.

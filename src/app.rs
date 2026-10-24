@@ -170,6 +170,21 @@ fn synthetic_qa_duration(value:Option<&str>)->u64 {
     let requested=value.and_then(|v|v.parse::<u64>().ok()).unwrap_or(2);
     if matches!(requested,2|15|30|60|120){requested}else{2}
 }
+/// Report the test's own completion in the HUD. A timed test that
+/// finishes by typing its whole passage before the deadline is still done:
+/// the old timer-only bar misleadingly showed 14% on a 13/13 native RTL
+/// result. Running timed tests continue to show elapsed-time fraction,
+/// and untimed lessons retain grapheme progress.
+fn session_progress_fraction(session:&Session)->f32 {
+    if session.state==State::Finished {return 1.0;}
+    if session.duration.is_zero() {
+        let total=session.target.graphemes(true).count().max(1);
+        (session.typed.graphemes(true).count() as f32 / total as f32)
+            .clamp(0.0,1.0)
+    } else {
+        (1.0-session.seconds_left()/session.duration.as_secs_f64()) as f32
+    }
+}
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
 }
@@ -1633,13 +1648,7 @@ impl Typefinch {
             }
         });
         ui.add(egui::ProgressBar::new(
-            if self.session.duration.is_zero() {
-                let total=self.session.target.graphemes(true).count().max(1);
-                (self.session.typed.graphemes(true).count() as f32 / total as f32)
-                    .clamp(0.0,1.0)
-            } else {
-                (1.0 - self.session.seconds_left() / self.session.duration.as_secs_f64()) as f32
-            }
+            session_progress_fraction(&self.session)
         ).show_percentage());
         ui.add_space(8.0);
         let entered=self.session.typed.graphemes(true).count();
@@ -2686,6 +2695,32 @@ mod palette_tests {
             let shaped=shaping.render_with_caret(&spans,640,96,Some(offset)).unwrap();
             assert!(shaped.caret.is_some(),"committed RTL input must yield a shaped visual cursor");
         }
+    }
+    #[test] fn timed_passage_ending_early_shows_fully_completed_progress(){
+        let mut session=Session::new_with_custom(15,TestMode::Custom,"سلام abc שלום");
+        assert_eq!(session_progress_fraction(&session),0.0);
+        session.begin();
+        session.type_text("سلام ");
+        assert_eq!(session.state,State::Running);
+        assert!(session_progress_fraction(&session)<1.0);
+        session.type_text("abc שלום");
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().correct,13);
+        assert_eq!(session_progress_fraction(&session),1.0);
+    }
+    #[test] fn timed_cutoff_and_untimed_lesson_both_report_completion(){
+        let mut timed=Session::new_with_custom(15,TestMode::Custom,"long target");
+        timed.begin();
+        timed.type_text("long");
+        assert!(session_progress_fraction(&timed)<1.0);
+        timed.state=State::Finished; // simulate elapsed-time cutoff
+        assert_eq!(session_progress_fraction(&timed),1.0);
+        let mut lesson=Session::new_with_custom(0,TestMode::Lesson,"abc");
+        lesson.begin();
+        lesson.type_text("ab");
+        assert!((session_progress_fraction(&lesson)-2.0/3.0).abs()<0.001);
+        lesson.type_text("c");
+        assert_eq!(session_progress_fraction(&lesson),1.0);
     }
     #[test] fn synthetic_gui_duration_is_explicit_bounded_and_not_default_extended(){
         assert_eq!(synthetic_qa_duration(None),2);

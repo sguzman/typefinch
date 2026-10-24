@@ -121,4 +121,59 @@ LUA
   stop_app
   unset TYPEFINCH_QA_XKB_COMPOSE
 done
-echo 'Arabic + Hebrew X11 XKB emulation scored real virtual key-position events; live Wayland, IME and physical-device acceptance remain open'
+# Verify ordinary OS-input scoring with genuinely changed X11 keyboard layout
+# and numeric raw X11 keycodes (evdev + 8). xdotool key 38 sends the
+# currently mapped X key position, not a requested Latin/RTL keysym.
+# The file-path importer runs under US XKB first to avoid synthetic text
+# remapping the installed RTL keyboard layer behind this test's back.
+for layout in ara il;do
+  setxkbmap -layout us
+  start_app "os-$layout"
+  xdotool key --clearmodifiers F11
+  sleep 0.45
+  xdotool type --clearmodifiers --delay 25 "$tmp/$layout-passage.txt"
+  xdotool key --clearmodifiers Return
+  sleep 0.55
+  if [[ "$layout" == ara ]];then expected=arabic; codes=(39 42 43 46);
+  else expected=hebrew; codes=(38 45 30 32);fi
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"),"No native OS RTL import report")
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.script==arg[2] and r.graphemes==4,
+  "Native OS RTL fixture identity mismatch")
+LUA
+  setxkbmap -layout "$layout"
+  setxkbmap -query | grep -Eq "^layout:[[:space:]]+$layout$" || {
+    echo "X11 native OS layout was not applied: $layout" >&2; exit 1;
+  }
+  xdotool windowfocus --sync "$window"
+  xdotool key --clearmodifiers F5
+  sleep 0.35
+  xdotool key --clearmodifiers F2
+  sleep 0.25
+  for code in "${codes[@]}";do
+    xdotool key --clearmodifiers "$code"
+    sleep 0.08
+  done
+  sleep 0.85
+  lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"),"Native OS RTL score missing")
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="finished" and r.entered==4
+  and r.correct==4 and r.accuracy==100,"Native OS RTL layout failed to score")
+local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local sql=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct FROM sessions'",path)
+local pipe=assert(io.popen(sql,"r"))
+local rows=assert(json.decode(assert(pipe:read("*a"))))
+assert(pipe:close())
+assert(#rows==1 and rows[1].input_mode=="OS" and rows[1].test_mode=="custom"
+  and rows[1].entered==4 and rows[1].correct==4,
+  "Native OS layout score mislabeled or missing")
+print("Native X11 OS-layout RTL word scoring PASS: 4/4")
+LUA
+  stop_app
+done
+setxkbmap -layout us
+echo 'Arabic/Hebrew emulated and X11 native-OS layout virtual key-position scoring PASS; IME/physical Hyprland still open'

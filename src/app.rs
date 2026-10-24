@@ -747,6 +747,9 @@ impl Typefinch {
                 let count=passage.graphemes(true).count();
                 self.custom_text=passage;
                 self.rebuild_session();
+                // Only an explicitly opted-in, synthetic CI process records
+                // coarse script metadata; ordinary imports never write text.
+                let _=crate::qa::write_custom_import_audit(&self.custom_text,count);
                 self.message=format!("Loaded {count} graphemes into memory. The passage is not saved.");
             },
             Err(reason)=>self.message=format!("Custom text import rejected: {reason}"),

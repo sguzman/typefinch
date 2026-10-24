@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
-# Native X11 rendering smoke for synthetic Arabic and Hebrew custom passages.
-# Tests actual shaped idle/active X11 frames, but not physical RTL keyboard
-# typing, live compositor IMEs or complete keyboard editor caret behavior.
+# Real X11 import/active-caret/error QA for isolated synthetic RTL passages.
+# Each script gets its own fresh Typefinch process and XDG_CONFIG_HOME.
+# No real keyboard, private text, hardware or IME acceptance implied.
 set -Eeuo pipefail
 export LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=x11 XDG_SESSION_TYPE=x11
 tmp="$(mktemp -d)"
-app_pid="" wm_pid=""
+app_pid="" wm_pid="" window=""
 cleanup(){
   status=$?
-  if (( status != 0 )) && [[ -s "$tmp/app.log" ]]; then
-    tail -n 60 "$tmp/app.log" >&2 || true
+  if (( status != 0 ));then
+    for log in "$tmp"/*/app.log;do
+      [[ ! -s "$log" ]] || tail -n 60 "$log" >&2 || true
+    done
   fi
-  if [[ -n "$app_pid" ]]; then
+  if [[ -n "$app_pid" ]];then
     kill "$app_pid" 2>/dev/null || true
     wait "$app_pid" 2>/dev/null || true
   fi
-  if [[ -n "$wm_pid" ]]; then
+  if [[ -n "$wm_pid" ]];then
     kill "$wm_pid" 2>/dev/null || true
     wait "$wm_pid" 2>/dev/null || true
   fi
-  if [[ -n "${GITHUB_WORKSPACE:-}" ]]; then
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]];then
     for img in "$tmp"/rtl-*.png;do
       [[ ! -s "$img" ]] || cp "$img" "$GITHUB_WORKSPACE/"
     done
@@ -27,85 +29,105 @@ cleanup(){
   rm -rf "$tmp"
 }
 trap cleanup EXIT
-export XDG_CONFIG_HOME="$tmp/config"
-mkdir -p "$XDG_CONFIG_HOME"
 printf '%s' 'سَلَام بالعربية 123' > "$tmp/arabic.txt"
 printf '%s' 'שָׁלוֹם בעברית 123' > "$tmp/hebrew.txt"
-openbox --sm-disable > "$tmp/wm.log" 2>&1 &
+openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm_pid=$!
 sleep 0.4
-./target/debug/typefinch > "$tmp/app.log" 2>&1 &
-app_pid=$!
-window=""
-for _ in $(seq 1 200);do
-  window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
-  [[ -z "$window" ]] || break
-  if ! kill -0 "$app_pid" 2>/dev/null; then cat "$tmp/app.log" >&2;exit 1;fi
-  sleep 0.25
-done
-[[ -n "$window" ]] || { echo 'No native RTL QA window' >&2;exit 1; }
+start_app(){
+  local name="$1"
+  export XDG_CONFIG_HOME="$tmp/$name/config"
+  export TYPEFINCH_QA_IMPORT_REPORT="$tmp/$name/import.json"
+  mkdir -p "$XDG_CONFIG_HOME"
+  ./target/debug/typefinch >"$tmp/$name/app.log" 2>&1 &
+  app_pid=$!
+  window=""
+  for _ in $(seq 1 200);do
+    window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
+    [[ -z "$window" ]] || break
+    if ! kill -0 "$app_pid" 2>/dev/null;then
+      cat "$tmp/$name/app.log" >&2;exit 1
+    fi
+    sleep 0.25
+  done
+  [[ -n "$window" ]] || { echo "No native RTL QA window for $name" >&2;exit 1; }
+  focus_window
+}
 focus_window(){
   xdotool windowactivate --sync "$window" 2>/dev/null || true
   xdotool windowfocus --sync "$window"
   sleep 0.25
 }
-focus_window
-import -window "$window" "$tmp/rtl-baseline.png"
+stop_app(){
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+  app_pid=""
+  window=""
+  sleep 0.3
+}
 for name in arabic hebrew;do
-  focus_window
+  mkdir -p "$tmp/$name"
+  start_app "$name"
+  import -window "$window" "$tmp/rtl-$name-baseline.png"
   xdotool key --clearmodifiers F11
   sleep 0.45
-  xdotool key --clearmodifiers ctrl+a
+  grep -q '"test_mode": "custom"' "$XDG_CONFIG_HOME/typefinch/settings.json" || {
+    echo "$name did not switch into Custom mode" >&2;exit 1;
+  }
   xdotool type --clearmodifiers --delay 25 "$tmp/$name.txt"
   xdotool key --clearmodifiers Return
-  sleep 0.7
-  grep -q '"test_mode": "custom"' "$XDG_CONFIG_HOME/typefinch/settings.json" || {
-    echo "RTL fixture did not reach Custom mode" >&2; exit 1;
-  }
+  sleep 0.65
+  # Strong fixture-identity assertion. The app emits only a synthetic script
+  # category and reference grapheme count, never text or a private file path.
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$name" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"No import audit file")
+local r=assert(json.decode(f:read("*a")))
+f:close()
+assert(r.state=="custom-import" and r.synthetic==true,"Import not confirmed")
+assert(r.script==arg[2], "Wrong language fixture imported: "..tostring(r.script))
+assert(type(r.graphemes)=="number" and r.graphemes>=10,
+  "Imported reference missing or truncated")
+print("Native RTL import identity PASS: "..r.script.."; "..r.graphemes.." graphemes")
+LUA
   focus_window
   import -window "$window" "$tmp/rtl-$name.png"
-  [[ -s "$tmp/rtl-$name.png" ]] || { echo "No $name screenshot" >&2;exit 1; }
-  delta="$(compare -metric AE "$tmp/rtl-baseline.png" "$tmp/rtl-$name.png" null: 2>&1 || true)"
+  [[ -s "$tmp/rtl-$name.png" ]] || { echo "Missing $name screenshot" >&2;exit 1; }
+  delta="$(compare -metric AE "$tmp/rtl-$name-baseline.png" "$tmp/rtl-$name.png" null: 2>&1 || true)"
   [[ "$delta" =~ ^[0-9]+$ && "$delta" -gt 1500 ]] || {
-    echo "RTL $name fixture did not alter rendered frame: $delta" >&2;exit 1;
+    echo "Loaded RTL $name did not change the frame: $delta" >&2;exit 1;
   }
-  echo "Native $name fixture rendered: $delta changed pixels (not BiDi QA)"
-  # The real app enters active typing mode with F5; capture COSMIC Text's
-  # shaped caret position with no synthetic private text or physical key
-  # attribution. Immediately cancel so the next fixture can import safely.
   focus_window
   xdotool key --clearmodifiers F5
   sleep 0.3
   xdotool key --clearmodifiers F2
-  sleep 0.2
+  sleep 0.25
   import -window "$window" "$tmp/rtl-$name-running.png"
   [[ -s "$tmp/rtl-$name-running.png" ]] || {
-    echo "No active RTL caret screenshot: $name" >&2;exit 1;
+    echo "Missing RTL active caret screenshot for $name" >&2;exit 1;
   }
-  active_delta="$(compare -metric AE "$tmp/rtl-$name.png" "$tmp/rtl-$name-running.png" null: 2>&1 || true)"
-  [[ "$active_delta" =~ ^[0-9]+$ && "$active_delta" -gt 100 ]] || {
-    echo "RTL active frame never changed: $name / $active_delta" >&2;exit 1;
+  active="$(compare -metric AE "$tmp/rtl-$name.png" "$tmp/rtl-$name-running.png" null: 2>&1 || true)"
+  [[ "$active" =~ ^[0-9]+$ && "$active" -gt 100 ]] || {
+    echo "Active RTL frame unchanged for $name: $active" >&2;exit 1;
   }
-  # Inject only an ordinary ASCII x into the focused application
-  # (not a global hook, not a claim of typing Arabic or Hebrew hardware).
-  # It intentionally mismatches the first RTL reference grapheme; the
-  # resulting screenshot lets review verify visual error coloring.
+  # An ASCII x should mismatch the first *logical* reference grapheme; it
+  # makes a real in-app highlight without claiming RTL physical key input.
   xdotool type --clearmodifiers --delay 35 "x"
   sleep 0.2
   import -window "$window" "$tmp/rtl-$name-error.png"
   [[ -s "$tmp/rtl-$name-error.png" ]] || {
-    echo "No native RTL error screenshot: $name" >&2;exit 1;
+    echo "Missing RTL error screenshot for $name" >&2;exit 1;
   }
-  error_delta="$(compare -metric AE "$tmp/rtl-$name-running.png" "$tmp/rtl-$name-error.png" null: 2>&1 || true)"
-  [[ "$error_delta" =~ ^[0-9]+$ && "$error_delta" -gt 100 ]] || {
-    echo "RTL scored error produced no changed frame: $name / $error_delta" >&2;exit 1;
+  changed="$(compare -metric AE "$tmp/rtl-$name-running.png" "$tmp/rtl-$name-error.png" null: 2>&1 || true)"
+  [[ "$changed" =~ ^[0-9]+$ && "$changed" -gt 100 ]] || {
+    echo "Reference error produced no visible difference for $name: $changed" >&2;exit 1;
   }
   xdotool key --clearmodifiers Escape
-  sleep 0.25
-  echo "Native $name active typing and incorrect-key frames: $active_delta / $error_delta changed pixels"
+  stop_app
+  echo "Native $name isolated reference, caret and error snapshots PASS ($delta / $active / $changed pixels)"
 done
 different="$(compare -metric AE "$tmp/rtl-arabic.png" "$tmp/rtl-hebrew.png" null: 2>&1 || true)"
 [[ "$different" =~ ^[0-9]+$ && "$different" -gt 400 ]] || {
-  echo "Arabic/Hebrew fixture screenshots indistinguishable: $different" >&2;exit 1;
+  echo "Distinct imported RTL scripts rendered identical frames: $different" >&2;exit 1;
 }
-echo 'RTL native shaped idle/active frames PASS (not hardware or live IME acceptance)'
+echo 'Independent Arabic and Hebrew native X11 fixture PASS; real IME/Hyprland QA pending'

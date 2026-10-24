@@ -10,6 +10,33 @@ An extended grapheme cluster is one user-perceived character. A composed `é` an
 
 The five-grapheme normalization intentionally stays consistent across the two supported languages so the displayed units have the same mathematical definition. **It does not establish linguistic equivalence or comparative typing difficulty.** Benchmark records remain partitioned by test mode and language (for example, `words` versus `words/es-MX`), and word-difficulty variants remain separately labeled. Compare only like-for-like passages, modes, duration and language.
 
+## CJK-friendly committed-text speed convention
+
+Typefinch also displays **corrected CPM**, defined as the count of correctly
+entered *final Unicode extended grapheme clusters* per elapsed minute:
+
+`corrected CPM = correctly matched reference graphemes ÷ elapsed minutes`
+
+It is useful for Chinese, Japanese and Korean passages entered through an IME:
+candidate selection and variable romanization length do **not** turn one
+displayed character into a fixed number of physical keypresses. The metric
+also includes correctly matched spaces and punctuation, consistent with the
+existing final-grapheme scorer. It is not a count of keyboard strokes, a
+linguistic word rate, or an estimate of IME composition effort.
+
+Mathematically, in the **same session**, standardized WPM is corrected CPM
+divided by five. That arithmetic does **not** imply cross-language proficiency
+equivalence. CPM and WPM should be compared only within similar passages,
+scoring versions, input methods and language contexts. Typefinch does not yet
+ship a certified CJK corpus or native Fcitx/IBus acceptance, and custom CJK
+practice is not a public or cross-language benchmark. The UI shows corrected
+CPM alongside WPM without silently substituting one for the other.
+
+Pure Rust tests cover Chinese corrections, Japanese kana, Korean Hangul,
+canonical accents, zero-duration handling and the exact five-unit
+relationship. Native CJK IME and bidirectional shaping remain separately
+unaccepted.
+
 ## Raw input versus corrected reference
 
 `raw WPM = attempted Unicode scalar input count ÷ 5 ÷ elapsed minutes`
@@ -20,7 +47,7 @@ Pastes are excluded from scored sessions. An emulation key repeat is suppressed,
 
 ## Explicitly unaccepted language extensions
 
-No CJK IME scoring policy or Arabic/Hebrew bidirectional caret/visual editing acceptance is implied by the shared five-grapheme convention. Those language-specific semantics remain open under the multilingual roadmap. The current application does not claim that a compositor delivers per-physical-device input events.
+The corrected CPM policy specifies display-text accounting only. Arabic/Hebrew bidirectional caret/visual editing acceptance, CJK IME behavior in live compositors and cross-script proficiency calibration remain open under the multilingual roadmap. The current application does not claim that a compositor delivers per-physical-device input events.
 
 **Verification:** `src/engine.rs` includes canonical-equivalence, corrected-speed and raw-attempt tests; native X11 deadline, paste rejection and focus cancellation are separately verified in CI.
 

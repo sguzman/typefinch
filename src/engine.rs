@@ -211,6 +211,9 @@ pub struct Session {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Score {
     pub wpm: f64,
+    /// Correct final reference grapheme clusters per minute. This measures
+    /// committed display text, not IME/romanization/physical keystrokes.
+    pub cpm: f64,
     pub accuracy: f64,
     pub raw_wpm: f64,
     pub raw_accuracy: f64,
@@ -453,15 +456,35 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
     let correct = entered.iter().zip(expected.iter()).filter(|(a,b)|canonically_equal(a,b)).count();
     let accuracy = if entered.is_empty() { 0.0 } else { 100.0 * correct as f64 / entered.len() as f64 };
     let minutes = elapsed.as_secs_f64() / 60.0;
-    let wpm=if minutes>0.0 {correct as f64 / STANDARD_GRAPHEMES_PER_WORD / minutes} else {0.0};
+    let cpm=if minutes>0.0 {correct as f64 / minutes} else {0.0};
+    let wpm=cpm / STANDARD_GRAPHEMES_PER_WORD;
     let raw_wpm=if minutes>0.0 {entered.len() as f64 / STANDARD_GRAPHEMES_PER_WORD / minutes} else {0.0};
-    Score { wpm, accuracy, raw_wpm, raw_accuracy:accuracy, attempts:entered.len(),
+    Score { wpm, cpm, accuracy, raw_wpm, raw_accuracy:accuracy, attempts:entered.len(),
         mistakes:entered.len().saturating_sub(correct), correct, entered:entered.len(), elapsed }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn committed_cjk_cpm_counts_display_graphemes_not_ime_keypresses() {
+        let perfect=score("你好世界","你好世界",Duration::from_secs(30));
+        assert_eq!(perfect.correct,4);
+        assert_eq!(perfect.cpm,8.0);
+        assert!((perfect.wpm-1.6).abs()<1e-10);
+        let error=score("你好世界","你坏世界",Duration::from_secs(60));
+        assert_eq!(error.correct,3);
+        assert_eq!(error.cpm,3.0);
+        assert_eq!(error.accuracy,75.0);
+        // Neither a Japanese IME romanization string nor a Korean keyboard
+        // stroke count is reconstructed from finalized display graphemes.
+        let japanese=score("きょう","きょう",Duration::from_secs(60));
+        assert_eq!(japanese.cpm,3.0);
+        let korean=score("한글","한글",Duration::from_secs(60));
+        assert_eq!(korean.cpm,2.0);
+        let composed=score("é","e\u{301}",Duration::from_secs(60));
+        assert_eq!(composed.cpm,1.0);
+        assert_eq!(score("你好","你好",Duration::ZERO).cpm,0.0);
+    }
     #[test] fn nfc_equivalent_graphemes_score_identically() {
         let scores=score("café mañana", "cafe\u{301} man\u{303}ana",Duration::from_secs(60));
         assert_eq!(scores.entered,11);

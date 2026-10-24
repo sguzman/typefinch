@@ -133,9 +133,9 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
         result.extend([
             position("JIS Yen",124,None,0,140,10),
             position("JIS Ro",89,None,3,130,10),
-            position("Muhenkan",94,None,4,20,12),
-            position("Henkan",92,None,4,116,12),
-            position("Kana",93,None,4,130,12),
+            position("Muhenkan",94,None,4,35,12),
+            position("Henkan",92,None,4,109,12),
+            position("Kana",93,None,4,122,12),
         ]);
     }
     // Controls and modifiers are illustrated physical slots only. They are
@@ -153,16 +153,23 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
             if split {158} else if jis {140} else {130},
             if split {18} else {22},true),
         special("Left Ctrl","Ctrl",29,4,0,12,true),
-        special("Left Alt","Alt",56,4,if jis {33} else {29},if jis {10} else {13},true),
-        special("Right Alt (AltGr)","Alt",100,4,if jis {143} else {119},12,true),
-        special("Right Ctrl","Ctrl",97,4,if jis {158} else {145},12,true),
+        special("Left Alt","Alt",56,4,if jis {24} else {29},if jis {10} else {13},true),
+        special("Right Alt (AltGr)","Alt",100,4,if jis {135} else {119},
+            if jis {10} else {12},true),
+        special("Right Ctrl","Ctrl",97,4,if jis {168} else {158},
+            if jis {10} else {12},true),
     ]);
-    if !jis {
-        result.extend([
-            special("Left Super","◆",125,4,14,12,true),
-            special("Right Super","◆",126,4,132,12,true),
-        ]);
-    }
+    // JIS 109 (unlike older 106) has both Super keys and an application
+    // Menu key. The complete bottom row is a physical *reference*, not an
+    // attempt to synthesize OS shortcuts or conversion-key input events.
+    result.extend([
+        special("Left Super","◆",125,4,if jis {13} else {14},
+            if jis {10} else {12},true),
+        special("Right Super","◆",126,4,if jis {146} else {132},
+            if jis {10} else {12},true),
+        special("Menu","Menu",127,4,if jis {157} else {145},
+            if jis {10} else {12},false),
+    ]);
     // The ordinary physical Space is longer on ANSI/ISO; shorter in a
     // JIS converter-key row, and shown as two *visual halves* on a split.
     if shape==Shape::Split {
@@ -170,7 +177,7 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
         // A deliberately non-input display slot; never double count Space.
         result.push(position("Space (right visual half)",0,None,4,94,22));
     } else {
-        let (x,width) = if shape==Shape::Jis {(45,60)} else {(45,72)};
+        let (x,width) = if shape==Shape::Jis {(48,60)} else {(45,72)};
         result.push(position("Space",57,Some(Key::Space),4,x,width));
     }
     result.sort_by_key(|slot|(slot.row,slot.x));
@@ -326,12 +333,25 @@ mod tests {
                 assert!(slot.egui_key.is_none());
                 assert!(!slot.caption.is_empty());
             }
-            for code in [125,126] {
-                assert_eq!(slots.iter().any(|s|s.evdev==code),shape!=Shape::Jis);
+            for code in [125,126,127] {
+                assert_eq!(slots.iter().filter(|s|s.evdev==code).count(),1,
+                    "all illustrated 104/105/109-key blocks retain Super/Menu keys");
             }
             assert_eq!(slots.iter().filter(|s|s.kind==SlotKind::Extra).count(),
                 match shape { Shape::Iso=>1,Shape::Jis=>5,_=>0 });
         }
+    }
+    #[test] fn jis_109_bottom_row_includes_windows_menu_and_conversion_keys() {
+        let slots=slots(Shape::Jis);
+        let order=[29,125,56,94,57,92,93,100,126,127,97];
+        let positions:Vec<u32>=slots.iter().filter(|s|s.row==4)
+            .map(|s|s.evdev).collect();
+        assert_eq!(positions,order,
+            "JIS 109 bottom-row geometry follows Ctrl/Win/Alt/NonConvert/Space/Convert/Kana/Alt/Win/Menu/Ctrl");
+        for code in [125,126,127,92,93,94] {
+            assert!(slots.iter().any(|s|s.evdev==code && s.egui_key.is_none()));
+        }
+        assert_eq!(slots.iter().filter(|s|s.egui_key==Some(Key::Space)).count(),1);
     }
     #[test] fn japanese_top_left_is_zenkaku_not_fake_ansi_grave() {
         let jis=slots(Shape::Jis);

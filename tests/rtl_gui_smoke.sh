@@ -294,6 +294,64 @@ assert(first.selected_graphemes==0 and last.selected_graphemes==0,
 print("Native mixed BiDi editor caret PASS: logical start/end; visual row moved "
   ..first.caret_y_px.." -> "..last.caret_y_px.." px")
 LUA
+    # Expand a keyboard selection through the Arabic-containing first
+    # paragraph, the Latin paragraph and toward the Hebrew/Arabic line.
+    # Test actual native TextEdit state and independent shaped-preview paint.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool key --clearmodifiers shift+Down
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-selection-first.json"
+    import -window "$window" "$tmp/rtl-mixed-selection-first.png"
+    xdotool key --clearmodifiers shift+Down
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-selection-second.json"
+    import -window "$window" "$tmp/rtl-mixed-selection-second.png"
+    xdotool key --clearmodifiers shift+Up
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-selection-reverse.json"
+    import -window "$window" "$tmp/rtl-mixed-selection-reverse.png"
+    lua5.4 - "$tmp/$name/mixed-caret-start.json" \
+      "$tmp/$name/mixed-selection-first.json" \
+      "$tmp/$name/mixed-selection-second.json" \
+      "$tmp/$name/mixed-selection-reverse.json" <<'LUA'
+local json=require("dkjson")
+local function read(file)
+  local f=assert(io.open(file,"rb"),"Missing native BiDi selection audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  assert(type(d.selected_graphemes)=="number" and type(d.caret_y_px)=="number")
+  return d
+end
+local start,first,second,reversed=read(arg[1]),read(arg[2]),read(arg[3]),read(arg[4])
+assert(first.total==start.total and second.total==start.total
+  and reversed.total==start.total,"Mixed BiDi source changed during selection")
+assert(first.selected_graphemes>5 and first.selected_graphemes<start.total-5,
+  "Shift+Down failed to form a partial Arabic/Latin range")
+assert(second.selected_graphemes>first.selected_graphemes
+  and second.selected_graphemes<start.total,
+  "Second Shift+Down failed to expand selection into next mixed run")
+assert(reversed.selected_graphemes<second.selected_graphemes,
+  "Reverse Shift+Up failed to shrink the mixed-direction selection")
+assert(first.caret_y_px>start.caret_y_px
+  and second.caret_y_px>first.caret_y_px,
+  "Shaped caret did not cross both mixed paragraphs")
+print("Native mixed-script selection PASS: "..first.selected_graphemes.." -> "
+  ..second.selected_graphemes.." -> "..reversed.selected_graphemes..
+  " graphemes, caret rows "..start.caret_y_px.." -> "
+  ..first.caret_y_px.." -> "..second.caret_y_px)
+LUA
+    convert "$tmp/rtl-mixed-editor-start.png" \
+      -crop 285x94+12+487 +repage "$tmp/$name/mixed-preview-base.png"
+    convert "$tmp/rtl-mixed-selection-second.png" \
+      -crop 285x94+12+487 +repage "$tmp/$name/mixed-preview-selection.png"
+    mixed_pixels="$(compare -metric AE \
+      "$tmp/$name/mixed-preview-base.png" \
+      "$tmp/$name/mixed-preview-selection.png" null: 2>&1 || true)"
+    [[ "$mixed_pixels" =~ ^[0-9]+$ && "$mixed_pixels" -gt 80 ]] || {
+      echo "Native mixed selection not visibly represented in shaped preview: $mixed_pixels" >&2
+      exit 1
+    }
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
   fi

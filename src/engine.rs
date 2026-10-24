@@ -1,5 +1,5 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
-use std::{collections::{BTreeMap, BTreeSet}, time::{Duration, Instant}};
+use std::{collections::BTreeMap, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
 use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
 use unicode_segmentation::UnicodeSegmentation;
@@ -17,6 +17,21 @@ fn canonical_prefix(expected:&str,entered:&str)->bool {
     normalized.starts_with(&prefix)
 }
 fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
+/// An error belongs to the *specific* reference position where it occurred,
+/// not an arbitrary earlier occurrence of the same Unicode character.
+fn reference_pair_at(target:&str,position:usize)->Option<String> {
+    let reference=target.graphemes(true).collect::<Vec<_>>();
+    let glyph=*reference.get(position)?;
+    if glyph.chars().all(char::is_whitespace) {return None;}
+    if let Some(right)=reference.get(position+1)
+        .filter(|right|!right.chars().all(char::is_whitespace)) {
+        return Some(format!("{glyph}{right}"));
+    }
+    if position>0 && !reference[position-1].chars().all(char::is_whitespace) {
+        return Some(format!("{}{glyph}",reference[position-1]));
+    }
+    None
+}
 fn extends_previous_grapheme(ch:char, typed:&str)->bool {
     let value=ch as u32;
     canonical_combining_class(ch)>0
@@ -175,6 +190,8 @@ pub struct Session {
     pub attempts: u32,
     pub mistakes: u32,
     weak_keys: BTreeMap<char,u32>,
+    // Error-local reference bigrams live only for this session.
+    weak_pairs: BTreeMap<String,u32>,
     key_timings:BTreeMap<char,KeyTiming>,
     last_key_at:Option<Instant>,
     pending_completion: Option<Instant>,
@@ -216,7 +233,7 @@ impl Session {
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
-            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
+            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
     }
     pub fn history_mode(&self)->String {
         if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
@@ -238,6 +255,7 @@ impl Session {
         self.attempts = 0;
         self.mistakes = 0;
         self.weak_keys.clear();
+        self.weak_pairs.clear();
         self.key_timings.clear();
         self.last_key_at=None;
         self.pending_completion=None;
@@ -284,6 +302,10 @@ impl Session {
                 if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
                     let errors=self.weak_keys.entry(key).or_default();
                     *errors=errors.saturating_add(1);
+                    if let Some(pair)=reference_pair_at(&self.target,position) {
+                        let misses=self.weak_pairs.entry(pair).or_default();
+                        *misses=misses.saturating_add(1);
+                    }
                 }
             }
             if single {
@@ -323,37 +345,19 @@ impl Session {
         }
         Some(syllables.join(" "))
     }
-    /// Generate in-memory two-grapheme drills adjacent to missed reference
-    /// characters. Never join characters across word boundaries, and never
-    /// persist source passage fragments or error positions.
+    /// Generate in-memory two-grapheme drills from the exact reference
+    /// positions that were missed. Never cross whitespace, persist source
+    /// fragments or record raw keystrokes in a user profile.
     pub fn weak_bigram_drill(&self)->Option<String> {
-        let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
-        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let mut candidates=self.weak_pairs.iter().map(|(pair,n)| (pair.as_str(),*n)).collect::<Vec<_>>();
+        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(b.0)));
         let largest=u64::from(candidates.first()?.1);
-        let reference=self.target.graphemes(true).collect::<Vec<_>>();
-        let mut unique=BTreeSet::new();
-        let mut pairs=Vec::new();
-        for (ch,misses) in candidates {
-            if unique.len()>=8 {break;}
-            let pair=reference.iter().enumerate().find_map(|(i,glyph)| {
-                if glyph.chars().next()!=Some(ch) {return None;}
-                if let Some(right)=reference.get(i+1)
-                    .filter(|right|!right.chars().all(char::is_whitespace)) {
-                    return Some(format!("{glyph}{right}"));
-                }
-                if i>0 && !reference[i-1].chars().all(char::is_whitespace) {
-                    return Some(format!("{}{glyph}",reference[i-1]));
-                }
-                None
-            });
-            if let Some(pair)=pair {
-                if unique.insert(pair.clone()) {
-                    let repetitions=((u64::from(misses)*8+largest/2)/largest).clamp(2,8);
-                    for _ in 0..repetitions {pairs.push(pair.clone());}
-                }
-            }
+        let mut patterns=Vec::new();
+        for (pair,misses) in candidates.into_iter().take(8) {
+            let repetitions=((u64::from(misses)*8+largest/2)/largest).clamp(2,8);
+            for _ in 0..repetitions {patterns.push(pair); }
         }
-        if pairs.is_empty() {None} else {Some(pairs.join(" "))}
+        Some(patterns.join(" "))
     }
     pub fn backspace(&mut self) {
         if self.state!=State::Running {return;}
@@ -832,14 +836,31 @@ mod tests {
             "do not make fake n-grams across word boundaries");
     }
     #[test] fn missed_pair_drill_has_an_eight_pattern_cap_and_resets() {
-        let mut s=Session::new_with_custom(30,TestMode::Custom,"abcdefghi");
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"ab cd ef gh ij kl mn op qr");
         s.begin();
-        s.type_text("xxxxxxxxx");
+        for (i,pair) in ["ab","cd","ef","gh","ij","kl","mn","op","qr"].iter().enumerate() {
+            s.type_text("x");
+            s.backspace();
+            s.type_text(pair);
+            if i<8 {s.type_text(" ");}
+        }
         let drill=s.weak_bigram_drill().unwrap();
         let pairs=drill.split_whitespace().collect::<Vec<_>>();
         assert_eq!(pairs.len(),64);
         assert_eq!(pairs.first(),Some(&"ab"));
-        assert_eq!(pairs.last(),Some(&"hi"));
+        assert_eq!(pairs.last(),Some(&"op"));
+        assert!(!pairs.contains(&"qr"),"ninth distinct error context excluded");
+        s.begin();
+        assert!(s.weak_bigram_drill().is_none());
+    }
+    #[test] fn missed_pair_drill_targets_actual_occurrence_not_first_matching_letter() {
+        let mut s=Session::new_with_custom(30,TestMode::Custom,"ab ac");
+        s.begin();
+        s.type_text("ab ");
+        s.type_text("x"); // Missed the second 'a', beside 'c', not the first 'a' beside 'b'.
+        let drill=s.weak_bigram_drill().unwrap();
+        assert_eq!(drill.split_whitespace().collect::<Vec<_>>(),vec!["ac";8]);
+        assert!(!drill.contains("ab"));
         s.begin();
         assert!(s.weak_bigram_drill().is_none());
     }

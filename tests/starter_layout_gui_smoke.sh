@@ -91,9 +91,9 @@ LUA
     sleep 0.07
   done
   sleep 0.8
-  lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" "${#codes[@]}" <<'LUA'
+  lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" "${#codes[@]}" "$tmp/$label-source.txt" <<'LUA'
 local json=require("dkjson")
-local path,layout,count=assert(arg[1]),assert(arg[2]),assert(tonumber(arg[3]))
+local path,layout,count,source=assert(arg[1]),assert(arg[2]),assert(tonumber(arg[3])),assert(arg[4])
 local f=assert(io.open(path,"rb"),"Starter XKB native session did not finish")
 local result=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(result.synthetic and result.state=="finished"
@@ -108,8 +108,10 @@ assert(#rows==1 and rows[1].layout==layout and rows[1].input_mode=="Emulated"
   "Starter emulation SQLite identity/score incorrect")
 local sf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
 local settings=assert(sf:read("*a"));sf:close()
-assert(not settings:find(assert(arg[1]):gsub("result.json","source.txt"),1,true),
-  "Unexpected fixture path in settings")
+local file=assert(io.open(source,"rb"))
+local passage=assert(file:read("*a"));file:close()
+assert(not settings:find(source,1,true),"Custom file path leaked to settings")
+assert(not settings:find(passage,1,true),"Private custom passage leaked to settings")
 print("Native starter ANSI XKB emulation PASS: "..layout.." "..count.."/"..count)
 LUA
   stop_app

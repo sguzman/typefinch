@@ -250,5 +250,36 @@ assert(restored.total==start.total and restored.selected_graphemes==0,
 print("Native Wayland marked RTL grapheme Backspace/Undo PASS: "..
   start.total.." -> "..deleted.total.." -> "..restored.total)
 LUA
+  # Exercise whole-range keyboard selection across connected RTL glyphs and
+  # the trailing left-to-right digits. The actual source TextEdit, rather than
+  # a synthetic text-layout mock, must preserve both selection endpoints.
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.2
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-start.json"
+  xdotool key --clearmodifiers ctrl+shift+End
+  sleep 0.3
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-selected.json"
+  xdotool key --clearmodifiers ctrl+shift+Home
+  sleep 0.3
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-retracted.json"
+  lua5.4 - "$tmp/$script-whole-start.json"     "$tmp/$script-whole-selected.json"     "$tmp/$script-whole-retracted.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native Wayland full-range RTL audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local start,selected,back=read(arg[1]),read(arg[2]),read(arg[3])
+assert(start.total>8 and start.index==0 and start.selected_graphemes==0,
+  "Wayland full-range RTL selection lacks a logical start boundary")
+assert(selected.total==start.total and selected.index==start.total
+  and selected.selected_graphemes==start.total,
+  "Wayland Ctrl+Shift+End did not select the entire mixed RTL/LTR source")
+assert(back.total==start.total and back.index==0 and back.selected_graphemes==0,
+  "Wayland Ctrl+Shift+Home failed to retract to the RTL selection anchor")
+print("Native Wayland whole-range mixed-direction selection PASS: 0 -> "..
+  selected.selected_graphemes.." -> 0")
+LUA
 done
-echo "Nested Weston Wayland Arabic/Hebrew selection and editing regression PASS"
+echo "Nested Weston Wayland Arabic/Hebrew editing and full-range selection regressions PASS"

@@ -10,6 +10,7 @@ mod wayland_seat;
 mod engine;
 mod history;
 mod export;
+mod fonts;
 mod layouts;
 mod geometry;
 mod lesson;

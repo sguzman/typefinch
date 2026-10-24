@@ -7,6 +7,7 @@ use crate::{
     devices::{self, Keyboard},
     engine::{Language, Session, State, TestMode, WordDifficulty},
     export,
+    fonts,
     geometry::{self, Shape, Section, Slot, SlotKind},
     history::{self, Record},
     lesson,
@@ -280,6 +281,7 @@ pub struct Typefinch {
     settings_read_only:bool,
     normal_animation_time:f32,
     show_keyboard_help:bool,
+    unicode_fonts:fonts::Fallbacks,
     session: Session,
     mode: Mode,
     session_layout: String,
@@ -344,6 +346,9 @@ impl Typefinch {
             Theme::Light => egui::ThemePreference::Light,
             Theme::Dark => egui::ThemePreference::Dark,
         });
+        // Use only installed system Unicode fallbacks, retaining egui's
+        // preferred fonts. No glyph assets are bundled or fetched.
+        let unicode_fonts=fonts::install(&cc.egui_ctx);
         let normal_animation_time=cc.egui_ctx.style().animation_time;
         cc.egui_ctx.all_styles_mut(|s| {
             s.animation_time=motion_seconds(prefs.reduce_motion,normal_animation_time);
@@ -408,7 +413,7 @@ impl Typefinch {
                 preview_shape.label(),&prefs.layout,preview_section.label(),
                 &geometry::section_slots(preview_shape,preview_section));
         }
-        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(), installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, unicode_fonts, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(), installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query,
@@ -1042,6 +1047,11 @@ impl Typefinch {
             }
             ui.add_space(6.0);
             ui.label("Theme");
+            ui.small(format!("System Unicode font fallbacks: CJK {} · Arabic {} · Hebrew {}",
+                if self.unicode_fonts.cjk {"available"} else {"not installed"},
+                if self.unicode_fonts.arabic {"available"} else {"not installed"},
+                if self.unicode_fonts.hebrew {"available"} else {"not installed"}));
+            ui.small("Missing scripts need installed Noto fonts. Built-in font choices remain primary; this does not claim RTL shaping.");
             let previous = self.prefs.theme;
             egui::ComboBox::from_id_salt("theme").selected_text(match previous {
                 Theme::System=>"System (default)", Theme::Light=>"Light", Theme::Dark=>"Dark",

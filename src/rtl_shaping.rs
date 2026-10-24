@@ -4,6 +4,7 @@
 //! This renderer does not subscribe to any keyboard input or mutate a layout.
 use cosmic_text::{Attrs,Buffer,Color,Cursor,FontSystem,Metrics,Shaping,SwashCache};
 use eframe::egui::{self,Color32};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Script-triggered preview only, not a language classifier. Unicode
 /// text order remains logical; COSMIC Text handles visual bidi placement.
@@ -55,10 +56,23 @@ impl Renderer {
             )),
             &Attrs::new(),Shaping::Advanced,None,
         );
-        let visible_bytes=spans.iter().map(|(text,_)|text.len()).sum::<usize>();
+        let visible=spans.iter().map(|(text,_)|text.as_str()).collect::<String>();
         borrowed.shape_until_scroll(false);
-        let caret=cursor_byte.filter(|index|*index<=visible_bytes)
-            .and_then(|byte|borrowed.cursor_position(&Cursor::new(0,byte)))
+        // Byte offsets are logical, but COSMIC cursors are (line, line-local
+        // byte offsets). Reject a cursor inside a codepoint or grapheme.
+        // A multiline pasted Hebrew or Arabic reference must not position
+        // the caret in the first line or bisect a combining mark.
+        let caret=cursor_byte.filter(|index|*index<=visible.len()
+            && visible.is_char_boundary(*index)
+            && (*index==visible.len() ||
+                visible.grapheme_indices(true).any(|(start,_)|start==*index)))
+            .and_then(|index|{
+                let before=&visible[..index];
+                let line=before.bytes().filter(|b|*b==b'\n').count();
+                let column=before.rsplit_once('\n')
+                    .map(|(_,tail)|tail.len()).unwrap_or(before.len());
+                borrowed.cursor_position(&Cursor::new(line,column))
+            })
             .filter(|(x,y)|x.is_finite() && y.is_finite());
         borrowed.draw(&mut self.cache,Color::rgb(255,255,255),|x,y,w,h,color|{
             let (red,green,blue,alpha)=color.as_rgba_tuple();
@@ -137,6 +151,41 @@ mod tests {
             assert!(renderer.render_with_caret(&style,640,96,Some(passage.len()+1))
                 .unwrap().caret.is_none(),"out-of-bounds caret is not guessed");
         }
+    }
+    #[test] fn multiline_rtl_caret_uses_line_relative_grapheme_boundary(){
+        let mut renderer=Renderer::new();
+        let content="سلام\nשָׁלוֹם";
+        let parts=vec![(content.to_owned(),Color32::WHITE)];
+        let first=renderer.render_with_caret(&parts,640,128,Some(0))
+            .unwrap().caret.expect("first line cursor");
+        let second=renderer.render_with_caret(&parts,640,128,
+            Some("سلام\n".len())).unwrap().caret.expect("second line cursor");
+        assert!(second.1>first.1+12.0,
+            "second logical paragraph's caret must be on a later visual row");
+        let mark_inside="سلام\nש".len()+1;
+        assert!(renderer.render_with_caret(&parts,640,128,Some(mark_inside))
+            .unwrap().caret.is_none(),"reject byte boundary inside UTF-8 scalar");
+        let grapheme="שָׁ";
+        let not_cluster_boundary="سلام\nש".len();
+        assert!(not_cluster_boundary<"سلام\n".len()+grapheme.len());
+        assert!(renderer.render_with_caret(&parts,640,128,Some(not_cluster_boundary))
+            .unwrap().caret.is_none(),"reject caret between base and niqqud");
+    }
+    #[test] fn styled_rtl_mistake_changes_raster_ink_without_reversing_source(){
+        let mut renderer=Renderer::new();
+        let text="سلام";
+        let neutral=renderer.render(&[(text.to_owned(),Color32::from_rgb(160,160,160))],
+            560,96).unwrap();
+        let highlighted=renderer.render(&[
+            ("س".to_owned(),Color32::from_rgb(220,50,65)),
+            ("لام".to_owned(),Color32::from_rgb(160,160,160)),
+        ],560,96).unwrap();
+        assert_eq!(neutral.size,highlighted.size);
+        let differences=neutral.pixels.iter().zip(&highlighted.pixels)
+            .filter(|(a,b)|a!=b).count();
+        assert!(differences>12,
+            "actual shaped raster must respond to reference error coloring");
+        assert!(differences<560*96,"render should retain transparent padding");
     }
     #[test] fn shaped_rtl_output_is_bounded_nonblank_and_transparent(){
         let mut renderer=Renderer::new();

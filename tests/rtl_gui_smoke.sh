@@ -86,9 +86,23 @@ for name in arabic hebrew;do
   [[ "$active_delta" =~ ^[0-9]+$ && "$active_delta" -gt 100 ]] || {
     echo "RTL active frame never changed: $name / $active_delta" >&2;exit 1;
   }
+  # Inject only an ordinary ASCII x into the focused application
+  # (not a global hook, not a claim of typing Arabic or Hebrew hardware).
+  # It intentionally mismatches the first RTL reference grapheme; the
+  # resulting screenshot lets review verify visual error coloring.
+  xdotool type --clearmodifiers --delay 35 "x"
+  sleep 0.2
+  import -window "$window" "$tmp/rtl-$name-error.png"
+  [[ -s "$tmp/rtl-$name-error.png" ]] || {
+    echo "No native RTL error screenshot: $name" >&2;exit 1;
+  }
+  error_delta="$(compare -metric AE "$tmp/rtl-$name-running.png" "$tmp/rtl-$name-error.png" null: 2>&1 || true)"
+  [[ "$error_delta" =~ ^[0-9]+$ && "$error_delta" -gt 100 ]] || {
+    echo "RTL scored error produced no changed frame: $name / $error_delta" >&2;exit 1;
+  }
   xdotool key --clearmodifiers Escape
   sleep 0.25
-  echo "Native $name active typing frame captured: $active_delta changed pixels"
+  echo "Native $name active typing and incorrect-key frames: $active_delta / $error_delta changed pixels"
 done
 different="$(compare -metric AE "$tmp/rtl-arabic.png" "$tmp/rtl-hebrew.png" null: 2>&1 || true)"
 [[ "$different" =~ ^[0-9]+$ && "$different" -gt 400 ]] || {

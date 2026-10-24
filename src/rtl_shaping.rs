@@ -81,6 +81,28 @@ pub fn snap_partial_selection(text:&str,active:usize,anchor:usize,previous:usize
     if active==anchor || anchor>text.chars().count() {return None;}
     snap_moved_caret(text,active,previous)
 }
+/// When a native pointer drag starts or ends inside a marked grapheme,
+/// expand both selection endpoints to complete logical clusters. This is
+/// applied only to a non-collapsed mouse selection, not to IME preedit,
+/// keyboard navigation, caret clicks, or scoring input.
+pub fn snap_drag_selection(text:&str,active:usize,anchor:usize)
+    ->Option<(usize,usize)> {
+    let total=text.chars().count();
+    if active==anchor || active>total || anchor>total {return None;}
+    let low=active.min(anchor);
+    let high=active.max(anchor);
+    let mut scalar=0;
+    let mut first=0;
+    let mut last=total;
+    for grapheme in text.graphemes(true) {
+        let next=scalar+grapheme.chars().count();
+        if scalar<=low && low<next {first=scalar;}
+        if scalar<high && high<=next {last=next;}
+        scalar=next;
+    }
+    let corrected=if active<anchor {(first,last)}else{(last,first)};
+    (corrected!=(active,anchor)).then_some(corrected)
+}
 pub struct ShapedImage {
     pub image:egui::ColorImage,
     /// Visual caret origin in texture-local points/pixels; no physical
@@ -209,6 +231,25 @@ mod tests {
             vec![(text.into(),regular)]);
         assert_eq!(selection_spans(text,Some((0,text.len()+2)),regular,highlight),
             vec![(text.into(),regular)]);
+    }
+    #[test] fn pointer_drag_never_selects_partial_marked_or_joined_graphemes(){
+        let arabic="سَلَام";
+        assert_eq!(snap_drag_selection(arabic,1,3),Some((0,4)));
+        assert_eq!(snap_drag_selection(arabic,3,1),Some((4,0)),
+            "reverse drag must preserve its active endpoint direction");
+        assert_eq!(snap_drag_selection(arabic,2,4),None,
+            "already complete grapheme range must remain unchanged");
+        let hebrew="שָׁלוֹם";
+        assert_eq!(snap_drag_selection(hebrew,1,4),Some((0,4)));
+        assert_eq!(snap_drag_selection(hebrew,4,1),Some((4,0)));
+        let emoji="👩‍💻";
+        assert_eq!(snap_drag_selection(emoji,1,2),Some((0,3)),
+            "a joined emoji cannot be partially selected by a mouse drag");
+        assert_eq!(snap_drag_selection(emoji,2,1),Some((3,0)));
+        assert_eq!(snap_drag_selection(emoji,2,2),None,
+            "ordinary mouse caret clicks are not rewritten");
+        assert_eq!(snap_drag_selection(emoji,3,0),None);
+        assert_eq!(snap_drag_selection(emoji,4,0),None);
     }
     #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){
         let hebrew="שָׁלוֹם";

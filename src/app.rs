@@ -42,16 +42,29 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 // Only a fresh emulated physical-key press can add scored text. EgGui's
 // system-mode Text events are an aggregate committed stream and cannot be
 // safely labeled as physical repeat or uniquely attributed to hardware.
-// Text from a system compositor and final IME commits are the only strings
-// scoreable in system-input mode. Uncommitted IME preedit/candidate updates,
-// clipboard pastes, and non-text key events never alter the typing session.
-fn score_system_committed_event(session:&mut Session,event:&egui::Event)->bool {
+// Keep provisional IME text *only in memory*, bounded to the visible
+// candidate preview. Never mistake it for a committed scoring event.
+const MAX_IME_PREEDIT_GRAPHEMES:usize=64;
+fn score_system_committed_event(session:&mut Session,preedit:&mut String,
+    event:&egui::Event)->bool {
     match event {
-        egui::Event::Text(text) | egui::Event::Ime(egui::ImeEvent::Commit(text))
-            if !text.is_empty() => {
+        egui::Event::Ime(egui::ImeEvent::Enabled|egui::ImeEvent::Disabled)=>{
+            preedit.clear();
+            false
+        },
+        egui::Event::Ime(egui::ImeEvent::Preedit(text))=>{
+            *preedit=text.graphemes(true).take(MAX_IME_PREEDIT_GRAPHEMES).collect();
+            false
+        },
+        egui::Event::Ime(egui::ImeEvent::Commit(text))=>{
+            preedit.clear();
+            if text.is_empty() {false} else {session.type_text(text);true}
+        },
+        egui::Event::Text(text) if !text.is_empty()=>{
             session.type_text(text);
             true
         },
+        // Clipboard paste, key events and candidate edits are not scoreable.
         _=>false,
     }
 }
@@ -273,6 +286,7 @@ pub struct Typefinch {
     session_input_mode: String,
     emulator: Option<Emulator>,
     composition: Option<xkbcommon::xkb::compose::State>,
+    ime_preedit:String,
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     layout_draft:Option<CustomLayout>,
@@ -394,7 +408,7 @@ impl Typefinch {
                 preview_shape.label(),&prefs.layout,preview_section.label(),
                 &geometry::section_slots(preview_shape,preview_section));
         }
-        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(), installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query,
@@ -523,6 +537,7 @@ impl Typefinch {
         }
     }
     fn rebuild_session(&mut self) {
+        self.ime_preedit.clear();
         let input=if self.prefs.test_mode==TestMode::Lesson {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
@@ -530,6 +545,7 @@ impl Typefinch {
         self.session = Session::new_with_settings(duration, self.prefs.test_mode, input, self.prefs.language, self.prefs.word_difficulty);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
+        self.ime_preedit.clear();
         if self.session.target.is_empty() {
             self.message = "Enter some custom text before starting this test.".into();
             return;
@@ -549,6 +565,7 @@ impl Typefinch {
         if !ctx.input(|i| i.focused) {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
+            self.ime_preedit.clear();
             if let Some(compose) = self.composition.as_mut() { compose.reset(); }
             let _=crate::qa::write_focus_lost_report();
             self.message = "Session canceled on window focus loss. No result saved.".into();
@@ -563,6 +580,7 @@ impl Typefinch {
             match event {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                     self.session.state = State::Ready;
+                    self.ime_preedit.clear();
                     if let Some(compose) = self.composition.as_mut() { compose.reset(); }
                 }
                 egui::Event::Key { key: egui::Key::Backspace, pressed: true, repeat: false, .. } => {
@@ -598,7 +616,8 @@ impl Typefinch {
                 // Explicitly accept finalized IME composition in system
                 // mode, but never transient preedit or clipboard paste.
                 event if self.mode==Mode::System => {
-                    let _=score_system_committed_event(&mut self.session,&event);
+                    let _=score_system_committed_event(&mut self.session,
+                        &mut self.ime_preedit,&event);
                 },
                 // Paste is intentionally disallowed in scored sessions.
                 _ => {}
@@ -1263,8 +1282,9 @@ impl Typefinch {
         });
         ui.add(egui::ProgressBar::new(
             if self.session.duration.is_zero() {
-                let total=self.session.target.chars().count().max(1);
-                self.session.typed.chars().count() as f32 / total as f32
+                let total=self.session.target.graphemes(true).count().max(1);
+                (self.session.typed.graphemes(true).count() as f32 / total as f32)
+                    .clamp(0.0,1.0)
             } else {
                 (1.0 - self.session.seconds_left() / self.session.duration.as_secs_f64()) as f32
             }
@@ -1295,6 +1315,11 @@ impl Typefinch {
             .show(ui, |ui| {
                 ui.set_min_height(135.0);
                 ui.label(job);
+                if !self.ime_preedit.is_empty() && self.session.state==State::Running
+                    && self.mode==Mode::System {
+                    ui.colored_label(accent_ink(ui.visuals().dark_mode),
+                        format!("Composing (not scored): {}",self.ime_preedit));
+                }
                 ui.small(format!("Reference graphemes {}–{} of {} · Click here to refocus or press F5 to restart.", first.saturating_add(1), last, total));
             });
         let response = ui.interact(
@@ -2123,22 +2148,47 @@ mod palette_tests {
     #[test] fn ime_commits_score_once_while_noncommitted_events_do_not() {
         let mut session=Session::new_with_custom(0,TestMode::Custom,"你好世界");
         session.begin();
-        assert!(!score_system_committed_event(&mut session,
+        let mut preedit=String::new();
+        assert!(!score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Ime(egui::ImeEvent::Enabled)));
-        assert!(!score_system_committed_event(&mut session,
+        assert!(!score_system_committed_event(&mut session,&mut preedit,
+            &egui::Event::Ime(egui::ImeEvent::Preedit("ni".into()))));
+        assert_eq!(preedit,"ni");
+        assert_eq!(session.typed,"");
+        assert!(!score_system_committed_event(&mut session,&mut preedit,
+            &egui::Event::Ime(egui::ImeEvent::Preedit("你好".into()))));
+        assert_eq!(preedit,"你好");
+        assert!(!score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Paste("你好世界".into())));
-        assert!(!score_system_committed_event(&mut session,
+        assert!(!score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Ime(egui::ImeEvent::Disabled)));
+        assert!(preedit.is_empty());
         assert_eq!(session.attempts,0);
-        assert!(score_system_committed_event(&mut session,
+        assert!(score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Ime(egui::ImeEvent::Commit("你好".into()))));
+        assert!(preedit.is_empty());
         assert_eq!(session.typed,"你好");
         assert_eq!(session.attempts,2);
-        assert!(score_system_committed_event(&mut session,
+        assert!(score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Text("世界".into())));
         assert_eq!(session.typed,"你好世界");
         assert_eq!(session.state,State::Finished);
         assert_eq!(session.score().correct,4);
+    }
+    #[test] fn ime_preedit_is_bounded_and_never_scores_candidates() {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"你好");
+        session.begin();
+        let mut preview=String::new();
+        let huge="你".repeat(8000);
+        assert!(!score_system_committed_event(&mut session,&mut preview,
+            &egui::Event::Ime(egui::ImeEvent::Preedit(huge))));
+        assert_eq!(preview.graphemes(true).count(),MAX_IME_PREEDIT_GRAPHEMES);
+        assert!(session.typed.is_empty());
+        assert_eq!(session.attempts,0);
+        assert!(!score_system_committed_event(&mut session,&mut preview,
+            &egui::Event::Ime(egui::ImeEvent::Commit(String::new()))));
+        assert!(preview.is_empty());
+        assert_eq!(session.attempts,0);
     }
     #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {
         let plain=egui::Modifiers::default();

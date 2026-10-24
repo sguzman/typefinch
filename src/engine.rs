@@ -579,6 +579,18 @@ mod tests {
         assert!(Session::new_with_mode(30,TestMode::Numbers).target.contains("42"));
         assert!(Session::new_with_mode(30,TestMode::Punctuation).target.contains('?'));
     }
+    #[test] fn decomposed_unicode_accent_has_one_progress_position() {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"éé");
+        session.begin();
+        session.type_text("e\u{301}");
+        assert_eq!(session.typed.graphemes(true).count(),1);
+        assert_eq!(session.target.graphemes(true).count(),2);
+        assert_eq!(session.score().correct,1);
+        assert_eq!(session.state,State::Running);
+        session.type_text("e\u{301}");
+        assert_eq!(session.typed.graphemes(true).count(),2);
+        assert_eq!(session.state,State::Finished);
+    }
     #[test] fn canceled_session_never_accepts_more_input_or_auto_finishes() {
         let mut session=Session::new_with_custom(15,TestMode::Custom,"abcdefghijklmnop");
         session.begin();

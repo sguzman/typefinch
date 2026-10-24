@@ -48,11 +48,29 @@ done
 }
 parent=""
 for _ in $(seq 1 100);do
-  parent="$(xdotool search --onlyvisible --name 'Weston' 2>/dev/null|head -n 1||true)"
+  # Weston/X11 has differing title/class conventions across distributions.
+  # Match its own PID first so Openbox, the Xvfb root, or another window
+  # can never be mistaken for the compositor input bridge.
+  parent="$(xdotool search --onlyvisible --pid "$weston_pid" 2>/dev/null|head -n 1||true)"
+  if [[ -z "$parent" ]];then
+    parent="$(xdotool search --onlyvisible --class '[Ww]eston' 2>/dev/null|head -n 1||true)"
+  fi
+  if [[ -z "$parent" ]];then
+    parent="$(xdotool search --onlyvisible --name '[Ww]eston' 2>/dev/null|head -n 1||true)"
+  fi
   [[ -n "$parent" ]] && break
   sleep 0.1
 done
-[[ -n "$parent" ]] || { echo "No Weston parent X11 window" >&2;exit 1; }
+if [[ -z "$parent" ]];then
+  echo "No Weston parent X11 window by PID/class/title" >&2
+  for id in $(xdotool search --onlyvisible --name '.' 2>/dev/null||true);do
+    printf 'Synthetic X11 window %s title=' "$id" >&2
+    xdotool getwindowname "$id" >&2 || true
+    printf ' class=' >&2
+    xdotool getwindowclassname "$id" >&2 || true
+  done
+  exit 1
+fi
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
 sleep 1
@@ -61,6 +79,8 @@ kill -0 "$app_pid" 2>/dev/null || {
 }
 xdotool windowactivate --sync "$parent" 2>/dev/null || true
 xdotool windowfocus --sync "$parent"
+# Focus the nested Wayland surface as well as the outer X11 bridge.
+xdotool mousemove --window "$parent" 500 340 click 1
 sleep 0.45
 xdotool key --clearmodifiers F11
 sleep 0.5

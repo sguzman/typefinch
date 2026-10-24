@@ -185,5 +185,67 @@ print("Native X11 OS-layout RTL typing PASS: 4/4 after one corrected error, raw 
 LUA
   stop_app
 done
+# A single real scored custom passage spans three genuine OS XKB layouts.
+# Language switches come from isolated Xvfb test setup, never Typefinch.
+# The native reference remains in logical Unicode order while COSMIC shapes
+# the adjacent Arabic/Latin/Hebrew words in the correct visual directions.
 setxkbmap -layout us
-echo 'Arabic/Hebrew emulated and X11 native-OS layout virtual key-position scoring PASS; IME/physical Hyprland still open'
+printf '%s' 'سلام abc שלום' >"$tmp/mixed-native-passage.txt"
+start_app "mixed-native"
+xdotool key --clearmodifiers F11
+sleep 0.45
+xdotool type --clearmodifiers --delay 25 "$tmp/mixed-native-passage.txt"
+xdotool key --clearmodifiers Return
+sleep 0.5
+lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"),"No mixed RTL import audit")
+local x=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(x.synthetic and x.state=="custom-import"
+  and x.script=="mixed" and x.graphemes==13,
+  "Real mixed Arabic/Latin/Hebrew reference was not loaded")
+LUA
+xdotool windowfocus --sync "$window"
+xdotool key --clearmodifiers F5
+sleep 0.3
+xdotool key --clearmodifiers F2
+sleep 0.25
+setxkbmap -layout ara
+for code in 39 42 43 46;do
+  xdotool key --clearmodifiers "$code"
+  sleep 0.07
+done
+xdotool key --clearmodifiers 65
+sleep 0.18
+setxkbmap -layout us
+for code in 38 56 54;do
+  xdotool key --clearmodifiers "$code"
+  sleep 0.07
+done
+xdotool key --clearmodifiers 65
+sleep 0.18
+setxkbmap -layout il
+for code in 38 45 30 32;do
+  xdotool key --clearmodifiers "$code"
+  sleep 0.07
+done
+sleep 0.75
+lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"),"Mixed native X11 score missing")
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="finished"
+  and r.entered==13 and r.correct==13 and r.accuracy==100,
+  "Native mixed Arabic/Latin/Hebrew text not scored in logical order")
+local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local q=string.format("sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct FROM sessions'",path)
+local p=assert(io.popen(q,"r"))
+local rows=assert(json.decode(assert(p:read("*a"))));assert(p:close())
+assert(#rows==1 and rows[1].input_mode=="OS"
+  and rows[1].test_mode=="custom" and rows[1].entered==13
+  and rows[1].correct==13,"Native mixed passage SQLite provenance wrong")
+print("Native mixed XKB input PASS: Arabic -> US Latin -> Hebrew, 13/13 OS graphemes")
+LUA
+stop_app
+setxkbmap -layout us
+echo 'Arabic/Hebrew emulated, native OS and mixed-direction virtual key-position scoring PASS; IME/physical Hyprland still open'

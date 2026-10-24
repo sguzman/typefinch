@@ -31,6 +31,8 @@ The app exports this style of self-contained, script-free SVG together with Mark
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Corrected CPM displays finalized graphemes per minute for IME-oriented practice; it does not measure IME keystrokes or cross-language proficiency. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
+**Native modifier input QA:** [CI 40114330744](https://github.com/sguzman/typefinch/actions/runs/40114330744) scored German X11 `Shift+1`, Space and `RightAlt+E` as exactly `! €` (3/3, OS input) in a real virtual-display process. This does not certify app-local AltGr emulation or physical Hyprland keyboards. [Keyboard limitations](docs/KEYBOARDS.md).
+
 **Current keyboard inspector acceptance:** [GitHub Actions 40037472601](https://github.com/sguzman/typefinch/actions/runs/40037472601) passed 151 Rust tests, synthetic Hyprland/Wayland checks, nested Weston virtual keyboard-capability tests, the read-only X11/Wayland/disconnected-session JSON inspector CLI, and full native X11 graphical QA. Real Hyprland hotplug, active generic XKB mapping, and physical per-device attribution remain unverified.
 
 A read-only terminal inspector is also available: `typefinch --inspect-keyboards` prints versioned JSON containing compositor/X11 seat and reported layout metadata. The command does not open a GUI, capture keystrokes, identify the physical source of typing, or modify the system. It returns a nonzero exit status when inspection is unavailable.

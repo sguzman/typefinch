@@ -85,6 +85,23 @@ true human typing speed, or verifies live Hyprland/Fcitx/IBus input.
 
 Twenty exact XKB output expectations exercise ANSI punctuation, shifted digits, Shift/AltGr symbol levels, and non-Latin code points across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic layouts. The regression suite and existing GUI checks passed in [GitHub Actions run 39986908299](https://github.com/sguzman/typefinch/actions/runs/39986908299) (107 Rust tests). These are static installed-keymap expectations, **not** proof of compositor-level physical AltGr events, per-device event attribution, ISO/JIS geometry, or full IME correctness.
 
+## Native X11 Shift and AltGr input verification
+
+[CI 40114330744](https://github.com/sguzman/typefinch/actions/runs/40114330744)
+passed a **real Xvfb/egui system-input** fixture under the installed German
+XKB layout. The disposable OS seat received `Shift+1`, Space and
+`ISO_Level3_Shift+E` (Right Alt/AltGr), and Typefinch scored the resulting
+`! €` as exactly **3/3 correct committed graphemes** with three attempts.
+The independent SQLite assertion verified `input_mode=OS` and
+`test_mode=custom`; no fixture passage/path was persisted in settings.
+This adds an actual virtual-X11 compositor-input regression beyond the
+static AltGr symbol-inspection tests.
+
+**Not accepted:** reliable left-Alt versus right-Alt event attribution in
+Typefinch's *software-emulation* path, unusual AltGr layers and combinations,
+real keyboard hardware, production Hyprland and generic IME composition.
+T303's complete modifier criterion stays open.
+
 ## Illustrative ANSI, ISO, JIS and split previews
 
 The preview now lets the user choose among four **explicit illustrative main typing blocks**, without inferring a keyboard's hardware shape. ANSI/ISO/JIS labels name keyboard families; the model includes representative control and modifier positions but is not a complete 104/105/109-key device, numeric keypad or comprehensive physical modifier geometry. Key slots are derived from named Linux evdev positions: ISO `KEY_102ND=86`, Japanese `KEY_RO=89`, `KEY_YEN=124`, `KEY_MUHENKAN=94`, `KEY_HENKAN=92`, and `KEY_KATAKANAHIRAGANA=93` ([Linux input-event codes](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)).

@@ -27,7 +27,7 @@ The app exports this style of self-contained, script-free SVG together with Mark
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `█████████░ 86%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `█████████░ 87%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Corrected CPM displays finalized graphemes per minute for IME-oriented practice; it does not measure IME keystrokes or cross-language proficiency. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
@@ -43,7 +43,7 @@ Native custom passage file import was verified end to end under X11: F11 opens t
 
 Native per-profile goals JSON import (F12 then Enter) and export (Shift+F12) passed [GitHub Actions 40041334789](https://github.com/sguzman/typefinch/actions/runs/40041334789), preserving profile identity and score fields.
 
-Partial system-input IME commit semantics are covered by synthetic CJK unit tests, while live CJK/RTL behavior remains unverified: see [scoring policy](docs/SCORING.md) and [CI 40044338842](https://github.com/sguzman/typefinch/actions/runs/40044338842).
+**Native CJK input acceptance:** [CI 40126249778](https://github.com/sguzman/typefinch/actions/runs/40126249778) verified real Fcitx5 Pinyin, Anthy and Hangul X11/XIM commits, one grapheme and one persisted attempt each. Synthetic IME event tests remain separate; live Wayland/Hyprland input, other IMEs and complete RTL editing are still open. [Language evidence](docs/LANGUAGES.md).
 
 Linux (especially EndeavourOS + Hyprland) is the priority runtime.
 
@@ -92,9 +92,9 @@ The ANSI keycap preview now highlights mistakes from the current session in red 
 
 ## 🌎 Language foundation
 
-Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. Canonical Unicode grapheme scoring is implemented and tested; complete localized academy lessons, native IME/RTL integration, and full AltGr/Compose hardware validation remain open. The OS-input mode is recommended for accented Spanish characters.
+Word tests support original English and Mexican Spanish word sets, selectable inside Test setup. Results are tagged separately (English `words`, Spanish `words/es-MX`) for comparable history. Canonical Unicode grapheme scoring is implemented and tested; complete localized academy lessons, live Wayland IME/RTL acceptance, and full AltGr/Compose hardware validation remain open. The OS-input mode is recommended for accented Spanish characters.
 
-**Language safety:** English benchmark IDs remain unchanged for existing histories; Mexican Spanish benchmark modes use distinct `/es-MX` identifiers. Spanish word, quote, punctuation and paragraph passages are original project text. Numbers are shared across languages but tracked under separate test contexts. English-only starter lessons and user-provided custom text are not translated automatically. Canonical Unicode normalization is tested; real CJK IME composition, RTL layout, and physical keyboard routing remain unverified.
+**Language safety:** English benchmark IDs remain unchanged for existing histories; Mexican Spanish benchmark modes use distinct `/es-MX` identifiers. Spanish word, quote, punctuation and paragraph passages are original project text. Numbers are shared across languages but tracked under separate test contexts. English-only starter lessons and user-provided custom text are not translated automatically. Canonical Unicode normalization and real Fcitx5 Pinyin/Anthy/Hangul X11 input are tested; live Wayland IME integration, complete RTL editing, and physical keyboard routing remain unverified.
 
 **Word difficulty tiers:** English and Mexican Spanish Words tests support Easy, Standard and Challenge starter word lists. Standard preserves existing history IDs; alternative tiers receive their own context labels. These are transparent heuristic groupings, not validated proficiency ratings.
 
@@ -102,9 +102,9 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 
 **Earlier language and backup acceptance:** [55 passing Rust tests + native Spanish Easy session + consistent settings/SQLite snapshot](https://github.com/sguzman/typefinch/actions/runs/39895462191). Normalization, IMEs, RTL and physical Hyprland QA remain open.
 
-**RTL and multiline reference progress:** [Shaping, cursor-following editor preview, selected-glyph feedback, mixed-script input, and remaining gates](docs/RTL.md). [CI 40058295306](https://github.com/sguzman/typefinch/actions/runs/40058295306) passed native Arabic/Hebrew editor-caret audits, corrected-key scoring, and a fully scored **13/13 Arabic → Latin → Hebrew** X11 OS-layout session with four visually inspected frames. `Ctrl+E` opens the native custom-text editor. Same-frame duplicate IME/Text commits are suppressed with tested safeguards. Native `Ctrl+A` selection now colors selected glyphs in the shaped preview; [CI 40113785730](https://github.com/sguzman/typefinch/actions/runs/40113785730) verified the preview-only image changes. **Full native bidirectional selection, real Fcitx/IBus IMEs, and physical Hyprland hardware remain unaccepted**.
+**RTL and multiline reference progress:** [Shaping, cursor-following editor preview, selected-glyph feedback, mixed-script input, and remaining gates](docs/RTL.md). [CI 40058295306](https://github.com/sguzman/typefinch/actions/runs/40058295306) passed native Arabic/Hebrew editor-caret audits, corrected-key scoring, and a fully scored **13/13 Arabic → Latin → Hebrew** X11 OS-layout session with four visually inspected frames. `Ctrl+E` opens the native custom-text editor. Same-frame duplicate IME/Text commits are suppressed with tested safeguards. Native `Ctrl+A` selection now colors selected glyphs in the shaped preview; [CI 40113785730](https://github.com/sguzman/typefinch/actions/runs/40113785730) verified the preview-only image changes. **Full native bidirectional selection, real Wayland Fcitx/IBus integration, and physical Hyprland hardware remain unaccepted**.
 
-**Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Complex IME and bidirectional input are not yet validated.
+**Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Three Fcitx5 engines are validated under virtual X11/XIM; other IMEs and full bidirectional editing are not yet accepted.
 
 **Latest Unicode acceptance:** [59 passing Rust tests, NFC grapheme scoring and full Lua-backed X11 QA](https://github.com/sguzman/typefinch/actions/runs/39896389227). Complex IME and Hyprland hardware QA remain pending.
 

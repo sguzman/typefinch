@@ -18,3 +18,4 @@ chrono = { version = "0.4", default-features = true }
 resvg = "=0.48.1"
 unicode-normalization = "0.1"
 unicode-segmentation = "1.12"
+base64 = "0.22"

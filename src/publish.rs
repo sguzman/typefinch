@@ -1,0 +1,208 @@
+//! Explicit, optional public GitHub card publishing. No stored tokens,
+//! background synchronization or arbitrary user-selected repository paths.
+//! The GitHub CLI owns authentication; this code never reads credentials.
+use base64::{engine::general_purpose::STANDARD,Engine as _};
+use serde_json::{json,Value};
+use std::{io::Write,process::{Command,Stdio}};
+
+const CARD_PATH:&str="typefinch-profile.svg";
+const MAX_REMOTE_JSON:usize=2_500_000;
+
+#[derive(Debug,PartialEq,Eq)]
+pub enum ApiFailure {NotFound,Unavailable}
+/// Narrow API seam: pure tests never connect to GitHub or invoke gh.
+pub trait Api {
+    fn get(&self,endpoint:&str)->Result<Value,ApiFailure>;
+    fn put(&self,endpoint:&str,body:&Value)->Result<Value,ApiFailure>;
+}
+pub struct Gh;
+impl Gh {
+    fn call(&self,endpoint:&str,body:Option<&Value>)->Result<Value,ApiFailure> {
+        // Linux coreutils imposes a process-wide deadline even if the CLI
+        // authentication helper or network hangs. Never invoke a shell.
+        let mut cmd=Command::new("timeout");
+        cmd.args(["-k","2s","25s","gh","api","--hostname","github.com",endpoint]);
+        if body.is_some() {cmd.args(["--method","PUT","--input","-"]);}
+        cmd.env("GH_PROMPT_DISABLED","1")
+            .stdin(if body.is_some(){Stdio::piped()}else{Stdio::null()})
+            .stdout(Stdio::piped()).stderr(Stdio::piped());
+        let mut child=cmd.spawn().map_err(|_|ApiFailure::Unavailable)?;
+        if let Some(data)=body {
+            let bytes=serde_json::to_vec(data).map_err(|_|ApiFailure::Unavailable)?;
+            let Some(mut input)=child.stdin.take() else{return Err(ApiFailure::Unavailable)};
+            if input.write_all(&bytes).is_err() {return Err(ApiFailure::Unavailable);}
+            drop(input);
+        }
+        let result=child.wait_with_output().map_err(|_|ApiFailure::Unavailable)?;
+        if !result.status.success() {
+            let error=String::from_utf8_lossy(&result.stderr);
+            return Err(if error.contains("HTTP 404") {
+                ApiFailure::NotFound
+            } else {ApiFailure::Unavailable});
+        }
+        if result.stdout.len()>MAX_REMOTE_JSON {return Err(ApiFailure::Unavailable);}
+        serde_json::from_slice(&result.stdout).map_err(|_|ApiFailure::Unavailable)
+    }
+}
+impl Api for Gh {
+    fn get(&self,endpoint:&str)->Result<Value,ApiFailure> {self.call(endpoint,None)}
+    fn put(&self,endpoint:&str,body:&Value)->Result<Value,ApiFailure> {
+        self.call(endpoint,Some(body))
+    }
+}
+/// Only a conventional GitHub.com owner/repository pair is allowed. This
+/// rejects hosts, paths, querystrings and shell control characters.
+pub fn repository(input:&str)->Result<String,String> {
+    let value=input.trim();
+    let Some((owner,repo))=value.split_once('/') else{
+        return Err("Enter a GitHub.com repository as owner/repository.".into());
+    };
+    let owner_ok=!owner.is_empty() && owner.len()<=39
+        && !owner.starts_with('-') && !owner.ends_with('-')
+        && owner.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'-');
+    let repo_ok=!repo.is_empty() && repo.len()<=100 && repo!="." && repo!=".."
+        && repo.bytes().all(|c|c.is_ascii_alphanumeric()||matches!(c,b'.'|b'_'|b'-'));
+    if !owner_ok || !repo_ok {
+        return Err("Repository must be a GitHub.com owner/repository without paths or punctuation.".into());
+    }
+    Ok(format!("{owner}/{repo}"))
+}
+fn owned_card(data:&Value)->Result<String,String> {
+    if data.get("type").and_then(Value::as_str)!=Some("file") {
+        return Err("Existing GitHub path is not an ordinary file; it will not be overwritten.".into());
+    }
+    let sha=data.get("sha").and_then(Value::as_str).filter(|sha|
+        sha.len()==40 && sha.bytes().all(|b|b.is_ascii_hexdigit()))
+        .ok_or("Cannot validate existing remote file identity; upload refused.")?;
+    if data.get("encoding").and_then(Value::as_str)!=Some("base64") {
+        return Err("Cannot inspect existing file content; upload refused.".into());
+    }
+    let encoded=data.get("content").and_then(Value::as_str)
+        .ok_or("Existing file content not readable; upload refused.")?
+        .chars().filter(|ch|!ch.is_ascii_whitespace()).collect::<String>();
+    if encoded.len()>1_500_000 {return Err("Remote content too large; upload refused.".into());}
+    let bytes=STANDARD.decode(encoded).map_err(|_|"Cannot decode remote file; upload refused.")?;
+    let current=std::str::from_utf8(&bytes)
+        .map_err(|_|"Existing file is not UTF-8 SVG; upload refused.")?;
+    if !current.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
+        || !current.contains("aria-label=\"Typefinch profile\"")
+            && !current.contains("aria-label=\"Typefinch compact profile\"") {
+        return Err("Existing file does not identify as a Typefinch card; refusing overwrite.".into());
+    }
+    Ok(sha.to_owned())
+}
+/// Every call is authorized by a fresh user-facing consent checkbox and
+/// concrete click, and only the fixed card path can be updated. The SVG
+/// string must already be produced by Typefinch's safe XML exporter.
+pub fn publish_via<A:Api>(api:&A,input:&str,svg:&str,consent:bool)->Result<String,String> {
+    if !consent {return Err("Public GitHub publishing requires explicit consent.".into());}
+    let repo=repository(input)?;
+    if !svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
+        || !svg.contains("aria-label=\"Typefinch") || svg.contains("<script") {
+        return Err("Only a Typefinch-generated, script-free SVG can be uploaded.".into());
+    }
+    let repo_endpoint=format!("repos/{repo}");
+    let info=api.get(&repo_endpoint).map_err(|_|
+        "Cannot verify the target GitHub repository or credentials; nothing was uploaded.".to_owned())?;
+    if info.get("permissions").and_then(|p|p.get("push")).and_then(Value::as_bool)!=Some(true) {
+        return Err("Current GitHub CLI credentials cannot confirm write permission; nothing was uploaded.".into());
+    }
+    let card_endpoint=format!("{repo_endpoint}/contents/{CARD_PATH}");
+    let old=match api.get(&card_endpoint) {
+        Ok(file)=>Some(owned_card(&file)?),
+        Err(ApiFailure::NotFound)=>None,
+        Err(ApiFailure::Unavailable)=>return Err(
+            "Cannot verify the existing card (network or authentication failure); nothing was uploaded.".into()),
+    };
+    let mut body=json!({
+        "message":"Update Typefinch public profile card",
+        "content":STANDARD.encode(svg.as_bytes())
+    });
+    if let Some(sha)=old {body["sha"]=Value::String(sha);}
+    let receipt=api.put(&card_endpoint,&body).map_err(|_|
+        "GitHub declined or could not complete the upload; check the repository manually.".to_owned())?;
+    if receipt.get("content").and_then(|c|c.get("path")).and_then(Value::as_str)!=Some(CARD_PATH){
+        return Err("GitHub response did not confirm the card path; inspect the repository.".into());
+    }
+    Ok(format!("https://github.com/{repo}"))
+}
+pub fn publish(input:&str,svg:&str,consent:bool)->Result<String,String> {
+    publish_via(&Gh,input,svg,consent)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{cell::RefCell,collections::VecDeque};
+    struct Mock {
+        replies:RefCell<VecDeque<Result<Value,ApiFailure>>>,
+        calls:RefCell<Vec<(String,Option<Value>)>>,
+    }
+    impl Mock {
+        fn new(responses:Vec<Result<Value,ApiFailure>>)->Self {
+            Self{replies:RefCell::new(responses.into()),calls:RefCell::new(Vec::new())}
+        }
+        fn next(&self,path:&str,body:Option<&Value>)->Result<Value,ApiFailure>{
+            self.calls.borrow_mut().push((path.to_owned(),body.cloned()));
+            self.replies.borrow_mut().pop_front().expect("unexpected API call")
+        }
+    }
+    impl Api for Mock {
+        fn get(&self,path:&str)->Result<Value,ApiFailure>{self.next(path,None)}
+        fn put(&self,path:&str,body:&Value)->Result<Value,ApiFailure>{
+            self.next(path,Some(body))
+        }
+    }
+    const DEMO:&str="<svg xmlns=\"http://www.w3.org/2000/svg\" aria-label=\"Typefinch compact profile\"></svg>";
+    fn repo_info()->Value{json!({"permissions":{"push":true}})}
+    fn uploaded()->Value{json!({"content":{"path":"typefinch-profile.svg"}})}
+    #[test] fn rejects_nonconforming_target_and_missing_consent_without_api_access(){
+        for target in ["owner/repo/README.md","https://github.com/owner/repo",
+            "owner/repo?x=1","evil;rm/repo","owner/..","-/repo","owner/repo and more"]{
+            assert!(repository(target).is_err(),"{target}");
+        }
+        assert_eq!(repository("  alice/typefinch-card ").unwrap(),"alice/typefinch-card");
+        let mock=Mock::new(vec![]);
+        assert!(publish_via(&mock,"alice/cards",DEMO,false).unwrap_err().contains("consent"));
+        assert!(mock.calls.borrow().is_empty());
+    }
+    #[test] fn publishing_new_card_never_handles_tokens_or_other_repository_paths(){
+        let mock=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),Ok(uploaded())]);
+        assert_eq!(publish_via(&mock,"alice/cards",DEMO,true).unwrap(),
+            "https://github.com/alice/cards");
+        let c=mock.calls.borrow();
+        assert_eq!(c.len(),3);
+        assert_eq!(c[0].0,"repos/alice/cards");
+        assert_eq!(c[1].0,"repos/alice/cards/contents/typefinch-profile.svg");
+        assert_eq!(c[2].0,c[1].0);
+        let body=c[2].1.as_ref().unwrap();
+        assert_eq!(body.get("sha"),None);
+        assert_eq!(STANDARD.decode(body["content"].as_str().unwrap()).unwrap(),DEMO.as_bytes());
+        assert!(!body.to_string().contains("token"));
+    }
+    #[test] fn existing_non_typefinch_files_are_never_replaced(){
+        let foreign=json!({"type":"file","sha":"a".repeat(40),
+            "encoding":"base64","content":STANDARD.encode("<svg>not ours</svg>")});
+        let mock=Mock::new(vec![Ok(repo_info()),Ok(foreign)]);
+        assert!(publish_via(&mock,"alice/cards",DEMO,true).unwrap_err().contains("refusing overwrite"));
+        assert_eq!(mock.calls.borrow().len(),2);
+    }
+    #[test] fn updates_owned_card_only_when_sha_is_verified(){
+        let existing=json!({"type":"file","sha":"a".repeat(40),
+            "encoding":"base64","content":STANDARD.encode(DEMO)});
+        let mock=Mock::new(vec![Ok(repo_info()),Ok(existing),Ok(uploaded())]);
+        publish_via(&mock,"alice/cards",DEMO,true).unwrap();
+        assert_eq!(mock.calls.borrow()[2].1.as_ref().unwrap()["sha"],"a".repeat(40));
+    }
+    #[test] fn offline_and_missing_permissions_fail_closed(){
+        let missing_permission=Mock::new(vec![Ok(json!({"permissions":{"push":false}}))]);
+        assert!(publish_via(&missing_permission,"alice/cards",DEMO,true).is_err());
+        assert_eq!(missing_permission.calls.borrow().len(),1);
+        let outage=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::Unavailable)]);
+        assert!(publish_via(&outage,"alice/cards",DEMO,true).unwrap_err().contains("nothing was uploaded"));
+        assert_eq!(outage.calls.borrow().len(),2);
+        let unauth=Mock::new(vec![Err(ApiFailure::Unavailable)]);
+        assert!(publish_via(&unauth,"alice/cards",DEMO,true).is_err());
+        assert_eq!(unauth.calls.borrow().len(),1);
+    }
+}

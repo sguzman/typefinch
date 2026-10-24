@@ -15,6 +15,7 @@ mod layouts;
 mod geometry;
 mod lesson;
 mod preferences;
+mod publish;
 mod registry;
 mod qa;
 mod xkb;

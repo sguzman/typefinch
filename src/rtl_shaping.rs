@@ -56,6 +56,25 @@ pub fn selection_spans(text:&str,selected:Option<(usize,usize)>,
     if end<text.len(){result.push((text[end..].into(),regular));}
     result
 }
+/// Align a keyboard selection endpoint with a complete Unicode grapheme.
+/// The ordinary egui TextEdit uses scalar-character cursor indices, which
+/// can land inside Arabic harakat, Hebrew niqqud, or joined emoji. Only
+/// Shift+Arrow selections use this helper; neither source text nor caret
+/// positioning for IME composition is rewritten.
+pub fn snap_partial_selection(text:&str,active:usize,anchor:usize)->Option<usize>{
+    if active==anchor {return None;}
+    let total=text.chars().count();
+    if active>total || anchor>total {return None;}
+    let mut start=0;
+    for grapheme in text.graphemes(true) {
+        let end=start+grapheme.chars().count();
+        if start<active && active<end {
+            return Some(if active>anchor {end} else {start});
+        }
+        start=end;
+    }
+    None
+}
 pub struct ShapedImage {
     pub image:egui::ColorImage,
     /// Visual caret origin in texture-local points/pixels; no physical
@@ -184,6 +203,22 @@ mod tests {
             vec![(text.into(),regular)]);
         assert_eq!(selection_spans(text,Some((0,text.len()+2)),regular,highlight),
             vec![(text.into(),regular)]);
+    }
+    #[test] fn keyboard_selection_never_splits_marked_rtl_or_zwj_grapheme(){
+        let hebrew="שָׁלוֹם";
+        assert_eq!(snap_partial_selection(hebrew,1,0),Some(3));
+        assert_eq!(snap_partial_selection(hebrew,2,0),Some(3));
+        assert_eq!(snap_partial_selection(hebrew,2,3),Some(0));
+        assert_eq!(snap_partial_selection(hebrew,3,0),None);
+        let arabic="سَلَام";
+        assert_eq!(snap_partial_selection(arabic,1,0),Some(2));
+        let emoji="👩‍💻 is one";
+        assert_eq!(snap_partial_selection(emoji,1,0),Some(3));
+        assert_eq!(snap_partial_selection(emoji,2,0),Some(3));
+        assert_eq!(snap_partial_selection(emoji,0,0),None);
+        assert_eq!(snap_partial_selection(emoji,99,0),None);
+        assert_eq!(snap_partial_selection(emoji,1,99),None);
+        assert_eq!(snap_partial_selection("abc",1,0),None);
     }
     #[test] fn egui_scalar_editor_caret_snaps_to_unicode_graphemes(){
         let text="שָׁלוֹם 🌍👩‍💻 سلام";

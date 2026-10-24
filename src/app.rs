@@ -1264,9 +1264,18 @@ impl Typefinch {
                             "Edit raw RTL source (advanced)"));
                     if self.rtl_raw_editor_open {
                         ui.small("Native multiline RTL caret/selection remain unverified; compare with the shaped preview.");
+                        let editor_id=egui::Id::new("custom_text_editor");
+                        let shift_arrow=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::Key {
+                                key:egui::Key::ArrowLeft|egui::Key::ArrowRight,
+                                pressed:true,modifiers,repeat:false,..}
+                                if modifiers.shift && !modifiers.alt
+                                    && !modifiers.command && !modifiers.ctrl)));
+                        let ime_event=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::Ime(_))));
                         let edit=ui.add_enabled(self.session.state!=State::Running,
                             egui::TextEdit::multiline(&mut self.custom_text)
-                                .id(egui::Id::new("custom_text_editor"))
+                                .id(editor_id)
                                 .desired_rows(4)
                                 .desired_width(ui.available_width())
                                 .hint_text("Edit private source text"));
@@ -1274,8 +1283,28 @@ impl Typefinch {
                         if edit.has_focus() {
                             ui.scroll_to_rect(edit.rect,Some(egui::Align::Center));
                         }
+                        // Native egui may select only the base Unicode scalar
+                        // of an Arabic/Hebrew marked cluster. On explicit
+                        // Shift+Arrow, extend its active endpoint to a whole
+                        // grapheme while retaining the original anchor.
+                        // Do not modify IME composition, unshifted navigation
+                        // or mouse selections.
+                        if edit.has_focus() && shift_arrow && !ime_event {
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
+                                if let Some(range)=state.cursor.char_range() {
+                                    if let Some(endpoint)=rtl_shaping::snap_partial_selection(
+                                        &self.custom_text,range.primary.index,range.secondary.index) {
+                                        state.cursor.set_char_range(Some(egui::text::CCursorRange {
+                                            primary:egui::text::CCursor::new(endpoint),
+                                            secondary:range.secondary,
+                                        }));
+                                        state.store(ui.ctx(),editor_id);
+                                    }
+                                }
+                            }
+                        }
                         let range=if edit.has_focus(){
-                            egui::TextEdit::load_state(ui.ctx(),egui::Id::new("custom_text_editor"))
+                            egui::TextEdit::load_state(ui.ctx(),editor_id)
                                 .and_then(|state|state.cursor.char_range())
                         }else{None};
                         self.rtl_editor_cursor_byte=range.as_ref()

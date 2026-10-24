@@ -2139,6 +2139,7 @@ mod palette_tests {
         (x.max(y)+0.05)/(x.min(y)+0.05)
     }
     #[test] fn rtl_reference_feedback_retains_logical_order_and_clusters() {
+        use unicode_normalization::UnicodeNormalization;
         // The same normalization policy applies to Arabic vowel marks and
         // Hebrew niqqud without interpreting display order as input order.
         let arabic="سَلَام بالعربية";

@@ -246,7 +246,9 @@ assert(selected.total==start.total and selected.index==1 and selected.selected_g
 assert(deleted.total==start.total-1 and deleted.index==0 and deleted.selected_graphemes==0,
   "Wayland native Backspace did not remove exactly one grapheme")
 assert(restored.total==start.total and restored.selected_graphemes==0,
-  "Wayland native Undo did not restore the original source length")
+  string.format("Wayland native Undo mismatch: initial=%d selected=%d deleted=%d restored=%d restored_selection=%d restored_index=%d",
+    start.total,selected.total,deleted.total,restored.total,
+    restored.selected_graphemes,restored.index))
 print("Native Wayland marked RTL grapheme Backspace/Undo PASS: "..
   start.total.." -> "..deleted.total.." -> "..restored.total)
 LUA

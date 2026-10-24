@@ -148,8 +148,13 @@ local ordinary=tick..[[1234567890-=[]'\;,./]]
 local ordinary_shift="~"..[[!@#$%^&*()_+{}"|:<>?]]
 local dvorak=tick..[[1234567890[]/=-\swvz]]
 local dvorak_shift="~"..[[!@#$%^&*(){}?+_|SWVZ]]
+local colemak=tick..[[1234567890-=[]'\o,./]]
+local colemak_shift="~"..[[!@#$%^&*()_+{}"|O<>?]]
 local base,shift=ordinary,ordinary_shift
 if layout=="us(dvorak)" then base,shift=dvorak,dvorak_shift end
+if layout=="us(colemak)" or layout=="us(colemak_dh)" then
+  base,shift=colemak,colemak_shift
+end
 assert(#base==21 and #shift==21,
   "Fixture must describe all 21 physical punctuation/number positions")
 local f=assert(io.open(path,"wb"));assert(f:write(base,shift));assert(f:close())

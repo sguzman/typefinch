@@ -434,6 +434,45 @@ assert(hebrew.index>latin.index and hebrew.caret_y_px>latin.caret_y_px,
 print("Native mixed BiDi mouse caret PASS: "..latin.index.." -> "..hebrew.index..
   " graphemes, visual rows "..latin.caret_y_px.." -> "..hebrew.caret_y_px)
 LUA
+    # Test real pointer *drag* ranges across different BiDi paragraph
+    # directions. Click-only caret motion is already covered above;
+    # mousedown/move/mouseup must preserve the logical range and move
+    # the independent shaped selection/caret.
+    xdotool mousemove --window "$window" 28 419 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 28 437
+    sleep 0.2
+    xdotool mouseup 1
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-drag-down.json"
+    import -window "$window" "$tmp/rtl-mixed-drag-down.png"
+    xdotool mousemove --window "$window" 28 437 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 28 419
+    sleep 0.2
+    xdotool mouseup 1
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-drag-up.json"
+    import -window "$window" "$tmp/rtl-mixed-drag-up.png"
+    lua5.4 - "$tmp/$name/mixed-drag-down.json" "$tmp/$name/mixed-drag-up.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native BiDi drag audit")
+  local r=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(r.synthetic and r.state=="rtl-editor-caret" and r.caret_positioned)
+  assert(r.total==54 and type(r.selected_graphemes)=="number")
+  return r
+end
+local down,up=read(arg[1]),read(arg[2])
+assert(down.index>=37 and down.index<=54 and down.caret_y_px>=55
+  and down.selected_graphemes>=8 and down.selected_graphemes<54,
+  "Native Latin-to-Hebrew/Arabic pointer drag failed")
+assert(up.index>=22 and up.index<37 and up.caret_y_px>=25 and up.caret_y_px<55
+  and up.selected_graphemes>=8 and up.selected_graphemes<54,
+  "Native Hebrew/Arabic-to-Latin reverse pointer drag failed")
+print("Native mixed BiDi drag selection PASS: "..down.selected_graphemes.." / "..
+  up.selected_graphemes.." graphemes, visual rows "..down.caret_y_px.." / "..up.caret_y_px)
+LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
   fi

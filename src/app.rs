@@ -132,6 +132,40 @@ fn score_system_committed_event(session:&mut Session,preedit:&mut String,
         _=>false,
     }
 }
+/// Only pairs of opposite platform event kinds carrying the *same*
+/// finalized text in one egui frame can be collapsed. Two ordinary Text
+/// events or two distinct IME commits remain independent; deduplication
+/// never uses a cross-frame timer or guessed keyboard identity.
+#[derive(Default)]
+struct SystemFrameCommitDedup {
+    last:Option<(bool,String)>, // true = IME Commit; false = Text
+}
+fn score_system_frame_event(session:&mut Session,preedit:&mut String,
+    dedup:&mut SystemFrameCommitDedup,event:&egui::Event)->bool {
+    let committed=match event {
+        egui::Event::Ime(egui::ImeEvent::Commit(text))=>Some((true,text.as_str())),
+        egui::Event::Text(text)=>Some((false,text.as_str())),
+        egui::Event::Ime(egui::ImeEvent::Enabled
+            |egui::ImeEvent::Preedit(_)|egui::ImeEvent::Disabled)=>{
+            dedup.last=None;
+            None
+        },
+        _=>None,
+    };
+    if let Some((is_ime,text))=committed {
+        if !text.is_empty() {
+            if dedup.last.as_ref().is_some_and(|(previous_ime,previous)|
+                *previous_ime!=is_ime && previous==text) {
+                dedup.last=None;
+                if is_ime {preedit.clear();}
+                return false;
+            }
+            // Never copy unbounded compositor text into an auxiliary cache.
+            dedup.last=(text.len()<=16_384).then(||(is_ime,text.to_owned()));
+        }
+    }
+    score_system_committed_event(session,preedit,event)
+}
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
 }
@@ -699,6 +733,7 @@ impl Typefinch {
         }
         let events = ctx.input(|i| i.events.clone());
         let mut enter_scored_in_frame=false;
+        let mut system_frame_dedup=SystemFrameCommitDedup::default();
         for event in events {
             match event {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
@@ -762,8 +797,8 @@ impl Typefinch {
                 // Explicitly accept finalized IME composition in system
                 // mode, but never transient preedit or clipboard paste.
                 event if self.mode==Mode::System => {
-                    let _=score_system_committed_event(&mut self.session,
-                        &mut self.ime_preedit,&event);
+                    let _=score_system_frame_event(&mut self.session,
+                        &mut self.ime_preedit,&mut system_frame_dedup,&event);
                 },
                 // Paste is intentionally disallowed in scored sessions.
                 _ => {}
@@ -2643,6 +2678,58 @@ mod palette_tests {
             let offset=text.graphemes(true).take(2).map(str::len).sum();
             let shaped=shaping.render_with_caret(&spans,640,96,Some(offset)).unwrap();
             assert!(shaped.caret.is_some(),"committed RTL input must yield a shaped visual cursor");
+        }
+    }
+    #[test] fn paired_ime_and_text_events_score_once_but_real_repeats_survive(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"你好你好");
+        s.begin();
+        let mut preedit=String::new();
+        let mut guard=SystemFrameCommitDedup::default();
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Ime(egui::ImeEvent::Preedit("ni hao".into()))));
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Ime(egui::ImeEvent::Commit("你好".into()))));
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("你好".into())),
+            "duplicate platform Text must not score a second IME commit");
+        assert_eq!(s.typed,"你好");
+        assert_eq!(s.attempts,2);
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("你好".into())));
+        assert_eq!(s.typed,"你好你好");
+        assert_eq!(s.attempts,4);
+        assert_eq!(s.score().accuracy,100.0);
+    }
+    #[test] fn reverse_text_then_ime_pair_is_not_double_scored(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"שש");
+        s.begin();
+        let mut preedit=String::new();
+        let mut guard=SystemFrameCommitDedup::default();
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("ש".into())));
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Ime(egui::ImeEvent::Commit("ש".into()))));
+        assert_eq!(s.attempts,1);
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("ש".into())));
+        assert_eq!(s.typed,"שש");
+        assert_eq!(s.score().correct,2);
+    }
+    #[test] fn independent_text_and_ime_commits_stay_independent(){
+        for cases in [
+            vec![egui::Event::Text("a".into()),egui::Event::Text("a".into())],
+            vec![egui::Event::Ime(egui::ImeEvent::Commit("a".into())),
+                egui::Event::Ime(egui::ImeEvent::Commit("a".into()))],
+        ] {
+            let mut s=Session::new_with_custom(0,TestMode::Custom,"aa");
+            s.begin();
+            let mut preedit=String::new();
+            let mut guard=SystemFrameCommitDedup::default();
+            for event in cases {
+                assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,&event));
+            }
+            assert_eq!(s.attempts,2);
+            assert_eq!(s.score().correct,2);
         }
     }
     #[test] fn ime_commits_score_once_while_noncommitted_events_do_not() {

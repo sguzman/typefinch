@@ -4,14 +4,14 @@
 
 1. **Recognized:** a curated layout identity in the selector, not necessarily installed in system XKB. The source catalog contains many presets from English, Spanish, German, French, other European, Cyrillic, Semitic and Asian layouts.
 2. **Native OS input:** accept committed text from the compositor's layout. Keep this default for complex scripts and IME input; advanced tests remain to do.
-3. **Software emulation:** interpret physical ANSI key locations through an alternate map inside Typefinch only. Four starter mappings are committed; these are provisional until complete shift/punctuation and live hardware QA.
+3. **Software emulation:** interpret physical ANSI key locations through an alternate map inside Typefinch only. Four starter layouts now have verified Base/Shift ANSI positions and outer punctuation even without installed XKB. Native physical AltGr, full modifier routing, ISO/JIS extras and live hardware QA remain pending.
 
 | Layout | Identity in catalog | Starter emulation |
 | --- | --- | --- |
-| US QWERTY | ✅ | ✅ ANSI base layer |
-| Dvorak | ✅ | ✅ ANSI base layer |
-| Colemak | ✅ | ✅ ANSI base layer |
-| Colemak-DH | ✅ | ✅ ANSI base layer |
+| US QWERTY | ✅ | ✅ ANSI Base/Shift + edge punctuation |
+| Dvorak | ✅ | ✅ ANSI Base/Shift + edge punctuation |
+| Colemak | ✅ | ✅ ANSI Base/Shift + edge punctuation |
+| Colemak-DH | ✅ | ✅ ANSI Base/Shift + edge punctuation |
 | Workman, Norman, Halmak, Canary, Engram, Semimak | ✅ | XKB if installed; complete modifier/IME QA planned |
 | QWERTZ, AZERTY, BÉPO, Neo 2, Turkish F | ✅ | XKB if installed; complete modifier/IME QA planned |
 | Spanish, Latin American, Nordic, Cyrillic, Greek | ✅ | XKB if installed; complete modifier/IME QA planned |
@@ -29,6 +29,29 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 Acceptance: hotplug two keyboards; map both with differing layouts; verify focus, shift/AltGr, symbols, dead keys, IMEs, ANSI/ISO/JIS and no double-count of physical + committed events.
 
 [Wayland keyboard protocol](https://wayland.app/protocols/wayland) · [Hyprland devices](https://wiki.hypr.land/configuring/core/devices/) · [Hyprland keyboard-layout documentation](https://wiki.hypr.land/configuring/core/binds/keyboard-layouts/).
+
+## Starter ANSI Base/Shift and offline fallback
+
+[CI 40118806315](https://github.com/sguzman/typefinch/actions/runs/40118806315)
+passed the complete Rust and native X11 GUI suite, including 48 physical
+ANSI positions (three ten-key letter rows, 17 edge keys, Space) at both
+Base and Shift levels for each of **US QWERTY, Dvorak, Colemak and
+Colemak-DH**, compared against installed libxkbcommon keymaps. The
+previous Colemak-DH bottom-row transposition was corrected; Dvorak's
+number-row-adjacent and punctuation key differences now retain their
+actual shifted/unshifted symbols.
+
+An independent native GUI regression uses physical X11 keycodes through
+Typefinch's own **software emulation** and requires Dvorak `[]{}_?`
+(6/6) plus Colemak-DH `xcdvz` (5/5). It repeats both fixtures with
+`XKB_CONFIG_ROOT` deliberately pointing to an empty directory,
+forcing the compiled-XKB path to be unavailable and exercising the
+explicit starter-table fallback. All four scored records identify
+`input_mode=Emulated`; source passages and local paths remain out of
+saved settings. This is reproducible virtual X11 QA, not a claim about
+physical keyboard identity, AltGr attribution, compositor-specific
+modifier routing or complete ISO/JIS layouts. T302 and T303 therefore
+remain partially unaccepted.
 
 ## XKB compiler (new implementation)
 

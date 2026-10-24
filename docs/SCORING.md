@@ -49,6 +49,25 @@ Raw attempts include mistakes and subsequent corrections. A decomposed accent ma
 
 Pastes are excluded from scored sessions. An emulation key repeat is suppressed, while system committed-text events may depend on compositor behavior; universal per-physical-keyboard repeat attribution is **not accepted**. Window-focus loss cancels a running session without persisting a score. Expiry is checked before frame input; timed sessions reject post-deadline typing. An unfinished combining sequence cannot extend the timed cutoff. Untimed practice finishes on passage completion.
 
+## Streaming Unicode composition boundary tests
+
+Scoring now determines whether an arriving Unicode scalar extends the
+previous grapheme using actual Unicode extended-grapheme segmentation,
+rather than guessing from a short list of combining codepoints. It
+handles Korean decomposed Hangul Jamo, a third regional-indicator symbol
+after an already paired flag, and split emoji ZWJ sequences without
+inventing extra character positions. Raw scalar attempts are still
+diagnostic and separate from final corrected-grapheme accuracy.
+
+Canonical composition also tolerates a still-incomplete sequence of
+the **exact expected combining marks** arriving in a different
+canonical-class order. Once the mark count is complete, genuine
+non-equivalent equal-class ordering remains an error. The regression
+suite verifies both the valid intermediate sequence and the negative
+case. This does not demonstrate any live Fcitx/IBus integration or
+hardware keystroke attribution. [CI 40118806315](https://github.com/sguzman/typefinch/actions/runs/40118806315)
+passed the complete source and native X11 suite with these tests.
+
 ## Explicitly unaccepted language extensions
 
 The corrected CPM policy specifies display-text accounting only. Arabic/Hebrew bidirectional caret/visual editing acceptance, CJK IME behavior in live compositors and cross-script proficiency calibration remain open under the multilingual roadmap. The current application does not claim that a compositor delivers per-physical-device input events.

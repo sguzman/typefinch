@@ -256,9 +256,19 @@ LUA
   xdotool key --clearmodifiers ctrl+Home
   sleep 0.2
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-start.json"
+  import -window "$parent" "$tmp/$script-whole-before.png"
   xdotool key --clearmodifiers ctrl+shift+End
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-selected.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-whole.png"
+  # Inspecting only metadata would miss a stale/unpainted shaped preview.
+  # Synthetic, self-contained screenshots are safe for the CI artifact.
+  pixels="$(compare -metric AE "$tmp/$script-whole-before.png" \
+    "typefinch-wayland-rtl-$script-whole.png" null: 2>&1 || true)"
+  [[ "$pixels" =~ ^[0-9]+$ && "$pixels" -gt 200 ]] || {
+    echo "Wayland full-range RTL selection did not visibly repaint: pixels=$pixels" >&2
+    exit 1
+  }
   xdotool key --clearmodifiers ctrl+shift+Home
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-whole-retracted.json"

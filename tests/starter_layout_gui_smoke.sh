@@ -48,8 +48,8 @@ stop_app(){
   app_pid=""
   sleep 0.2
 }
-for label in dvorak colemak-dh;do
-  if [[ "$label" == dvorak ]];then
+for label in dvorak colemak-dh dvorak-offline colemak-dh-offline;do
+  if [[ "$label" == dvorak* ]];then
     layout='us(dvorak)'
     passage='[]{}_?'
     codes=(20 21 shift+20 shift+21 shift+48 shift+34)
@@ -76,6 +76,13 @@ preferences.layout=layout
 local out=assert(io.open(path,"wb"))
 assert(out:write(json.encode(preferences,{indent=true})));assert(out:close())
 LUA
+  if [[ "$label" == *-offline ]];then
+    # Force installed-XKB compilation to fail inside Typefinch, while
+    # the disposable Xvfb server keeps its known US physical keymap.
+    # Verify the offline starter fallback scores identical physical keys.
+    mkdir -p "$tmp/empty-xkb-root"
+    export XKB_CONFIG_ROOT="$tmp/empty-xkb-root"
+  fi
   start_app "$label"
   xdotool key --clearmodifiers F11
   sleep 0.45
@@ -115,5 +122,6 @@ assert(not settings:find(passage,1,true),"Private custom passage leaked to setti
 print("Native starter ANSI XKB emulation PASS: "..layout.." "..count.."/"..count)
 LUA
   stop_app
+  unset XKB_CONFIG_ROOT
 done
-echo 'Dvorak shifted punctuation and Colemak-DH bottom row native scoring PASS'
+echo 'Native Dvorak and Colemak-DH Shift/edge keys PASS with installed XKB and forced offline fallback'

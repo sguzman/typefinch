@@ -54,9 +54,15 @@ done
 fcitx5-remote --check >/dev/null 2>&1 || {
   echo "Fcitx5 DBus controller unavailable" >&2; exit 1;
 }
-fcitx5-remote -s pinyin
+# Fcitx advertises its D-Bus controller before asynchronously loading
+# the installed Pinyin dictionary/addon. Retry selection until ready.
+for _ in $(seq 1 80);do
+  fcitx5-remote -s pinyin >/dev/null 2>&1 || true
+  [[ "$(fcitx5-remote -n 2>/dev/null || true)" == pinyin ]] && break
+  sleep 0.25
+done
 [[ "$(fcitx5-remote -n)" == pinyin ]] || {
-  echo "Installed Pinyin engine did not become selected" >&2;exit 1;
+  echo "Installed Pinyin engine did not become selected after startup" >&2;exit 1;
 }
 setxkbmap -layout us
 printf '%s' '你' >"$tmp/chinese.txt"

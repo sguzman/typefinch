@@ -186,6 +186,12 @@ LUA
     sleep 0.18
     xdotool key --clearmodifiers F2
     sleep 0.18
+    # A held Ctrl or ordinary Left Alt is a shortcut, not a printable
+    # emulated position. Neither combination may add a scored attempt.
+    # Real physical RightAlt/Level-3 detection remains a separate gate.
+    xdotool key --clearmodifiers ctrl+b
+    xdotool key --clearmodifiers alt+b
+    xdotool key --clearmodifiers ctrl+shift+b
     for code in "${full_codes[@]}";do
       xdotool key --clearmodifiers "$code"
     done

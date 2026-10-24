@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 85%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 86%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
@@ -224,11 +224,11 @@
 - 🐤 GitHub widget — `██████████ 100%`
 - 🔄 Publishing automation — `████████░░ 75%`
 
-## 🌎 M5 — Multilingual typing — `███████░░░ 67%`
+## 🌎 M5 — Multilingual typing — `████████░░ 75%`
 
 **Acceptance gate:** Correct Unicode, IME composition, RTL and per-language corpora.
 
-### 🗣️ P8 — Languages and input methods — `███████░░░ 67%`
+### 🗣️ P8 — Languages and input methods — `████████░░ 75%`
 
 - 🧾 **T801** Language packs and corpora — `██████████ 100%`
   - [x] English/Spanish data — src/engine.rs: English and Mexican Spanish corpora, CI 39895462191
@@ -242,14 +242,14 @@
   - [x] Committed text semantics — src/app.rs score_system_committed_event accepts system-mode egui::Event::Text and ImeEvent::Commit, excludes noncommitted IME events and Paste, and advertises a focused IME candidate rectangle; synthetic 你好世界 custom passage test validates four graphemes and no scoring of enable/disable/paste. GitHub Actions 40044338842 passed 159 Rust tests including ime_commits_score_once_while_noncommitted_events_do_not plus native X11 GUI suite. No live CJK/Fcitx/IBus integration, cross-script speed policy or RTL acceptance claimed.
   - [ ] CJK integration tests
   - [x] Speed conventions — src/engine.rs Score.cpm counts correctly matched final Unicode grapheme clusters per elapsed minute, independently of raw IME keystrokes; tests cover corrected Chinese, Japanese kana, Korean Hangul, canonical accents and zero-duration bounds. src/app.rs displays corrected CPM separately from standardized WPM; docs/SCORING.md explicitly rejects cross-language equivalence and physical-key attribution. GitHub Actions 40048186051 passed 174 Rust tests and the complete native X11 graphical/compositor suite. Actual Fcitx/IBus CJK integration and RTL acceptance remain open.
-- 🪶 **T804** Arabic and Hebrew bidirectional input — `░░░░░░░░░░ 0%`
+- 🪶 **T804** Arabic and Hebrew bidirectional input — `███░░░░░░░ 33%`
   - [ ] Shaping and caret
-  - [ ] Error highlighting
+  - [x] Error highlighting — src/app.rs logical reference_runs and RTL shape_rtl_reference; src/rtl_shaping.rs COSMIC Text bidi/OpenType raster maintains feedback colors and visual caret mapping. CI 40054099986: 193 Rust tests, complete native X11 suite, separate disposable Arabic and Hebrew app/config instances with synthetic script-identity/grapheme audit, real F5/F2 running-caret and incorrect-ASCII-key highlight screenshots. Archived rtl-arabic-error.png and rtl-hebrew-error.png visually inspected: correct script-specific right-to-left reference, first mistaken logical glyph red and caret visibly separate; no real RTL keyboard input or Fcitx/IBus/Hyprland acceptance. Earlier fixture falsely reused Arabic on Hebrew and was rejected before this isolated rerun.
   - [ ] RTL tests
 
 **Feature inventory** (computed from associated task progress):
 
-- 🌏 Languages — `██████░░░░ 56%`
+- 🌏 Languages — `███████░░░ 67%`
 - 🔤 Unicode correctness — `██████████ 100%`
 
 ## 📦 M6 — Release quality — `████████░░ 75%`

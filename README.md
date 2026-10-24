@@ -27,7 +27,7 @@ The app exports this style of self-contained, script-free SVG together with Mark
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `█████████░ 85%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `█████████░ 86%` across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Corrected CPM displays finalized graphemes per minute for IME-oriented practice; it does not measure IME keystrokes or cross-language proficiency. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 
@@ -95,6 +95,8 @@ Word tests support original English and Mexican Spanish word sets, selectable in
 **Full local backups:** F8 or **Backup settings + SQLite** creates a timestamped pair under `exports/`: a settings JSON file and a consistent SQLite snapshot. The pair includes local profile names and complete aggregate history, so treat both as private files. They are not uploaded, published or automatically restored; backup creation never deletes existing data.
 
 **Earlier language and backup acceptance:** [55 passing Rust tests + native Spanish Easy session + consistent settings/SQLite snapshot](https://github.com/sguzman/typefinch/actions/runs/39895462191). Normalization, IMEs, RTL and physical Hyprland QA remain open.
+
+**RTL reference progress:** [Arabic/Hebrew shaping, visual caret and remaining IME/editor gates](docs/RTL.md). Native CI 40054099986 passed independent script-identified Arabic/Hebrew import, active-caret and incorrect-key screenshots; **full bidirectional editing and hardware input are not accepted**.
 
 **Unicode scoring v2:** Final scores now compare canonically normalized extended grapheme clusters rather than raw Unicode scalar positions. Existing version-1 history remains intact and is not silently combined with new trends. Complex IME and bidirectional input are not yet validated.
 

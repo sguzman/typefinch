@@ -1125,7 +1125,7 @@
               "id": "T804",
               "emoji": "🪶",
               "name": "Arabic and Hebrew bidirectional input",
-              "progress": 0,
+              "progress": 33,
               "checks": [
                 {
                   "text": "Shaping and caret",
@@ -1133,7 +1133,8 @@
                 },
                 {
                   "text": "Error highlighting",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs logical reference_runs and RTL shape_rtl_reference; src/rtl_shaping.rs COSMIC Text bidi/OpenType raster maintains feedback colors and visual caret mapping. CI 40054099986: 193 Rust tests, complete native X11 suite, separate disposable Arabic and Hebrew app/config instances with synthetic script-identity/grapheme audit, real F5/F2 running-caret and incorrect-ASCII-key highlight screenshots. Archived rtl-arabic-error.png and rtl-hebrew-error.png visually inspected: correct script-specific right-to-left reference, first mistaken logical glyph red and caret visibly separate; no real RTL keyboard input or Fcitx/IBus/Hyprland acceptance. Earlier fixture falsely reused Arabic on Hebrew and was rejected before this isolated rerun."
                 },
                 {
                   "text": "RTL tests",

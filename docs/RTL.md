@@ -41,12 +41,23 @@ privileged input-monitoring APIs are involved.
 - CI [40053309856](https://github.com/sguzman/typefinch/actions/runs/40053309856)
   passed logical-to-visual cursor unit tests and the complete native X11
   suite. It did not yet independently screenshot the caret during live typing.
-- Additional source tests cover multiline caret coordinates, grapheme
-  boundaries, transparent bounded glyph textures and visible error-color
-  differences. Do not credit them until a fully green CI run is recorded.
-- The extended native fixture captures *idle and running* real X11 frames
-  for both Arabic and Hebrew using the ordinary F11/F5/F2/Escape controls.
-  This is synthetic UI QA, not an RTL keyboard/IME hardware test.
+- CI [40054099986](https://github.com/sguzman/typefinch/actions/runs/40054099986)
+  passed **193 Rust tests** and the complete native graphical suite.
+  The corrected native fixture runs Arabic and Hebrew in **separate disposable
+  app processes** with separate XDG settings. A synthetic-only script-class
+  and grapheme-count audit must agree with the fixture before any screenshots
+  are accepted. Both independent RTL reference screenshots, running caret
+  images and deliberately incorrect ASCII-key error images were inspected.
+  The corresponding reference glyph is highlighted in red and text shapes
+  right-to-left in both languages.
+- An earlier screenshot test falsely reused the Arabic passage for its
+  "Hebrew" case. That evidence was explicitly rejected, the fixture was
+  isolated, and the new run passed. No raw passage content is written to
+  the test-only import audit.
+- Multiline caret, grapheme boundaries, transparent bounded textures and
+  actual error-colored raster differences have synthetic Rust coverage.
+  These results are **not** live RTL keyboard typing, compositor IME,
+  editor-selection or physical Hyprland acceptance.
 
 ## Unaccepted scope
 

@@ -73,21 +73,33 @@ if [[ -z "$parent" ]];then
 fi
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
-sleep 1
-kill -0 "$app_pid" 2>/dev/null || {
-  echo "Typefinch failed to launch in native Wayland mode" >&2;exit 1;
-}
-xdotool windowactivate --sync "$parent" 2>/dev/null || true
-xdotool windowfocus --sync "$parent"
-# Focus the nested Wayland surface as well as the outer X11 bridge.
-xdotool mousemove --window "$parent" 500 340 click 1
-sleep 0.45
-xdotool key --clearmodifiers F11
-sleep 0.5
 cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
-grep -q '"test_mode": "custom"' "$cfg" || {
-  echo "Wayland keyboard F11 did not select Custom mode" >&2;exit 1;
-}
+# The Wayland client can become live after Weston's X11 bridge is already
+# focusable. A fixed sleep makes F11 a timing lottery on fast CI runners.
+# Require the app's persisted response before injecting any private text.
+custom_selected=0
+for _ in $(seq 1 30);do
+  kill -0 "$app_pid" 2>/dev/null || {
+    echo "Typefinch exited before native Wayland keyboard input" >&2;exit 1;
+  }
+  xdotool windowactivate --sync "$parent" 2>/dev/null || true
+  xdotool windowfocus "$parent" 2>/dev/null || true
+  # Focus the *inner* Wayland surface, not merely the outer X11 window.
+  xdotool mousemove --window "$parent" 500 340 click 1
+  xdotool key --clearmodifiers F11
+  sleep 0.3
+  if [[ -f "$cfg" ]] && grep -q '"test_mode": "custom"' "$cfg";then
+    custom_selected=1
+    break
+  fi
+done
+if ((custom_selected!=1));then
+  # The image contains only a disposable synthetic fixture. Retain it for
+  # failed CI diagnosis; never include a real profile or passage.
+  import -window "$parent" typefinch-wayland-virtual.png 2>/dev/null || true
+  echo "Wayland F11 did not select Custom after 30 focused attempts" >&2
+  exit 1
+fi
 xdotool type --clearmodifiers --delay 25 "$tmp/source.txt"
 xdotool key --clearmodifiers Return
 sleep 0.55

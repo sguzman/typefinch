@@ -122,9 +122,12 @@ fn score_system_committed_event(session:&mut Session,preedit:&mut String,
         },
         egui::Event::Ime(egui::ImeEvent::Commit(text))=>{
             preedit.clear();
-            if text.is_empty() {false} else {session.type_text(text);true}
+            if text.is_empty() || text.len()>crate::engine::MAX_SCORABLE_COMMIT_BYTES {
+                false
+            } else {session.type_text(text);true}
         },
-        egui::Event::Text(text) if !text.is_empty()=>{
+        egui::Event::Text(text) if !text.is_empty()
+            && text.len()<=crate::engine::MAX_SCORABLE_COMMIT_BYTES=>{
             session.type_text(text);
             true
         },

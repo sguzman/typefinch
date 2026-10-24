@@ -43,6 +43,14 @@ fn grapheme_count(text:&str)->usize {text.graphemes(true).count()}
 /// An error belongs to the *specific* reference position where it occurred,
 /// not an arbitrary earlier occurrence of the same Unicode character.
 const MAX_DRILL_PAIR_BYTES:usize=256;
+// A scored reference has at most 4096 graphemes. An untrusted system
+// Text/IME payload must not deliver an arbitrarily large string to the
+// scalar-by-scalar segmenter (or retain it in a session).
+pub const MAX_SCORABLE_COMMIT_BYTES:usize=65_536;
+// A stream of unmatched combining marks can remain a *single* Unicode
+// grapheme forever. Permit canonical decomposition and some extra invalid
+// marks, then stop accepting that pathological cluster.
+const MAX_UNEXPECTED_CLUSTER_SCALARS:usize=16;
 fn reference_pair_at(target:&str,position:usize)->Option<String> {
     // Scan to the specific error without allocating a vector for the whole
     // reference on each mistaken key. Never cut a Unicode grapheme in half.
@@ -341,7 +349,7 @@ impl Session {
             .nth(grapheme_count(&self.typed))==Some("\n")
     }
     pub fn type_text(&mut self, text: &str) {
-        if self.state != State::Running { return; }
+        if self.state != State::Running || text.len()>MAX_SCORABLE_COMMIT_BYTES { return; }
         let allowed=|ch:char|!ch.is_control() || ch=='\n';
         let single=text.chars().filter(|c|allowed(*c)).count()==1;
         if !single {self.last_key_at=None;}
@@ -366,8 +374,16 @@ impl Session {
             let extension=cursor>0 && updated==cursor;
             let position=if extension {cursor-1} else {cursor};
             let expected=self.target.graphemes(true).nth(position).unwrap_or("");
-            self.attempts=self.attempts.saturating_add(1);
             let actual=self.typed.graphemes(true).nth(position).unwrap_or("");
+            // Even malicious input full of combining marks must have bounded
+            // cost. Canonical-equivalent decomposition remains legal because
+            // the budget follows the actual normalized reference cluster.
+            if actual.chars().count() >
+                expected.nfd().count().saturating_add(MAX_UNEXPECTED_CLUSTER_SCALARS) {
+                self.typed.pop();
+                break;
+            }
+            self.attempts=self.attempts.saturating_add(1);
             if !canonical_prefix(expected,actual) {
                 self.mistakes=self.mistakes.saturating_add(1);
                 if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
@@ -531,6 +547,36 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 mod tests {
     use super::*;
     #[cfg(target_os="linux")]
+    #[test] fn committed_ime_payloads_are_bounded_without_partial_session_scoring() {
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"a");
+        s.begin();
+        let overlarge=format!("a{}","\u{0301}".repeat(MAX_SCORABLE_COMMIT_BYTES));
+        s.type_text(&overlarge);
+        assert_eq!(s.state,State::Running);
+        assert!(s.typed.is_empty());
+        assert_eq!(s.attempts,0);
+        // A candidate smaller than 64 KiB can still contain thousands of
+        // combining marks that never form a second grapheme. Reject the
+        // excess scalars after a small bound instead of quadratic growth.
+        let malicious=format!("a{}","\u{0301}".repeat(8_192));
+        assert!(malicious.len()<MAX_SCORABLE_COMMIT_BYTES);
+        s.type_text(&malicious);
+        assert!(s.typed.chars().count()<=MAX_UNEXPECTED_CLUSTER_SCALARS+1,
+            "invalid marks must not accumulate forever in one grapheme");
+        assert!(s.attempts<=MAX_UNEXPECTED_CLUSTER_SCALARS+1);
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.score().correct,0);
+    }
+    #[test] fn long_but_valid_combining_reference_remains_typeable() {
+        let target=format!("e{}","\u{0301}".repeat(48));
+        let mut s=Session::new_with_custom(0,TestMode::Custom,&target);
+        s.begin();
+        s.type_text(&target);
+        assert_eq!(s.typed,target);
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.score().correct,1);
+        assert_eq!(s.mistakes,0);
+    }
     #[test] fn local_import_rejects_fifo_without_waiting_for_a_writer() {
         use std::{process::Command,time::{Duration,Instant}};
         let path=std::env::temp_dir().join(format!(

@@ -42,8 +42,19 @@ impl Emulator {
     pub fn translate_composed(
         &self, physical: Key, shift: bool, compose: &mut xkb::compose::State,
     ) -> Option<String> {
+        self.translate_composed_layer(physical, shift, false, compose)
+    }
+
+    /// Compose translation for an explicitly known physical Level-3 state.
+    /// Currently the scored egui input path cannot distinguish left Alt from
+    /// physical Right Alt, so it deliberately calls the non-Level-3 wrapper.
+    /// A caller must never infer alt_gr=true solely from Modifiers.alt.
+    pub fn translate_composed_layer(
+        &self, physical: Key, shift: bool, alt_gr: bool,
+        compose: &mut xkb::compose::State,
+    ) -> Option<String> {
         let evdev = evdev_code(physical)?;
-        let state = self.layer_state(shift, false);
+        let state = self.layer_state(shift, alt_gr);
         let code = xkb::Keycode::new(evdev + 8);
         let literal = state.key_get_utf8(code);
         compose.feed(state.key_get_one_sym(code));
@@ -173,6 +184,34 @@ mod tests {
         assert_eq!(es.translate_composed(Key::Quote, false, &mut compose), None);
         assert_eq!(es.translate_composed(Key::E, false, &mut compose).as_deref(), Some("é"));
         assert_eq!(es.translate_composed(Key::E, false, &mut compose).as_deref(), Some("e"));
+    }
+    #[test] fn explicit_level_three_compose_respects_real_german_symbols() {
+        let de=Emulator::compile("de").unwrap();
+        let mut compose=de.compose_state().expect("CI needs an XKB Compose locale");
+        // Only the expressly supplied right-Alt/Level-3 state yields these
+        // symbols. Ordinary left-Alt is never inferred from egui Modifiers.alt.
+        for (key,alt_gr,expected) in [
+            (Key::E,false,"e"),(Key::E,true,"€"),(Key::Q,true,"@"),
+            (Key::E,false,"e"),
+        ] {
+            assert_eq!(
+                de.translate_composed_layer(key,false,alt_gr,&mut compose).as_deref(),
+                Some(expected),"German Compose Level 3 for {key:?} alt_gr={alt_gr}"
+            );
+        }
+        let mut session=crate::engine::Session::new_with_custom(
+            30,crate::engine::TestMode::Custom,"e€@e");
+        session.begin();
+        for (key,alt_gr) in [
+            (Key::E,false),(Key::E,true),(Key::Q,true),(Key::E,false),
+        ] {
+            if let Some(text)=de.translate_composed_layer(key,false,alt_gr,&mut compose) {
+                session.type_text(&text);
+            }
+        }
+        assert_eq!(session.typed,"e€@e");
+        assert_eq!(session.attempts,4);
+        assert_eq!(session.score().accuracy,100.0);
     }
     #[test] fn compose_can_be_cancelled_without_leaking_pending_accent() {
         let es = Emulator::compile("es").unwrap();

@@ -707,7 +707,7 @@
                 {
                   "text": "Adaptive drill generation",
                   "passed": true,
-                  "evidence": "src/engine.rs: ephemeral missed-key drill generation and deterministic tests; Actions 39896389227"
+                  "evidence": "src/engine.rs: deterministic, session-local severity-weighted Unicode grapheme and error-position-specific bigram drills; eight distinct patterns, two-to-eight repetitions, 256-byte bounded source fragments, no whitespace-spanning pairs and no persisted typed text. Engine tests cover Unicode combining and ZWJ clusters, repeated letters in different contexts, memory/reset bounds, and targeted ranking. GitHub Actions 40047696761 passed 173 Rust tests, app build, complete native X11 graphical and compositor suites. T502 training efficacy remains unverified."
                 },
                 {
                   "text": "Training efficacy tests",

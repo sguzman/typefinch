@@ -150,7 +150,7 @@
   - [x] Course completion tests — src/history.rs: full-accuracy mastery rules and profile isolation; GitHub Actions 39888678045, 46 Rust tests and native untimed lesson
 - 🎯 **T502** Character and n-gram drills — `███████░░░ 67%`
   - [x] Per-key timing metrics — src/engine.rs bounded ephemeral single-key timing and deterministic interval tests; src/app.rs slowest-key feedback; CI 39950437760 (73 Rust tests)
-  - [x] Adaptive drill generation — src/engine.rs: ephemeral missed-key drill generation and deterministic tests; Actions 39896389227
+  - [x] Adaptive drill generation — src/engine.rs: deterministic, session-local severity-weighted Unicode grapheme and error-position-specific bigram drills; eight distinct patterns, two-to-eight repetitions, 256-byte bounded source fragments, no whitespace-spanning pairs and no persisted typed text. Engine tests cover Unicode combining and ZWJ clusters, repeated letters in different contexts, memory/reset bounds, and targeted ranking. GitHub Actions 40047696761 passed 173 Rust tests, app build, complete native X11 graphical and compositor suites. T502 training efficacy remains unverified.
   - [ ] Training efficacy tests
 - 🖐️ **T503** Finger assignments and visual guidance — `██████████ 100%`
   - [x] Finger models — src/layouts.rs and src/app.rs: tested ANSI positional finger assignments and keycap guide; Actions 39896389227

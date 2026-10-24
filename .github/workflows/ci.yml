@@ -44,6 +44,14 @@ jobs:
           name: typefinch-cargo-lock
           path: Cargo.lock
           if-no-files-found: error
+      # One-time transport of PUBLIC dependency checksums through the
+      # existing GitHub log interface for the source-control steward.
+      # No user passages, settings, tokens or profile data are included.
+      - name: Emit public dependency lock bytes for source tracking
+        run: |
+          echo TYPEFINCH_PUBLIC_LOCK_BEGIN
+          base64 --wrap=120 Cargo.lock
+          echo TYPEFINCH_PUBLIC_LOCK_END
       - name: Installed Unicode font coverage (CJK, Arabic, Hebrew)
         run: TYPEFINCH_QA_UNICODE_FONTS=1 cargo test fonts::tests::system_noto_fallbacks_render_required_glyphs -- --nocapture
       - name: Build graphical executable

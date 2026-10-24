@@ -134,13 +134,13 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
     }
     if shape==Shape::Iso {
         // Linux KEY_102ND (86); left of Z, below the shorter ISO left Shift.
-        result.push(position("ISO 102nd",86,None,3,20,10));
+        result.push(named_extra("ISO 102nd","ISO",86,3,20,10));
     }
     if shape==Shape::Jis {
         // The Japanese-specific Linux input-event-codes.h assignments.
         result.extend([
-            position("JIS Yen",124,None,0,140,10),
-            position("JIS Ro",89,None,3,130,10),
+            named_extra("JIS Yen","Yen",124,0,140,10),
+            named_extra("JIS Ro","Ro",89,3,130,10),
             named_extra("Muhenkan","Non",94,4,35,12),
             named_extra("Henkan","Conv",92,4,109,12),
             named_extra("Kana","Kana",93,4,122,12),
@@ -162,7 +162,7 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
             if split {18} else {22},true),
         special("Left Ctrl","Ctrl",29,4,0,12,true),
         special("Left Alt","Alt",56,4,if jis {24} else {29},if jis {10} else {13},true),
-        special("Right Alt (AltGr)","Alt",100,4,if jis {135} else {119},
+        special("Right Alt (AltGr)","RAlt",100,4,if jis {135} else {119},
             if jis {10} else {12},true),
         special("Right Ctrl","Ctrl",97,4,if jis {168} else {158},
             if jis {10} else {12},true),
@@ -430,6 +430,25 @@ mod tests {
             assert!(slots.iter().any(|s|s.evdev==code && s.egui_key.is_none()));
         }
         assert_eq!(slots.iter().filter(|s|s.egui_key==Some(Key::Space)).count(),1);
+    }
+    #[test] fn iso_and_jis_extra_keys_have_honest_readable_fallback_labels(){
+        for (shape,specs) in [
+            (Shape::Iso,vec![(86,"ISO")]),
+            (Shape::Jis,vec![(124,"Yen"),(89,"Ro"),(94,"Non"),(92,"Conv"),(93,"Kana")]),
+        ] {
+            let slots=slots(shape);
+            for (evdev,caption) in specs {
+                let key=slots.iter().find(|s|s.evdev==evdev).unwrap();
+                assert_eq!(key.kind,SlotKind::Extra);
+                assert_eq!(key.caption,caption);
+                assert!(key.egui_key.is_none(),"national edge keys cannot fabricate key events");
+            }
+        }
+        for shape in Shape::ALL {
+            let right_alt=slots(shape).into_iter().find(|s|s.evdev==100).unwrap();
+            assert_eq!(right_alt.caption,"RAlt",
+                "right Alt position is shown without claiming an AltGr event");
+        }
     }
     #[test] fn jis_conversion_keys_have_visible_fallback_labels_without_inventing_input() {
         let slots=slots(Shape::Jis);

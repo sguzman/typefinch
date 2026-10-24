@@ -1095,7 +1095,7 @@
               "id": "T803",
               "emoji": "㊙️",
               "name": "CJK IME composition",
-              "progress": 33,
+              "progress": 67,
               "checks": [
                 {
                   "text": "Committed text semantics",
@@ -1108,7 +1108,8 @@
                 },
                 {
                   "text": "Speed conventions",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/engine.rs Score.cpm counts correctly matched final Unicode grapheme clusters per elapsed minute, independently of raw IME keystrokes; tests cover corrected Chinese, Japanese kana, Korean Hangul, canonical accents and zero-duration bounds. src/app.rs displays corrected CPM separately from standardized WPM; docs/SCORING.md explicitly rejects cross-language equivalence and physical-key attribution. GitHub Actions 40048186051 passed 174 Rust tests and the complete native X11 graphical/compositor suite. Actual Fcitx/IBus CJK integration and RTL acceptance remain open."
                 }
               ]
             },

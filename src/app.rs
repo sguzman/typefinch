@@ -1140,16 +1140,30 @@ impl Typefinch {
                     let path=std::path::PathBuf::from(self.custom_import_path.trim());
                     self.load_custom_file(&path);
                 }
-                let edit = ui.add_enabled(
-                    self.session.state != State::Running,
-                    egui::TextEdit::multiline(&mut self.custom_text)
-                        .desired_rows(4)
-                        .desired_width(ui.available_width())
-                        .hint_text("Paste or write text for your private typing test")
-                );
-                if edit.changed() { self.rebuild_session(); }
+                if rtl_shaping::contains_rtl(&self.custom_text) {
+                    // The egui 0.33 multiline editor cannot promise the
+                    // correct visual caret for mixed Hebrew/Arabic scripts.
+                    // Keep it available without making its mangled glyphs
+                    // the default representation of an imported RTL file.
+                    ui.collapsing("Edit raw RTL source (advanced)", |ui| {
+                        ui.small("Native multiline RTL editing remains unverified. The shaped preview below is read-only.");
+                        let edit=ui.add_enabled(self.session.state!=State::Running,
+                            egui::TextEdit::multiline(&mut self.custom_text)
+                                .desired_rows(4)
+                                .desired_width(ui.available_width())
+                                .hint_text("Edit private source text"));
+                        if edit.changed(){self.rebuild_session();}
+                    });
+                    self.show_rtl_editor_preview(ui);
+                } else {
+                    let edit=ui.add_enabled(self.session.state!=State::Running,
+                        egui::TextEdit::multiline(&mut self.custom_text)
+                            .desired_rows(4)
+                            .desired_width(ui.available_width())
+                            .hint_text("Paste or write text for your private typing test"));
+                    if edit.changed(){self.rebuild_session();}
+                }
                 ui.small(format!("{} graphemes entered; only the first 4096 will be used. Text is not saved.", self.custom_text.graphemes(true).count()));
-                self.show_rtl_editor_preview(ui);
             }
             ui.add_space(6.0);
             ui.label("Theme");

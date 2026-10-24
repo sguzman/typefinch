@@ -13,6 +13,7 @@ use crate::{
     lesson,
     layouts::{self, Mode},
     preferences::{Preferences, Profile, Theme, CardTheme, CardFont,CardTemplate},
+    publish,
     registry::{self, InstalledLayout},
     xkb::Emulator,
 };
@@ -378,6 +379,11 @@ pub struct Typefinch {
     goal_import_path:String,
     backup_settings_path:String,
     backup_check_result:String,
+    publish_repository:String,
+    publish_consent:bool,
+    publish_last_card:String,
+    publish_feedback:String,
+    pending_publish:Option<Receiver<Result<String,String>>>,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -484,7 +490,10 @@ impl Typefinch {
                device_poll_started:Instant::now(), pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
                new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
-            backup_check_result:String::new(), preview_layer:PreviewLayer::Base,
+            backup_check_result:String::new(),
+            publish_repository:String::new(),publish_consent:false,
+            publish_last_card:String::new(),publish_feedback:String::new(),
+            pending_publish:None,preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
     fn apply_device_result(&mut self,result:Result<Vec<Keyboard>,String>,focused:bool) {
@@ -542,6 +551,24 @@ impl Typefinch {
         }
         if focused && can_poll {
             ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
+        }
+    }
+    fn poll_publish_result(&mut self) {
+        let response=match self.pending_publish.as_ref() {
+            None=>None,
+            Some(receiver)=>match receiver.try_recv() {
+                Ok(result)=>Some(result),
+                Err(TryRecvError::Disconnected)=>Some(Err(
+                    "Public card publishing worker disconnected; verify GitHub before retrying.".into())),
+                Err(TryRecvError::Empty)=>None,
+            },
+        };
+        if let Some(result)=response {
+            self.pending_publish=None;
+            self.publish_feedback=match result {
+                Ok(url)=>format!("GitHub confirmed the public profile card update in {url}."),
+                Err(problem)=>problem,
+            };
         }
     }
     fn save(&mut self) {
@@ -1881,6 +1908,54 @@ impl Typefinch {
                 self.message = "Markdown image embed copied to clipboard.".into();
             }
         });
+        ui.add_space(14.0);
+        ui.collapsing("Optional public GitHub publishing",|ui| {
+            ui.label("Publish the selected profile's name and aggregate statistics as a public SVG using an already-authenticated GitHub CLI (gh). No tokens are requested or saved.");
+            ui.small("The target is the fixed repository-root typefinch-profile.svg file. It never edits README.md and refuses to replace unrelated existing files. Publishing is off unless explicitly authorized for this card.");
+            let selected=&self.prefs.profiles[self.prefs.active_profile];
+            let card=export::card_with_template(selected,&self.prefs.layout,
+                self.prefs.card_theme,self.prefs.card_font,self.prefs.card_template);
+            if self.publish_last_card!=card {
+                self.publish_last_card=card.clone();
+                self.publish_consent=false;
+            }
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Target GitHub.com repository");
+                if ui.add(egui::TextEdit::singleline(&mut self.publish_repository)
+                    .hint_text("owner/repository").desired_width(280.0)).changed() {
+                    self.publish_consent=false;
+                }
+            });
+            ui.checkbox(&mut self.publish_consent,
+                "I authorize publishing this profile name and statistics publicly to the selected repository.");
+            let valid=publish::repository(&self.publish_repository).is_ok();
+            let working=self.pending_publish.is_some();
+            if ui.add_enabled(!working && valid && self.publish_consent && !self.settings_read_only,
+                egui::Button::new(if working {"Publishing..."} else {"Publish public card using gh"})).clicked() {
+                let repo=self.publish_repository.trim().to_owned();
+                let svg=card;
+                let (sender,receiver)=mpsc::channel();
+                self.pending_publish=Some(receiver);
+                self.publish_consent=false;
+                self.publish_feedback="Publishing the explicitly approved public card; other app features remain available.".into();
+                let repaint=ui.ctx().clone();
+                std::thread::spawn(move||{
+                    let outcome=publish::publish(&repo,&svg,true);
+                    let _=sender.send(outcome);
+                    repaint.request_repaint();
+                });
+            }
+            if working {ui.small("One upload attempt is in progress. No extra upload can begin.");}
+            if !valid && !self.publish_repository.trim().is_empty() {
+                ui.small("Repository must be a GitHub.com owner/repository identifier (no paths).");
+            }
+            if self.settings_read_only {
+                ui.small("GitHub publishing is disabled while settings recovery is required.");
+            }
+            if !self.publish_feedback.is_empty() {
+                ui.label(&self.publish_feedback);
+            }
+        });
         if !self.settings_read_only {
             ui.add_space(10.0);
             self.show_backup_verifier(ui);
@@ -1901,6 +1976,7 @@ impl eframe::App for Typefinch {
             }
         }
         self.poll_keyboard_hotplug(ctx,focused);
+        self.poll_publish_result();
         self.last_window_focused=focused;
         let theme_cycle=ctx.input(|i|
             pressed_key_modifiers(&i.events,egui::Key::T)

@@ -204,6 +204,43 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi
+  if [[ "$name" == mixed ]];then
+    # Three actual script directions over three logical paragraphs. This
+    # checks native editor caret positioning against the shaped preview,
+    # not only Rust-level shaping or a nonblank screenshot.
+    focus_window
+    xdotool key --clearmodifiers ctrl+e
+    sleep 0.35
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-caret-start.json"
+    import -window "$window" "$tmp/rtl-mixed-editor-start.png"
+    xdotool key --clearmodifiers ctrl+End
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-caret-end.json"
+    import -window "$window" "$tmp/rtl-mixed-editor-end.png"
+    lua5.4 - "$tmp/$name/mixed-caret-start.json" "$tmp/$name/mixed-caret-end.json" <<'LUA'
+local json=require("dkjson")
+local function read(file)
+  local f=assert(io.open(file,"rb"),"Missing mixed BiDi caret audit")
+  local r=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(r.synthetic and r.state=="rtl-editor-caret" and r.caret_positioned)
+  assert(type(r.caret_y_px)=="number" and r.caret_y_px>=0)
+  return r
+end
+local first,last=read(assert(arg[1])),read(assert(arg[2]))
+assert(first.index==0 and last.index==last.total and first.total==last.total,
+  "Mixed BiDi native editor start/end did not reach logical boundaries")
+assert(last.caret_y_px>first.caret_y_px+15,
+  "Mixed RTL/LTR source end caret did not move to a later shaped paragraph")
+assert(first.selected_graphemes==0 and last.selected_graphemes==0,
+  "Caret movement must not create a selection")
+print("Native mixed BiDi editor caret PASS: logical start/end; visual row moved "
+  ..first.caret_y_px.." -> "..last.caret_y_px.." px")
+LUA
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+  fi
   focus_window
   import -window "$window" "$tmp/rtl-$name.png"
   [[ -s "$tmp/rtl-$name.png" ]] || { echo "Missing $name screenshot" >&2;exit 1; }

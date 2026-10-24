@@ -96,6 +96,9 @@ pub fn write_rtl_editor_caret_audit(index:usize,total:usize,
         "index":index,"total":total,"visible_start":first,
         "visible_end":last,
         "caret_positioned":caret.is_some(),
+        // Synthetic-only rendered caret geometry, not source text or
+        // selection contents. Check true cross-paragraph BiDi movement.
+        "caret_y_px":caret.map(|(_,y)|y.round() as i32),
         "selected_graphemes":selected_graphemes,
     });
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)

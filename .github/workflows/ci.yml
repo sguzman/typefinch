@@ -71,6 +71,8 @@ jobs:
         run: bash tests/github_card_browser_smoke.sh
       - name: Arabic and Hebrew native rendering smoke (not BiDi acceptance)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_gui_smoke.sh
+      - name: Native starter-layout Dvorak Shift and Colemak-DH physical-key scoring
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/starter_layout_gui_smoke.sh
       - name: Native Arabic and Hebrew XKB emulated keypress scoring
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_input_gui_smoke.sh
       - name: Native X11 Shift and German AltGr text scoring

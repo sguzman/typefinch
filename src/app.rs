@@ -646,6 +646,14 @@ impl Typefinch {
     }
     fn rebuild_session(&mut self) {
         self.ime_preedit.clear();
+        // Textures and their cache signatures can contain pixels/strings from
+        // a previously loaded private passage. Discard them when the source
+        // changes, including when switching back to non-RTL content.
+        self.rtl_caret=None;
+        self.rtl_signature.clear();
+        self.rtl_texture=None;
+        self.rtl_editor_signature.clear();
+        self.rtl_editor_texture=None;
         let input=if self.prefs.test_mode==TestMode::Lesson {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };

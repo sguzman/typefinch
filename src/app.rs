@@ -76,6 +76,27 @@ fn reference_runs(target:&str,typed:&str,start:usize,end:usize,running:bool)
     }
     runs
 }
+/// Build the *actual* colored egui reference layout from logical grapheme
+/// classifications. Native egui is responsible for glyph rendering; this
+/// function never reverses visual order or invents a physical caret.
+fn reference_layout_job(target:&str,typed:&str,start:usize,end:usize,
+    running:bool,dark:bool)->egui::text::LayoutJob {
+    let mut job=egui::text::LayoutJob::default();
+    for run in reference_runs(target,typed,start,end,running) {
+        let color=match run.feedback {
+            ReferenceFeedback::Correct=>correct_ink(dark),
+            ReferenceFeedback::Error=>error_ink(dark),
+            ReferenceFeedback::Cursor=>accent_ink(dark),
+            ReferenceFeedback::Unentered=>reference_ink(dark),
+        };
+        job.append(&run.text,0.0,egui::TextFormat{
+            font_id:egui::FontId::monospace(21.0),
+            color,
+            ..Default::default()
+        });
+    }
+    job
+}
 const MAX_IME_PREEDIT_GRAPHEMES:usize=64;
 const MAX_IME_PREEDIT_BYTES:usize=4096;
 fn limited_ime_preedit(text:&str)->String {
@@ -1363,22 +1384,8 @@ impl Typefinch {
         let entered = self.session.typed.graphemes(true).count();
         let total = self.session.target.graphemes(true).count();
         let (first, last) = crate::engine::viewport(total, entered, 230);
-        let runs=reference_runs(&self.session.target,&self.session.typed,first,last,
-            self.session.state==State::Running);
-        let mut job=egui::text::LayoutJob::default();
-        for run in runs {
-            let color=match run.feedback {
-                ReferenceFeedback::Correct=>correct_ink(ui.visuals().dark_mode),
-                ReferenceFeedback::Error=>error_ink(ui.visuals().dark_mode),
-                ReferenceFeedback::Cursor=>accent_ink(ui.visuals().dark_mode),
-                ReferenceFeedback::Unentered=>reference_ink(ui.visuals().dark_mode),
-            };
-            job.append(&run.text,0.0,egui::TextFormat{
-                font_id:egui::FontId::monospace(21.0),
-                color,
-                ..Default::default()
-            });
-        }
+        let job=reference_layout_job(&self.session.target,&self.session.typed,
+            first,last,self.session.state==State::Running,ui.visuals().dark_mode);
         let typing_area = egui::Frame::group(ui.style())
             .inner_margin(egui::Margin::same(16))
             .show(ui, |ui| {
@@ -2156,6 +2163,31 @@ mod palette_tests {
         let decomposed="שָׁ";
         let composed=decomposed.nfc().collect::<String>();
         assert!(crate::engine::canonically_equal(decomposed,&composed));
+    }
+    #[test] fn actual_rtl_egui_layout_retains_text_and_highlight_ranges() {
+        let target="abc سَلَام שָׁלוֹם 123";
+        let entered="abc سx";
+        for dark in [false,true] {
+            let job=reference_layout_job(target,entered,0,
+                target.graphemes(true).count(),true,dark);
+            assert_eq!(job.text,target,"rendered text cannot be reversed");
+            assert!(!job.sections.is_empty());
+            let spans=job.sections.iter().map(|s|
+                (&job.text[s.byte_range.clone()],s.format.color)).collect::<Vec<_>>();
+            assert_eq!(spans.iter().map(|(text,_)|*text).collect::<String>(),target);
+            assert!(spans.iter().any(|(_,color)|*color==correct_ink(dark)));
+            assert!(spans.iter().any(|(_,color)|*color==error_ink(dark)));
+            assert!(spans.iter().any(|(_,color)|*color==accent_ink(dark)));
+            assert!(spans.iter().any(|(_,color)|*color==reference_ink(dark)));
+            assert_eq!(spans.last().unwrap().1,reference_ink(dark));
+            // A completely unentered Arabic phrase is one shaping section
+            // rather than separately formatted letters.
+            let arabic="سَلَام";
+            let blank=reference_layout_job(arabic,"",0,arabic.graphemes(true).count(),false,dark);
+            assert_eq!(blank.text,arabic);
+            assert_eq!(blank.sections.len(),1);
+            assert_eq!(blank.sections[0].format.color,reference_ink(dark));
+        }
     }
     #[test] fn mixed_script_errors_and_windows_never_reverse_reference() {
         let target="abc سلام שלום xyz";

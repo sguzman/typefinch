@@ -31,6 +31,11 @@ cleanup(){
 trap cleanup EXIT
 printf '%s' 'سَلَام بالعربية 123' > "$tmp/arabic.txt"
 printf '%s' 'שָׁלוֹם בעברית 123' > "$tmp/hebrew.txt"
+# An RTL-base line, a Latin-base line, and Hebrew/Arabic with ASCII digits
+# and punctuation. Keep this text synthetic and out of persisted settings.
+printf '%s' 'سَلَام (ABC 123), שָׁלוֹם!
+English XYZ 42
+שלום, مرحبا! 2026' > "$tmp/mixed.txt"
 # Long original synthetic fixture, with enough connected RTL words to test
 # responsive wrapping, a forced newline and a narrow reference viewport.
 for _ in $(seq 1 24);do printf '%s' 'שלום עולם ' >> "$tmp/hebrew-long.txt";done
@@ -69,7 +74,7 @@ stop_app(){
   window=""
   sleep 0.3
 }
-for name in arabic hebrew hebrew-long;do
+for name in arabic hebrew hebrew-long mixed;do
   mkdir -p "$tmp/$name"
   start_app "$name"
   import -window "$window" "$tmp/rtl-$name-baseline.png"
@@ -135,4 +140,4 @@ different="$(compare -metric AE "$tmp/rtl-arabic.png" "$tmp/rtl-hebrew.png" null
 [[ "$different" =~ ^[0-9]+$ && "$different" -gt 400 ]] || {
   echo "Distinct imported RTL scripts rendered identical frames: $different" >&2;exit 1;
 }
-echo 'Independent Arabic/Hebrew native X11 fixtures (including long RTL wrapping) PASS; real IME/Hyprland QA pending'
+echo 'Independent Arabic/Hebrew/mixed-direction native X11 fixtures (including long RTL wrapping) PASS; real IME/Hyprland QA pending'

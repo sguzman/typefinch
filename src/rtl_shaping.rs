@@ -202,6 +202,46 @@ mod tests {
         assert!(renderer.render_with_caret(&parts,640,128,Some(not_cluster_boundary))
             .unwrap().caret.is_none(),"reject caret between base and niqqud");
     }
+    #[test] fn mixed_direction_paragraphs_keep_logical_carets_across_line_changes(){
+        let mut renderer=Renderer::new();
+        // Deliberately use an RTL base line, an LTR base line, and a third
+        // RTL line. Numerals and parentheses must not cause source reversal.
+        let passage="سَلَام (ABC 123), שָׁלוֹם!\nEnglish XYZ 42\nשלום 123";
+        let spans=vec![(passage.to_owned(),Color32::WHITE)];
+        let lines=renderer.paragraph_directions(passage);
+        assert!(lines.iter().any(|rtl|*rtl),"RTL line missing");
+        assert!(lines.iter().any(|rtl|!*rtl),"LTR line missing");
+        let starts=[0,"سَلَام (ABC 123), שָׁלוֹם!\n".len(),
+            "سَلَام (ABC 123), שָׁלוֹם!\nEnglish XYZ 42\n".len()];
+        let positions=starts.into_iter().map(|cursor|{
+            renderer.render_with_caret(&spans,760,150,Some(cursor))
+                .unwrap().caret.expect("grapheme boundary must map to a caret")
+        }).collect::<Vec<_>>();
+        assert!(positions[1].1>positions[0].1+12.0,"LTR paragraph caret in RTL line");
+        assert!(positions[2].1>positions[1].1+12.0,"final RTL caret in LTR line");
+        for (x,y) in positions {
+            assert!(x>=0.0 && x<=760.0 && y>=0.0 && y<150.0);
+        }
+        // A niqqud combining cluster is one cursor step, even in mixed text.
+        let cluster_start="سَلَام (ABC 123), ".len();
+        let inside_cluster=cluster_start+"ש".len();
+        assert!(renderer.render_with_caret(&spans,760,150,Some(inside_cluster))
+            .unwrap().caret.is_none(),"mixed BiDi cursor must not split niqqud");
+    }
+    #[test] fn mixed_direction_error_raster_tracks_logical_arabic_prefix(){
+        let mut renderer=Renderer::new();
+        let neutral=renderer.render(&[
+            ("سلام English 42, שלום!".into(),Color32::WHITE)
+        ],760,108).unwrap();
+        let mistake=renderer.render(&[
+            ("س".into(),Color32::from_rgb(220,55,55)),
+            ("لام English 42, שלום!".into(),Color32::WHITE)
+        ],760,108).unwrap();
+        let changed=neutral.pixels.iter().zip(&mistake.pixels)
+            .filter(|(a,b)|a!=b).count();
+        assert!(changed>8 && changed<760*108,
+            "mixed RTL error must change the shaped ink, not reorder the source");
+    }
     #[test] fn styled_rtl_mistake_changes_raster_ink_without_reversing_source(){
         let mut renderer=Renderer::new();
         let text="سلام";

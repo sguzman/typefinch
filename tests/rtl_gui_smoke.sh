@@ -171,9 +171,13 @@ LUA
     for direction in Right Left; do
       xdotool key --clearmodifiers ctrl+Home
       sleep 0.15
-      xdotool key --clearmodifiers "shift+$direction"
-      sleep 0.3
-      partial_status="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+      # The egui native field navigates Unicode scalar positions: Arabic
+      # harakat and Hebrew niqqud can take extra arrow presses before the
+      # first entire extended grapheme is selected. Never accept 0 or 2+.
+      for _ in $(seq 1 6); do
+        xdotool key --clearmodifiers "shift+$direction"
+        sleep 0.18
+        partial_status="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"))
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
@@ -181,9 +185,12 @@ assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
 print(tostring(d.selected_graphemes)..":"..tostring(d.index))
 LUA
 )"
+        [[ "$partial_status" != "1:1" ]] || break
+      done
       [[ "$partial_status" != "1:1" ]] || break
     done
     [[ "$partial_status" == "1:1" ]] || {
+      import -window "$window" "rtl-$name-editor-first-grapheme-debug.png" 2>/dev/null || true
       echo "Native $name first-script-grapheme selection failed: $partial_status" >&2
       exit 1
     }

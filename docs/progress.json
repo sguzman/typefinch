@@ -89,7 +89,7 @@
               "id": "T004",
               "emoji": "🧭",
               "name": "Navigation and responsive egui shell",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Main panels and controls coded",
@@ -98,7 +98,8 @@
                 },
                 {
                   "text": "Keyboard navigation audit",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs Ctrl+N focuses native egui profile name TextEdit without bypassing Create profile validation; tests/keyboard_navigation_smoke.sh uses only X11 key events for Ctrl+N, Tab, Shift+Tab and Enter and captures F1 guide visibility. GitHub Actions 40047048736 passed 168 Rust tests, native profile creation (one new identity and zero score history), F1 guide screenshot changed 107294 pixels, full X11 GUI, compositor and Unicode font QA. This completes shell navigation audit, not live Hyprland or assistive-technology acceptance."
                 },
                 {
                   "text": "HiDPI/small-window screenshots",

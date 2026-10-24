@@ -2,13 +2,13 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `████████░░ 80%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `████████░░ 81%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████████░ 90%`
+## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
-### 🧱 P0 — Foundation and visual identity — `████████░░ 77%`
+### 🧱 P0 — Foundation and visual identity — `█████████░ 86%`
 
 - 🦀 **T001** Rust/egui application — `███████░░░ 67%`
   - [x] Native shell committed — Cargo.toml; src/main.rs
@@ -23,9 +23,9 @@
   - [x] Preference persistence coded — src/preferences.rs
   - [x] Explicit Light and Dark rendered screenshots pass graphical CI — GitHub Actions 39872686067: light luminance 0.955 vs dark 0.125
   - [ ] Hyprland system theme transition verified
-- 🧭 **T004** Navigation and responsive egui shell — `███████░░░ 67%`
+- 🧭 **T004** Navigation and responsive egui shell — `██████████ 100%`
   - [x] Main panels and controls coded — src/app.rs
-  - [ ] Keyboard navigation audit
+  - [x] Keyboard navigation audit — src/app.rs Ctrl+N focuses native egui profile name TextEdit without bypassing Create profile validation; tests/keyboard_navigation_smoke.sh uses only X11 key events for Ctrl+N, Tab, Shift+Tab and Enter and captures F1 guide visibility. GitHub Actions 40047048736 passed 168 Rust tests, native profile creation (one new identity and zero score history), F1 guide screenshot changed 107294 pixels, full X11 GUI, compositor and Unicode font QA. This completes shell navigation audit, not live Hyprland or assistive-technology acceptance.
   - [x] HiDPI/small-window screenshots — CI 39955283848: 740×590 narrow and 150% DPI 1279×880 screenshots; both inspected for immediate, legible typing surface
 
 ### 🐦 P1 — Profiles and persistence — `██████████ 100%`
@@ -78,7 +78,7 @@
 
 - ⌨️ Typing tests — `██████████ 95%`
 - 🐦 Local identity — `██████████ 100%`
-- 🌗 Appearance — `████████░░ 81%`
+- 🌗 Appearance — `█████████░ 92%`
 
 ## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 73%`
 

@@ -298,16 +298,18 @@ needs a functioning renderer (or an authorized graphical Hyprland test runner)
 and must preserve independent screenshots, keyboard and focus evidence without
 touching the user's active workspace, global input devices or private data.
 
-## Explicit XKB Level-3 Compose path (pending CI)
+## Explicit XKB Level-3 Compose path (verified in isolated Rust tests)
 
 Commit [`a2094fc`](https://github.com/sguzman/typefinch/commit/a2094fc82b6bea8e2afc5a3de82a2a691fa0fcf1)
 adds `Emulator::translate_composed_layer` for an **explicitly supplied**
 Level-3 modifier state, while the existing scored egui input path retains
-its conservative non-Level-3 wrapper. Source regression cases translate
-German E/Q at Level 3 to the euro/at symbols and exercise one score with
-four distinct graphemes. CI has not yet accepted this new test.
+its conservative non-Level-3 wrapper. [CI 40141102036](https://github.com/sguzman/typefinch/actions/runs/40141102036)
+passed all 230 Rust tests and the full graphical suite. The scoped source
+regression verifies German E/Q Level-3 euro/at output and a 4/4-correct
+Unicode scoring sequence. This is XKB-symbol and explicit-modifier
+translation acceptance, not physical AltGr input acceptance.
 
-This does **not** infer a Right-Alt press from egui's generic `alt` flag:
-that flag may represent Left Alt or AltGr depending on the compositor.
-Reliable physical Right-Alt/AltGr event attribution, native in-app modifier
-routing and T303's full Shift/AltGr/dead-key acceptance remain open.
+The application does **not** infer Right Alt from egui's generic `alt`
+flag, which may represent Left Alt or AltGr depending on the compositor.
+Reliable physical Right-Alt/AltGr event attribution, scored native in-app
+modifier routing and T303's full Shift/AltGr/dead-key acceptance remain open.

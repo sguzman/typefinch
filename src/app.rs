@@ -1820,7 +1820,11 @@ impl Typefinch {
         let symbol=match slot.kind {
             SlotKind::Control|SlotKind::Modifier=>slot.caption.to_string(),
             SlotKind::Decoration=>"Space".to_string(),
-            SlotKind::Extra=>mapped.unwrap_or_else(||if dead.is_some() {"dk".into()} else {"–".into()}),
+            SlotKind::Extra=>mapped.unwrap_or_else(|| {
+                if dead.is_some() {"dk".into()}
+                else if !slot.caption.is_empty() {slot.caption.to_owned()}
+                else {"–".into()}
+            }),
             SlotKind::Character=>unreachable!("normal keys use show_preview_key"),
         };
         let frame=egui::Frame::group(ui.style()).inner_margin(egui::Margin::symmetric(7,7));

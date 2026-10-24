@@ -73,6 +73,14 @@ fn position(name: &'static str, evdev: u32, key: Option<Key>, row:u8, x:u16, wid
         else if key.is_some() {SlotKind::Character} else {SlotKind::Extra};
     Slot { name, evdev, egui_key:key, row, x, width, kind, caption:"" }
 }
+/// Visible fallback labels for dedicated national input keys that have no
+/// printable XKB symbol. These are not interpreted as scored key events.
+fn named_extra(name:&'static str, caption:&'static str, evdev:u32,
+    row:u8, x:u16, width:u8)->Slot {
+    let mut slot=position(name,evdev,None,row,x,width);
+    slot.caption=caption;
+    slot
+}
 fn special(name:&'static str, caption:&'static str, evdev:u32,
     row:u8, x:u16, width:u8, modifier:bool)->Slot {
     let mut slot=position(name,evdev,None,row,x,width);
@@ -133,9 +141,9 @@ pub fn slots(shape:Shape) -> Vec<Slot> {
         result.extend([
             position("JIS Yen",124,None,0,140,10),
             position("JIS Ro",89,None,3,130,10),
-            position("Muhenkan",94,None,4,35,12),
-            position("Henkan",92,None,4,109,12),
-            position("Kana",93,None,4,122,12),
+            named_extra("Muhenkan","Non",94,4,35,12),
+            named_extra("Henkan","Conv",92,4,109,12),
+            named_extra("Kana","Kana",93,4,122,12),
         ]);
     }
     // Controls and modifiers are illustrated physical slots only. They are
@@ -352,6 +360,15 @@ mod tests {
             assert!(slots.iter().any(|s|s.evdev==code && s.egui_key.is_none()));
         }
         assert_eq!(slots.iter().filter(|s|s.egui_key==Some(Key::Space)).count(),1);
+    }
+    #[test] fn jis_conversion_keys_have_visible_fallback_labels_without_inventing_input() {
+        let slots=slots(Shape::Jis);
+        for (name,caption) in [("Muhenkan","Non"),("Henkan","Conv"),("Kana","Kana")] {
+            let slot=slots.iter().find(|s|s.name==name).unwrap();
+            assert_eq!(slot.kind,SlotKind::Extra);
+            assert_eq!(slot.caption,caption);
+            assert!(slot.egui_key.is_none());
+        }
     }
     #[test] fn japanese_top_left_is_zenkaku_not_fake_ansi_grave() {
         let jis=slots(Shape::Jis);

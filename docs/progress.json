@@ -495,7 +495,7 @@
               "id": "T305",
               "emoji": "🌍",
               "name": "ANSI, ISO, JIS and split geometries",
-              "progress": 67,
+              "progress": 83,
               "checks": [
                 {
                   "text": "Geometry definitions",
@@ -523,7 +523,8 @@
                 },
                 {
                   "text": "Complete control/modifier and edge-key geometry",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/geometry.rs exhaustive 104 ANSI/105 ISO/109 JIS/104 split unique Linux evdev reference inventories across Typing, Function/navigation and Keypad sections, non-attributed controls, modifier and national-edge keys with visible fallback captions. GitHub Actions 40134673256 green: 224 Rust tests and complete native X11 GUI, ISO/JIS/split 1100×850 screenshots manually inspected for labels and clipping. Earlier F10 function and keypad native screenshot inspections CI 40006834967. This accepts the standard illustrative reference inventory, not device hardware topology, extra-key routing or physical Hyprland."
                 }
               ]
             }

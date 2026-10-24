@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 87%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 88%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `█████████░ 93%`
 
@@ -80,11 +80,11 @@
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `███████░░░ 73%`
+## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 75%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `████████░░ 83%`
+### 🧬 P3 — Recognition, emulation and geometry — `█████████░ 87%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -104,13 +104,13 @@
   - [x] Editor and geometry — src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Versioned schema — src/custom_layout.rs v1 UUID-identified serde JSON schema, Unicode grapheme validation, malformed-input unit tests; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Import/export and tests — src/app.rs bounded JSON file import/export, collision renaming, per-profile persistence and synthetic custom-keyboard input; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
-- 🌍 **T305** ANSI, ISO, JIS and split geometries — `███████░░░ 67%`
+- 🌍 **T305** ANSI, ISO, JIS and split geometries — `████████░░ 83%`
   - [x] Geometry definitions — src/geometry.rs: typed ANSI/ISO/JIS/split main-block slot models, verified Linux evdev extra-key codes, uniqueness and non-attribution tests; GitHub Actions 39992682545: 111 Rust tests and native X11 smoke passed. This is preview geometry, not complete hardware routing.
   - [ ] Physical key routing
   - [x] Per-key rendering for modeled main typing-block positions — src/app.rs and src/geometry.rs: XKB key symbols, named dead-key positions, extra-key placeholders and four layouts; 1100×850 ISO/JIS/split native screenshots inspected from Actions 39997672154 (113 Rust tests + X11 smoke pass), including full five-row visibility and unclipped split final key. Main-block preview only.
   - [x] Core control/modifier keycaps and XKB position parity — src/geometry.rs, src/app.rs and src/xkb.rs: typed Backspace/Tab/Enter/Caps/Shift/Ctrl/Alt/Super keycaps, geometry nonoverlap/non-attribution tests, 48 printable slot-to-XKB code parity checks and native ISO/JIS/split captures visually inspected; CI 40003691924: 116 Rust tests and X11 graphical suite passed
   - [x] Function/navigation and numeric keypad reference views — src/geometry.rs, src/app.rs and tests/gui_smoke.sh: 26 function/navigation and 17 keypad Linux evdev reference keys, non-overlap/uniqueness/non-attribution tests and F10 native selection; Actions 40006834967 passed 118 Rust tests and X11 GUI assertions, both archived screenshots visually inspected
-  - [ ] Complete control/modifier and edge-key geometry
+  - [x] Complete control/modifier and edge-key geometry — src/geometry.rs exhaustive 104 ANSI/105 ISO/109 JIS/104 split unique Linux evdev reference inventories across Typing, Function/navigation and Keypad sections, non-attributed controls, modifier and national-edge keys with visible fallback captions. GitHub Actions 40134673256 green: 224 Rust tests and complete native X11 GUI, ISO/JIS/split 1100×850 screenshots manually inspected for labels and clipping. Earlier F10 function and keypad native screenshot inspections CI 40006834967. This accepts the standard illustrative reference inventory, not device hardware topology, extra-key routing or physical Hyprland.
 
 ### 🔌 P4 — Keyboard detection and selection — `██████░░░░ 61%`
 
@@ -135,7 +135,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `████████░░ 81%`
-- 🔀 Software layout emulation — `████████░░ 79%`
+- 🔀 Software layout emulation — `████████░░ 83%`
 - 🔌 Multi-keyboard selection — `█████░░░░░ 50%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

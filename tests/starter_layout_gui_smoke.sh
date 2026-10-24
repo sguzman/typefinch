@@ -216,7 +216,13 @@ local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout
   and rows[1].input_mode=="Emulated" and rows[1].test_mode=="custom"
   and rows[1].entered==42 and rows[1].correct==42 and rows[1].attempts==42,
-  "Full ANSI session SQLite identity or score did not match")
+  string.format("Full ANSI SQLite mismatch: rows=%d layout=%s expected=%s input=%s test=%s entered=%s correct=%s attempts=%s",
+    #rows,tostring(rows[1] and rows[1].layout),layout,
+    tostring(rows[1] and rows[1].input_mode),
+    tostring(rows[1] and rows[1].test_mode),
+    tostring(rows[1] and rows[1].entered),
+    tostring(rows[1] and rows[1].correct),
+    tostring(rows[1] and rows[1].attempts)))
 local file=assert(io.open(source,"rb"));local passage=assert(file:read("*a"));file:close()
 local sf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
 local settings=assert(sf:read("*a"));sf:close()

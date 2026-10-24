@@ -1273,6 +1273,14 @@ impl Typefinch {
                                     && !modifiers.command && !modifiers.ctrl)));
                         let ime_event=ui.input(|i|i.events.iter().any(|event|
                             matches!(event,egui::Event::Ime(_))));
+                        // Capture the active endpoint *before* the native editor
+                        // handles the arrow. Moving backward should contract a
+                        // grapheme selection, not snap it back to its old end.
+                        let previous_cursor=if shift_arrow && !ime_event {
+                            egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|state|state.cursor.char_range())
+                                .map(|range|range.primary.index)
+                        }else{None};
                         let edit=ui.add_enabled(self.session.state!=State::Running,
                             egui::TextEdit::multiline(&mut self.custom_text)
                                 .id(editor_id)
@@ -1289,16 +1297,19 @@ impl Typefinch {
                         // grapheme while retaining the original anchor.
                         // Do not modify IME composition, unshifted navigation
                         // or mouse selections.
-                        if edit.has_focus() && shift_arrow && !ime_event {
-                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
-                                if let Some(mut range)=state.cursor.char_range() {
-                                    if let Some(endpoint)=rtl_shaping::snap_partial_selection(
-                                        &self.custom_text,range.primary.index,range.secondary.index) {
+                        if edit.has_focus() {
+                            if let Some(previous_cursor)=previous_cursor {
+                                if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
+                                    if let Some(mut range)=state.cursor.char_range() {
+                                        if let Some(endpoint)=rtl_shaping::snap_partial_selection(
+                                            &self.custom_text,range.primary.index,
+                                            range.secondary.index,previous_cursor) {
                                         // Preserve the native horizontal preferred position and
                                         // anchor rather than reconstructing CCursorRange.
                                         range.primary=egui::text::CCursor::new(endpoint);
                                         state.cursor.set_char_range(Some(range));
                                         state.store(ui.ctx(),editor_id);
+                                        }
                                     }
                                 }
                             }

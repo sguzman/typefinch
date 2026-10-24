@@ -61,15 +61,19 @@ pub fn selection_spans(text:&str,selected:Option<(usize,usize)>,
 /// can land inside Arabic harakat, Hebrew niqqud, or joined emoji. Only
 /// Shift+Arrow selections use this helper; neither source text nor caret
 /// positioning for IME composition is rewritten.
-pub fn snap_partial_selection(text:&str,active:usize,anchor:usize)->Option<usize>{
-    if active==anchor {return None;}
+pub fn snap_partial_selection(text:&str,active:usize,anchor:usize,previous:usize)->Option<usize>{
+    if active==anchor || active==previous {return None;}
     let total=text.chars().count();
-    if active>total || anchor>total {return None;}
+    if active>total || anchor>total || previous>total {return None;}
     let mut start=0;
     for grapheme in text.graphemes(true) {
         let end=start+grapheme.chars().count();
         if start<active && active<end {
-            return Some(if active>anchor {end} else {start});
+            // Snap in the direction actually moved by the native cursor:
+            // increasing expands to the cluster end; decreasing retreats
+            // to its start. Comparing only to the anchor incorrectly traps
+            // reverse Shift+Arrow at an already-selected marked cluster.
+            return Some(if active>previous {end} else {start});
         }
         start=end;
     }
@@ -204,21 +208,25 @@ mod tests {
         assert_eq!(selection_spans(text,Some((0,text.len()+2)),regular,highlight),
             vec![(text.into(),regular)]);
     }
-    #[test] fn keyboard_selection_never_splits_marked_rtl_or_zwj_grapheme(){
+    #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){
         let hebrew="שָׁלוֹם";
-        assert_eq!(snap_partial_selection(hebrew,1,0),Some(3));
-        assert_eq!(snap_partial_selection(hebrew,2,0),Some(3));
-        assert_eq!(snap_partial_selection(hebrew,2,3),Some(0));
-        assert_eq!(snap_partial_selection(hebrew,3,0),None);
+        assert_eq!(snap_partial_selection(hebrew,1,0,0),Some(3));
+        assert_eq!(snap_partial_selection(hebrew,2,0,1),Some(3));
+        assert_eq!(snap_partial_selection(hebrew,2,0,3),Some(0),
+            "Shift+Arrow reversed must clear the selected first cluster");
+        assert_eq!(snap_partial_selection(hebrew,2,3,3),Some(0));
+        assert_eq!(snap_partial_selection(hebrew,3,0,0),None);
         let arabic="سَلَام";
-        assert_eq!(snap_partial_selection(arabic,1,0),Some(2));
+        assert_eq!(snap_partial_selection(arabic,1,0,0),Some(2));
+        assert_eq!(snap_partial_selection(arabic,1,0,2),Some(0));
         let emoji="👩‍💻 is one";
-        assert_eq!(snap_partial_selection(emoji,1,0),Some(3));
-        assert_eq!(snap_partial_selection(emoji,2,0),Some(3));
-        assert_eq!(snap_partial_selection(emoji,0,0),None);
-        assert_eq!(snap_partial_selection(emoji,99,0),None);
-        assert_eq!(snap_partial_selection(emoji,1,99),None);
-        assert_eq!(snap_partial_selection("abc",1,0),None);
+        assert_eq!(snap_partial_selection(emoji,1,0,0),Some(3));
+        assert_eq!(snap_partial_selection(emoji,2,0,1),Some(3));
+        assert_eq!(snap_partial_selection(emoji,2,0,3),Some(0));
+        assert_eq!(snap_partial_selection(emoji,0,0,0),None);
+        assert_eq!(snap_partial_selection(emoji,99,0,0),None);
+        assert_eq!(snap_partial_selection(emoji,1,99,0),None);
+        assert_eq!(snap_partial_selection("abc",1,0,0),None);
     }
     #[test] fn egui_scalar_editor_caret_snaps_to_unicode_graphemes(){
         let text="שָׁלוֹם 🌍👩‍💻 سلام";

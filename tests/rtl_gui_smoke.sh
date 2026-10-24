@@ -168,6 +168,7 @@ LUA
     # not a trailing ASCII digit. The native editor now snaps a *single*
     # Shift+Arrow selection to a whole grapheme boundary.
     partial_status=''
+    selected_direction=''
     for direction in Right Left; do
       xdotool key --clearmodifiers ctrl+Home
       sleep 0.15
@@ -181,7 +182,10 @@ assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
 print(tostring(d.selected_graphemes)..":"..tostring(d.index))
 LUA
 )"
-      [[ "$partial_status" != "1:1" ]] || break
+      if [[ "$partial_status" == "1:1" ]];then
+        selected_direction="$direction"
+        break
+      fi
     done
     [[ "$partial_status" == "1:1" ]] || {
       import -window "$window" "rtl-$name-editor-first-grapheme-debug.png" 2>/dev/null || true
@@ -201,6 +205,25 @@ LUA
       exit 1
     }
     echo "Native $name first RTL script grapheme selection PASS: one cluster; $partial_pixels preview pixels changed"
+    # The opposite Shift+Arrow must contract that exact marked cluster
+    # back to its anchor. Without direction-aware snapping the editor
+    # can get stuck selecting the same grapheme indefinitely.
+    if [[ "$selected_direction" == Right ]];then reverse=Left;else reverse=Right;fi
+    xdotool key --clearmodifiers "shift+$reverse"
+    sleep 0.3
+    retracted_status="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+print(tostring(d.selected_graphemes)..":"..tostring(d.index))
+LUA
+)"
+    [[ "$retracted_status" == "0:0" ]] || {
+      echo "Native $name RTL Shift+Arrow could not retract selected grapheme: $retracted_status" >&2
+      exit 1
+    }
+    echo "Native $name reverse RTL selection PASS: selected one full cluster and retracted to anchor"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi

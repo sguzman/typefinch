@@ -42,6 +42,19 @@ const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
 // Only a fresh emulated physical-key press can add scored text. EgGui's
 // system-mode Text events are an aggregate committed stream and cannot be
 // safely labeled as physical repeat or uniquely attributed to hardware.
+// Text from a system compositor and final IME commits are the only strings
+// scoreable in system-input mode. Uncommitted IME preedit/candidate updates,
+// clipboard pastes, and non-text key events never alter the typing session.
+fn score_system_committed_event(session:&mut Session,event:&egui::Event)->bool {
+    match event {
+        egui::Event::Text(text) | egui::Event::Ime(egui::ImeEvent::Commit(text))
+            if !text.is_empty() => {
+            session.type_text(text);
+            true
+        },
+        _=>false,
+    }
+}
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
 }
@@ -582,8 +595,11 @@ impl Typefinch {
                         if let Some(text) = mapped { self.session.type_text(&text); }
                     }
                 }
-                egui::Event::Text(text) if self.mode == Mode::System =>
-                    self.session.type_text(&text),
+                // Explicitly accept finalized IME composition in system
+                // mode, but never transient preedit or clipboard paste.
+                event if self.mode==Mode::System => {
+                    let _=score_system_committed_event(&mut self.session,&event);
+                },
                 // Paste is intentionally disallowed in scored sessions.
                 _ => {}
             }
@@ -1287,6 +1303,20 @@ impl Typefinch {
             egui::Sense::click()
         );
         if response.clicked() { response.request_focus(); }
+        if self.session.state==State::Running
+            && self.mode==Mode::System
+            && ctx.memory(|m|m.has_focus(egui::Id::new("typing_surface"))) {
+            // This focus-owned custom typing surface is an IME text target,
+            // even though it is not an editable TextEdit widget. IME popup
+            // positioning is approximate until caret/RTL QA is accepted.
+            let rect=typing_area.response.rect;
+            let cursor=egui::Rect::from_min_size(
+                rect.left_top()+egui::vec2(16.0,16.0),
+                egui::vec2(1.0,22.0));
+            ctx.output_mut(|out|out.ime=Some(egui::output::IMEOutput{
+                rect,cursor_rect:cursor
+            }));
+        }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
     }
     /// Render any supported ANSI physical position consistently, including
@@ -2089,6 +2119,26 @@ mod palette_tests {
         assert_eq!(recorded_layout(Mode::System,"us",&[seat.clone()],&installed),
             "os:unknown");
         assert_eq!(recorded_layout(Mode::Emulated,"us",&[seat],&installed),"us");
+    }
+    #[test] fn ime_commits_score_once_while_noncommitted_events_do_not() {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,"你好世界");
+        session.begin();
+        assert!(!score_system_committed_event(&mut session,
+            &egui::Event::Ime(egui::ImeEvent::Enabled)));
+        assert!(!score_system_committed_event(&mut session,
+            &egui::Event::Paste("你好世界".into())));
+        assert!(!score_system_committed_event(&mut session,
+            &egui::Event::Ime(egui::ImeEvent::Disabled)));
+        assert_eq!(session.attempts,0);
+        assert!(score_system_committed_event(&mut session,
+            &egui::Event::Ime(egui::ImeEvent::Commit("你好".into()))));
+        assert_eq!(session.typed,"你好");
+        assert_eq!(session.attempts,2);
+        assert!(score_system_committed_event(&mut session,
+            &egui::Event::Text("世界".into())));
+        assert_eq!(session.typed,"你好世界");
+        assert_eq!(session.state,State::Finished);
+        assert_eq!(session.score().correct,4);
     }
     #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {
         let plain=egui::Modifiers::default();

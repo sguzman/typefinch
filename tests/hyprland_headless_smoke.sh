@@ -101,8 +101,36 @@ jq -n --slurpfile version "$tmp/version.json" \
   --slurpfile monitors "$tmp/monitors.json" \
   --slurpfile clients "$tmp/clients.json" \
   '{compositor:"Hyprland",virtual:true,physical_keyboard:false,version:$version[0],monitors:$monitors[0],clients:($clients[0]|map({title,class,workspace}))}' >typefinch-hyprland-inspection.json
-sleep 1
+# A rendered window is not evidence that Hyprland delivers keyboard events.
+# Route a synthetic F1 through Hyprland's native sendshortcut dispatcher to the
+# actual Typefinch Wayland window; never access /dev/input or global key streams.
+hyprctl dispatch focuswindow "pid:$app" >"$tmp/focus.log"
+for _ in $(seq 1 30);do
+  active_pid="$(hyprctl -j activewindow | jq -r '.pid // empty')"
+  [[ "$active_pid" == "$app" ]] && break
+  sleep 0.2
+done
+[[ "${active_pid:-}" == "$app" ]] || {
+  echo "Typefinch did not become the active native Hyprland window" >&2
+  exit 1
+}
+sleep 0.6
+grim "$tmp/before-shortcut.png"
+[[ -s "$tmp/before-shortcut.png" ]] || {
+  echo "Hyprland baseline screenshot missing" >&2; exit 1;
+}
+# F1 toggles Typefinch's built-in keyboard help panel in the real GUI.
+hyprctl dispatch sendshortcut ", F1, pid:$app" >"$tmp/shortcut.log"
+sleep 0.7
 grim typefinch-hyprland-headless.png
 file typefinch-hyprland-headless.png
 [[ -s typefinch-hyprland-headless.png ]]
-echo "Real headless Hyprland Typefinch GUI screenshot PASS"
+# A changed screenshot alone can be a blinking caret. Demand a substantial
+# pixel difference consistent with the entire F1 help panel being rendered.
+pixels="$(compare -metric AE "$tmp/before-shortcut.png"   typefinch-hyprland-headless.png null: 2>&1 || true)"
+[[ "$pixels" =~ ^[0-9]+$ && "$pixels" -gt 2000 ]] || {
+  echo "Native Hyprland F1 did not visibly open Typefinch help: pixels=$pixels" >&2
+  exit 1
+}
+echo "Native Hyprland Wayland GUI and F1 keyboard shortcut PASS ($pixels differing pixels)"
+echo "Virtual compositor only; physical keyboard, IME and hotplug remain unaccepted"

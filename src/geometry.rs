@@ -332,6 +332,76 @@ mod tests {
             assert_eq!(slots.iter().filter(|s|s.egui_key==Some(Key::Space)).count(),1);
         }
     }
+    #[test] fn full_ansi_iso_jis_and_split_reference_inventories_are_exact() {
+        use std::collections::HashSet;
+        // Count *unique physical Linux key codes*, never graphical halves,
+        // never independently numbered control rows or imagined hotplug
+        // devices. ANSI 104 / ISO 105 / JIS 109 include the navigation and
+        // numeric key blocks shown through the preview's section selector.
+        for (shape,count) in [
+            (Shape::Ansi,104_usize),(Shape::Iso,105),
+            (Shape::Jis,109),(Shape::Split,104)
+        ] {
+            let sections=[
+                section_slots(shape,Section::Typing),
+                section_slots(shape,Section::Navigation),
+                section_slots(shape,Section::Keypad),
+            ];
+            let mut physical=HashSet::new();
+            let mut rendered=0;
+            let mut decorative=0;
+            for slots in &sections {
+                rendered+=slots.len();
+                for slot in slots {
+                    assert!(slot.width>0 && !slot.name.is_empty());
+                    if slot.evdev==0 {
+                        decorative+=1;
+                        assert_eq!(slot.kind,SlotKind::Decoration);
+                        assert!(slot.egui_key.is_none());
+                    }else{
+                        assert!(physical.insert(slot.evdev),
+                            "{shape:?}: duplicate physical evdev {} ({})",
+                            slot.evdev,slot.name);
+                        if slot.kind!=SlotKind::Character {
+                            assert!(slot.egui_key.is_none(),
+                                "reference control or national key emits text: {}",
+                                slot.name);
+                        }
+                    }
+                }
+            }
+            assert_eq!(physical.len(),count,
+                "{shape:?}: incomplete family key inventory");
+            assert_eq!(rendered,count+decorative);
+            assert_eq!(decorative,if shape==Shape::Split {1}else{0},
+                "split Space halves must never be two physical keys");
+            for evdev in [
+                1,14,15,28,29,42,54,56,58,97,100,125,126,127,
+                57,69,82,83,96,98,99,119
+            ] {
+                assert!(physical.contains(&evdev),
+                    "{shape:?}: missing function, control, modifier or keypad code {evdev}");
+            }
+            match shape {
+                Shape::Ansi|Shape::Split=>{
+                    assert!(physical.contains(&41));
+                    assert!(!physical.contains(&86));
+                    assert!(!physical.contains(&85));
+                },
+                Shape::Iso=>{
+                    assert!(physical.contains(&41));
+                    assert!(physical.contains(&86));
+                },
+                Shape::Jis=>{
+                    assert!(!physical.contains(&41));
+                    for evdev in [85,89,92,93,94,124] {
+                        assert!(physical.contains(&evdev),
+                            "JIS 109 special evdev {evdev} missing");
+                    }
+                },
+            }
+        }
+    }
     #[test] fn modifier_and_control_positions_are_explicit_not_scored() {
         for shape in Shape::ALL {
             let slots=slots(shape);

@@ -35,6 +35,15 @@ jobs:
         run: cargo check --all-targets
       - name: Test
         run: cargo test --all-targets
+      # Bootstrap the actual Cargo resolution once so the resulting
+      # application dependency graph can be committed and locked in source.
+      # Do not infer package checksums or version choices from job logs.
+      - name: Export resolved Cargo lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: typefinch-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
       - name: Installed Unicode font coverage (CJK, Arabic, Hebrew)
         run: TYPEFINCH_QA_UNICODE_FONTS=1 cargo test fonts::tests::system_noto_fallbacks_render_required_glyphs -- --nocapture
       - name: Build graphical executable

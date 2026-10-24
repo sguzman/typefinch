@@ -1291,13 +1291,13 @@ impl Typefinch {
                         // or mouse selections.
                         if edit.has_focus() && shift_arrow && !ime_event {
                             if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
-                                if let Some(range)=state.cursor.char_range() {
+                                if let Some(mut range)=state.cursor.char_range() {
                                     if let Some(endpoint)=rtl_shaping::snap_partial_selection(
                                         &self.custom_text,range.primary.index,range.secondary.index) {
-                                        state.cursor.set_char_range(Some(egui::text::CCursorRange {
-                                            primary:egui::text::CCursor::new(endpoint),
-                                            secondary:range.secondary,
-                                        }));
+                                        // Preserve the native horizontal preferred position and
+                                        // anchor rather than reconstructing CCursorRange.
+                                        range.primary=egui::text::CCursor::new(endpoint);
+                                        state.cursor.set_char_range(Some(range));
                                         state.store(ui.ctx(),editor_id);
                                     }
                                 }

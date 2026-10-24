@@ -1,36 +1,68 @@
-# Arabic and Hebrew: current scope and acceptance
+# Arabic and Hebrew input: implementation and acceptance
 
-Typefinch operates on **Unicode logical grapheme order** for scoring and
-reference feedback. A mistake is matched to the reference position rather
-than reversing the typed string to approximate visual RTL order. Adjacent
-equally colored graphemes share an egui text run so the unentered part of an
-Arabic word is not needlessly split into individually formatted letters.
+## What works in source
 
-Automated unit tests check Arabic marks, Hebrew niqqud, mixed Latin/RTL
-passages, cursor highlighting, windowed reference positions, canonical
-equivalence, and preserved string order. Native X11 automation imports
-author-authored synthetic Arabic and Hebrew passages with the ordinary
-keyboard-operated Custom file importer, captures separate screenshots, and
-asserts that the actual egui window changes. CI checks availability of OS
-Noto glyph fallbacks. The fixtures contain no private texts, device events,
-or account identifiers.
+Typefinch scores input against the reference in **logical Unicode extended
+grapheme order**, including Arabic vowel marks, Hebrew niqqud and mixed-script
+text. It does not reverse a string in order to imitate right-to-left layout.
 
-**Not yet accepted:** complete Arabic contextual glyph shaping, proper
-Unicode Bidirectional Algorithm reordering across mixed paragraphs, visual
-selection/caret positioning, edit controls in RTL, or real RTL IME/compositor
-entry. egui 0.33.3 text/layout has limitations in complex bidirectional
-paragraphs. Do not claim that styling contiguous logical runs alone solves
-OpenType shaping or UAX #9. End-to-end RTL success requires rendering and
-input tests against suitable shaped output, not only nonblank screenshots.
-Text remains in logical order; avoid naïve grapheme reversal because it
-breaks numbers, punctuation, diacritics and mixed scripts.
+For passages containing Arabic/Hebrew script ranges, the typing reference
+widget now delegates text layout and glyph rasterization to the pure-Rust
+`cosmic-text` engine. This supplies OpenType shaping and Unicode bidirectional
+layout. Adjacent reference graphemes with the same feedback color form one
+logical style run; colored missed graphemes remain tied to the correct
+reference index before the shaper maps them into visual glyphs.
 
-Future architecture: evaluate a pure-Rust Unicode BiDi + OpenType shaping
-stack for this focused reference widget, maintain mapping from logical
-grapheme ranges to visual glyph clusters and correct cursor rectangle, then
-verify native Arabic/Hebrew rendering, selection, IME, accessibility, and
-highlighting in an actual Wayland compositor. Never route untrusted physical
-device events or collect private keyboard input as a testing shortcut.
+When a test is running, the text shaper maps the logical reference grapheme
+boundary into a **visual caret position**. The native typing widget draws the
+caret at the result and offers that rectangle to egui's IME output. The
+conversion accounts for multiple lines and rejects byte offsets inside
+UTF-8 scalars and combining-grapheme clusters. A missing or invalid
+coordinate never triggers fabricated physical keyboard events.
 
-The T804 shaping/caret and RTL acceptance checks remain pending until
-that larger work is complete.
+The custom-passages editor remains a regular egui multiline control so that
+its existing keyboard and clipboard editing behavior is preserved. Because
+egui's complex-script editor selection is not fully accepted, Typefinch
+additionally displays a separate, read-only COSMIC Text preview of up to
+160 graphemes. This makes the preview visually useful without pretending the
+editable caret is reliable.
+
+All source text, scoring and preview textures are local and in-memory.
+No keyboard hooks, telemetry, unrequested files, public statistics or
+privileged input-monitoring APIs are involved.
+
+## Evidence
+
+- CI [40052914361](https://github.com/sguzman/typefinch/actions/runs/40052914361)
+  passed the integrated shaped-reference tests and native Arabic/Hebrew
+  screenshot fixtures. Visual review showed correctly ordered, joined RTL
+  reference words, diacritics and numeric suffixes; the old egui reference
+  path visibly reversed that content.
+- CI [40053309856](https://github.com/sguzman/typefinch/actions/runs/40053309856)
+  passed logical-to-visual cursor unit tests and the complete native X11
+  suite. It did not yet independently screenshot the caret during live typing.
+- Additional source tests cover multiline caret coordinates, grapheme
+  boundaries, transparent bounded glyph textures and visible error-color
+  differences. Do not credit them until a fully green CI run is recorded.
+- The extended native fixture captures *idle and running* real X11 frames
+  for both Arabic and Hebrew using the ordinary F11/F5/F2/Escape controls.
+  This is synthetic UI QA, not an RTL keyboard/IME hardware test.
+
+## Unaccepted scope
+
+T804 is not automatically complete because shaped screenshots are legible.
+Real Arabic/Hebrew keyboard and IME composition, complex bidi paragraph
+selection, arrow/caret motion **inside the editable custom-text control**,
+focus changes under Hyprland, mixed punctuation and cursor overlays
+positioned under live input still need end-to-end QA. The fixed-size shaped
+reference texture may also clip long wrapped passages and needs a responsive
+multi-line acceptance pass.
+
+There must be no broad claim of bidirectional editing or screen-reader
+support until those paths are demonstrated. In particular, correct
+appearance of a read-only reference or a nonblank native screenshot does not
+prove that the UI's editable text caret or compositor IME behaves correctly.
+
+The acceptance tracker is [progress.json](progress.json); human-readable
+percentages are rendered from it. Failed acceptance evidence is kept
+distinct from feature planning. No real private passage is needed in CI.

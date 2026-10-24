@@ -4,15 +4,21 @@
 set -euo pipefail
 tmp="$(mktemp -d)"
 compositor=''
+parent=''
 app=''
 cleanup(){
   local code=$?
   set +e
   [[ -z "$app" ]] || { kill "$app" 2>/dev/null; wait "$app" 2>/dev/null; }
   [[ -z "$compositor" ]] || { kill "$compositor" 2>/dev/null; wait "$compositor" 2>/dev/null; }
+  [[ -z "$parent" ]] || { kill "$parent" 2>/dev/null; wait "$parent" 2>/dev/null; }
   if ((code!=0));then
     echo "Headless Hyprland failed" >&2
     [[ ! -f "$tmp/hyprland.log" ]] || tail -n 100 "$tmp/hyprland.log" >&2
+    [[ ! -f "$tmp/weston.log" ]] || tail -n 50 "$tmp/weston.log" >&2
+    for log in "$XDG_RUNTIME_DIR"/hypr/*/hyprland.log;do
+      [[ ! -f "$log" ]] || tail -n 110 "$log" >&2
+    done
     [[ ! -f "$tmp/typefinch.log" ]] || tail -n 50 "$tmp/typefinch.log" >&2
   fi
   rm -rf "$tmp" || true
@@ -24,8 +30,22 @@ export XDG_RUNTIME_DIR="$tmp/runtime" XDG_CONFIG_HOME="$tmp/config"
 export XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache"
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland
 export LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
-export AQ_BACKEND=headless HYPRLAND_NO_SD_NOTIFY=1
+export HYPRLAND_NO_SD_NOTIFY=1
 unset DISPLAY WAYLAND_SOCKET WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE
+# Current Aquamarine cannot create a GPU-less stand-alone backend. The
+# disposable software-rendered parent Weston supplies a legitimate Wayland
+# allocator/surface; Hyprland itself still owns the real child compositor.
+weston --backend=headless-backend.so --renderer=pixman --socket=parent-wayland \
+  --no-config --idle-time=0 --width=1280 --height=900 \
+  --log="$tmp/weston.log" >"$tmp/weston-stdout.log" 2>&1 &
+parent=$!
+for _ in $(seq 1 100);do
+  [[ -S "$XDG_RUNTIME_DIR/parent-wayland" ]] && break
+  kill -0 "$parent" 2>/dev/null || { echo "Parent Weston exited" >&2;exit 1; }
+  sleep 0.2
+done
+[[ -S "$XDG_RUNTIME_DIR/parent-wayland" ]] || { echo "Parent Weston socket missing" >&2;exit 1; }
+export WAYLAND_DISPLAY=parent-wayland
 cat >"$tmp/hyprland.conf" <<'CONF'
 monitor = ,1280x900@60,auto,1
 misc {

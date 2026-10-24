@@ -199,6 +199,9 @@ pub struct Session {
     pub attempts: u32,
     pub mistakes: u32,
     weak_keys: BTreeMap<char,u32>,
+    // Exact Unicode grapheme practice targets; original miss counts remain
+    // available by first scalar for the illustrative ANSI heatmap.
+    weak_graphemes:BTreeMap<String,u32>,
     // Error-local reference bigrams live only for this session.
     weak_pairs: BTreeMap<String,u32>,
     key_timings:BTreeMap<char,KeyTiming>,
@@ -242,7 +245,7 @@ impl Session {
             .split_whitespace().collect::<Vec<_>>().join(" ");
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
-            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
+            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),weak_graphemes:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
     }
     pub fn history_mode(&self)->String {
         if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
@@ -264,6 +267,7 @@ impl Session {
         self.attempts = 0;
         self.mistakes = 0;
         self.weak_keys.clear();
+        self.weak_graphemes.clear();
         self.weak_pairs.clear();
         self.key_timings.clear();
         self.last_key_at=None;
@@ -311,6 +315,10 @@ impl Session {
                 if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
                     let errors=self.weak_keys.entry(key).or_default();
                     *errors=errors.saturating_add(1);
+                    if expected.len()<=MAX_DRILL_PAIR_BYTES {
+                        let count=self.weak_graphemes.entry(expected.to_owned()).or_default();
+                        *count=count.saturating_add(1);
+                    }
                     if let Some(pair)=reference_pair_at(&self.target,position) {
                         let misses=self.weak_pairs.entry(pair).or_default();
                         *misses=misses.saturating_add(1);
@@ -341,16 +349,16 @@ impl Session {
         self.weak_keys.get(&key).copied().unwrap_or(0)
     }
     pub fn weak_character_drill(&self)->Option<String> {
-        let mut candidates=self.weak_keys.iter().map(|(ch,n)|(*ch,*n)).collect::<Vec<_>>();
-        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        // More frequent misses deserve more practice, but one difficult key
-        // must never create an unbounded lesson. Keep the existing eight-key
-        // cap and use between two and eight repetitions per selected key.
+        let mut candidates=self.weak_graphemes.iter().map(|(glyph,n)|(glyph.as_str(),*n))
+            .collect::<Vec<_>>();
+        candidates.sort_by(|a,b|b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        // Preserve whole Unicode graphemes in practice. More frequent misses
+        // deserve more repetitions, capped at eight patterns and eight each.
         let largest=u64::from(candidates.first()?.1);
         let mut syllables=Vec::new();
-        for (ch,misses) in candidates.into_iter().take(8) {
+        for (glyph,misses) in candidates.into_iter().take(8) {
             let count=((u64::from(misses)*8+largest/2)/largest).clamp(2,8);
-            for _ in 0..count {syllables.push(ch.to_string());}
+            for _ in 0..count {syllables.push(glyph);}
         }
         Some(syllables.join(" "))
     }
@@ -781,6 +789,37 @@ mod tests {
         s.begin();
         assert!(s.weak_character_drill().is_none());
         assert_eq!(s.missed_character_count('c'),0);
+    }
+    #[test] fn adaptive_drill_preserves_full_unicode_graphemes() {
+        let accent="e\u{301}";
+        let emoji="👩‍💻";
+        let mut s=Session::new_with_custom(30,TestMode::Custom,
+            &format!("{accent} {emoji}"));
+        s.begin();
+        s.type_text("x");
+        s.backspace();
+        s.type_text(&format!("{accent} "));
+        s.type_text("x");
+        let drill=s.weak_character_drill().unwrap();
+        let glyphs=drill.split_whitespace().collect::<Vec<_>>();
+        assert_eq!(glyphs.len(),16);
+        assert!(glyphs.iter().take(8).all(|g|*g==accent));
+        assert!(glyphs.iter().skip(8).all(|g|*g==emoji));
+        assert!(glyphs.iter().all(|g|g.graphemes(true).count()==1),
+            "practice must not truncate a grapheme or split a ZWJ emoji");
+        s.begin();
+        assert!(s.weak_character_drill().is_none());
+    }
+    #[test] fn oversized_single_grapheme_is_not_copied_into_practice() {
+        let huge=format!("e{}x","\u{301}".repeat(500));
+        let mut s=Session::new_with_custom(30,TestMode::Custom,&huge);
+        s.begin();
+        s.type_text("q");
+        assert!(s.weak_character_drill().is_none(),
+            "oversized reference glyph should not create a huge repeated drill");
+        assert!(s.weak_bigram_drill().is_none());
+        assert_eq!(s.missed_character_count('e'),1,
+            "heatmap may still safely count the first reference symbol");
     }
     #[test] fn weighted_drill_exposes_frequent_misses_more_often() {
         let mut s=Session::new_with_custom(30,TestMode::Custom,"aaaab");

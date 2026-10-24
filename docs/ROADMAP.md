@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 88%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 89%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `██████████ 95%`
 
@@ -80,21 +80,21 @@
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 75%`
+## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 78%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `█████████░ 87%`
+### 🧬 P3 — Recognition, emulation and geometry — `█████████░ 92%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
   - [x] Discover installed XKB variants — src/registry.rs; GitHub Actions 39872686067 discovered XKB layouts and passed 30 tests
   - [x] Normalize identities and availability — src/registry.rs and src/app.rs: deduplicated variants, unique active-map resolution, unavailable-map fallback; Actions 39880764327
-- 🔀 **T302** Starter software emulation — `████████░░ 75%`
+- 🔀 **T302** Starter software emulation — `██████████ 100%`
   - [x] Four initial ANSI row mappings coded — src/layouts.rs
   - [x] Physical key event handling coded — src/app.rs
   - [x] Native mapping QA — src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
-  - [ ] Full modifiers and punctuation layers
+  - [x] Full modifiers and punctuation layers — src/layouts.rs all four 48-position English ANSI base/Shift symbol tables cross-checked against installed XKB; tests/starter_layout_gui_smoke.sh 8 real Xvfb/winit/egui native UI scoring cases: US QWERTY, Dvorak, Colemak and Colemak-DH each 42/42 with installed XKB and forced-offline fallback, including punctuation, Shift and negative Ctrl/left-Alt shortcut presses. SQLite layout/input mode/test mode/attempt counts and source non-persistence audited. GitHub Actions 40143940280: 230 Rust tests and entire graphical suite passed. Eight screenshots archived, sample US/Dvorak/Colemak/Colemak-DH frames inspected. This is starter ANSI software emulation, not native Hyprland hardware or trustworthy physical AltGr routing (T303/T305).
 - 🌐 **T303** libxkbcommon-backed full emulation — `████████░░ 75%`
   - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
   - [x] Session-local XKB Compose for ANSI dead keys and one-grapheme scoring — src/xkb.rs and src/app.rs: session-local XKB Compose, reset on restart/Backspace/cancel/focus loss; GitHub Actions 39985958620: 106 Rust tests and native X11 graphical suite passed
@@ -135,7 +135,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `████████░░ 81%`
-- 🔀 Software layout emulation — `████████░░ 83%`
+- 🔀 Software layout emulation — `█████████░ 90%`
 - 🔌 Multi-keyboard selection — `█████░░░░░ 50%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

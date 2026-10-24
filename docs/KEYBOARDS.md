@@ -148,7 +148,7 @@ F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard
 
 ## Native Tab and Enter keyboard-only profile navigation
 
-Ctrl+N focuses the real new-profile name field without creating anything automatically. Tab moves to the adjacent **Create profile** button; Enter submits through the same production UI validation path. F1 opens the visible keyboard guide. Dedicated X11 automation uses only keyboard actions for these controls, verifies a saved new profile, and checks that guide visibility changes the rendered frame. This supports keyboard accessibility while leaving a full real Hyprland/assistive-technology audit open.
+Ctrl+Shift+T cycles the actual saved appearance selection **System → Light → Dark → System** without opening settings, and is disabled while a typing session is active or settings are in recovery mode. Ctrl+N focuses the real new-profile name field without creating anything automatically. Tab moves to the adjacent **Create profile** button; Enter submits through the same production UI validation path. F1 opens the visible keyboard guide. Dedicated X11 automation uses only keyboard actions for these controls, verifies a saved new profile, and checks that guide visibility changes the rendered frame. This supports keyboard accessibility while leaving a full real Hyprland/assistive-technology audit open.
 
 ## Keyboard-operated profile goals transfer
 

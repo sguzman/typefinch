@@ -89,3 +89,18 @@ assert(n==1,"Ctrl+N, Tab, Shift+Tab and Enter must navigate the real profile edi
 print("Native keyboard profile creation PASS: Ctrl+N, Tab, Shift+Tab, Enter")
 LUA
 echo "Native keyboard guide PASS: F1 altered $diff_pixels rendered pixels"
+# Explicit keyboard shortcut changes persisted appearance, not OS settings.
+for theme in light dark system; do
+  xdotool windowactivate --sync "$window" 2>/dev/null || true
+  xdotool windowfocus --sync "$window"
+  xdotool key --clearmodifiers ctrl+shift+t
+  sleep 0.5
+  lua5.4 - "$settings" "$theme" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local prefs,_,err=json.decode(f:read("*a"));f:close()
+assert(not err and prefs.theme==arg[2],
+    "Ctrl+Shift+T must cycle and save the explicit appearance override")
+LUA
+done
+echo "Native keyboard theme cycling PASS: system/light/dark/system"

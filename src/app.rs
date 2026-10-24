@@ -282,6 +282,10 @@ fn key_heat_fill(errors:u32,dark:bool)->Color32 {
 }
 
 
+fn next_theme(theme:Theme)->Theme {
+    match theme {Theme::System=>Theme::Light,Theme::Light=>Theme::Dark,
+        Theme::Dark=>Theme::System}
+}
 fn motion_seconds(reduced:bool,normal:f32)->f32 {
     if reduced {0.0} else {normal}
 }
@@ -1852,6 +1856,18 @@ impl eframe::App for Typefinch {
         }
         self.poll_keyboard_hotplug(ctx,focused);
         self.last_window_focused=focused;
+        let theme_cycle=ctx.input(|i|
+            pressed_key_modifiers(&i.events,egui::Key::T)
+                .is_some_and(|modifiers|modifiers.ctrl && modifiers.shift));
+        if theme_cycle && self.session.state!=State::Running && !self.settings_read_only {
+            self.prefs.theme=next_theme(self.prefs.theme);
+            ctx.set_theme(match self.prefs.theme {
+                Theme::System=>egui::ThemePreference::System,
+                Theme::Light=>egui::ThemePreference::Light,
+                Theme::Dark=>egui::ThemePreference::Dark,
+            });
+            self.save();
+        }
         let f12=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::F12));
         if let Some(modifiers)=f12.filter(|_|self.session.state!=State::Running) {
             if modifiers.shift {
@@ -2036,7 +2052,8 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
-                            ui.label("Ctrl+N: new profile name (then Tab, Enter); F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
+                            ui.label("Ctrl+N: new profile name (Tab, Enter) · Ctrl+Shift+T: cycle System/Light/Dark theme.");
+                            ui.label("F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");
@@ -2241,6 +2258,13 @@ mod palette_tests {
         assert!(!emulated_key_accepted(false,egui::Modifiers{alt:true,..plain}));
         assert!(!emulated_key_accepted(false,egui::Modifiers{command:true,..plain}));
         assert!(!emulated_key_accepted(true,egui::Modifiers{shift:true,..plain}));
+    }
+    #[test] fn keyboard_theme_cycle_keeps_explicit_system_light_dark_order() {
+        let mut theme=Theme::System;
+        for next in [Theme::Light,Theme::Dark,Theme::System] {
+            theme=next_theme(theme);
+            assert_eq!(theme,next);
+        }
     }
     #[test] fn modified_shortcuts_preserve_keypress_modifiers_after_frame_release() {
         let held=egui::Modifiers { shift:true,..Default::default() };

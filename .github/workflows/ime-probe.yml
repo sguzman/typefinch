@@ -21,6 +21,6 @@ jobs:
       - name: Validate experimental fixture
         run: bash -n tests/fcitx_ime_gui_smoke.sh
       - name: Build native Typefinch GUI
-        run: cargo build --locked
+        run: cargo build
       - name: Real Fcitx5 Pinyin XIM candidate commit
         run: xvfb-run -a -s '-screen 0 1280x900x24' dbus-run-session -- bash tests/fcitx_ime_gui_smoke.sh

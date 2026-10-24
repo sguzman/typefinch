@@ -1296,10 +1296,17 @@ impl Typefinch {
         }
         let score = self.session.score();
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0).color(accent_ink(ui.visuals().dark_mode)).strong())
-                .on_hover_text("Standard WPM = correct extended grapheme clusters / 5 / elapsed minutes. English and Mexican Spanish benchmarks remain separate.");
-            ui.label(format!("{:.0} corrected CPM",score.cpm))
-                .on_hover_text("Correct completed Unicode grapheme clusters per minute. Useful for CJK committed-text passages; does not count IME romanization or physical keystrokes, and is not cross-language proficiency equivalence.");
+            if self.session.has_cjk_reference() {
+                ui.label(RichText::new(format!("{:.0} CPM",score.cpm)).size(23.0)
+                    .color(accent_ink(ui.visuals().dark_mode)).strong())
+                    .on_hover_text("Correct committed reference graphemes per minute, not IME input keystrokes. No cross-language proficiency equivalence.");
+                ui.label(format!("{:.1} standardized WPM",score.wpm))
+                    .on_hover_text("Correct graphemes divided by five per minute; diagnostic for CJK custom passages, not directly comparable with English/Spanish benchmarks.");
+            } else {
+                ui.label(RichText::new(format!("{:.0} WPM", score.wpm)).size(23.0)
+                    .color(accent_ink(ui.visuals().dark_mode)).strong())
+                    .on_hover_text("Standard WPM = correct extended grapheme clusters / 5 / elapsed minutes. English and Mexican Spanish benchmarks remain separate.");
+            }
             ui.label(format!("{:.1}% accuracy", score.accuracy));
             ui.label(format!("{:.0} raw WPM", score.raw_wpm))
                 .on_hover_text("Raw WPM = attempted Unicode scalars / 5 / elapsed minutes. It is diagnostic, not a cross-language or cross-input-method benchmark.");

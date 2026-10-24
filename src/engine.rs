@@ -429,6 +429,15 @@ impl Session {
         } else {0.0};
         result
     }
+    /// A display-only script heuristic for custom IME-oriented passages. It
+    /// does not infer keyboard layout, input method, or proficiency language.
+    pub fn has_cjk_reference(&self)->bool {
+        self.target.chars().any(|ch|matches!(ch as u32,
+            0x1100..=0x11FF | 0x2E80..=0x2FDF | 0x3040..=0x30FF
+            | 0x31F0..=0x31FF | 0x3400..=0x9FFF | 0xA960..=0xA97F
+            | 0xAC00..=0xD7AF | 0xD7B0..=0xD7FF | 0xF900..=0xFAFF
+            | 0x20000..=0x3134F))
+    }
     pub fn seconds_left(&self) -> f64 { self.duration.saturating_sub(self.elapsed).as_secs_f64() }
 }
 
@@ -466,6 +475,16 @@ pub fn score(target: &str, typed: &str, elapsed: Duration) -> Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn cjk_display_units_do_not_change_latin_or_rtl_layout_defaults() {
+        for text in ["你好","きょう","カタカナ","한글","Mixed 你好"] {
+            let s=Session::new_with_custom(0,TestMode::Custom,text);
+            assert!(s.has_cjk_reference(),"expected CJK display units for {text}");
+        }
+        for text in ["café mañana","שָׁלוֹם","العربية","👩‍💻","12345"] {
+            let s=Session::new_with_custom(0,TestMode::Custom,text);
+            assert!(!s.has_cjk_reference(),"not a Han/kana/Hangul passage: {text}");
+        }
+    }
     #[test] fn committed_cjk_cpm_counts_display_graphemes_not_ime_keypresses() {
         let perfect=score("你好世界","你好世界",Duration::from_secs(30));
         assert_eq!(perfect.correct,4);

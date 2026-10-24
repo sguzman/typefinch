@@ -29,8 +29,12 @@ divided by five. That arithmetic does **not** imply cross-language proficiency
 equivalence. CPM and WPM should be compared only within similar passages,
 scoring versions, input methods and language contexts. Typefinch does not yet
 ship a certified CJK corpus or native Fcitx/IBus acceptance, and custom CJK
-practice is not a public or cross-language benchmark. The UI shows corrected
-CPM alongside WPM without silently substituting one for the other.
+practice is not a public or cross-language benchmark. When a custom passage
+contains Han, kana or Hangul, the typing HUD emphasizes corrected CPM and
+retains standardized WPM as a secondary diagnostic. English/Spanish passages
+keep their familiar prominent WPM rather than acquiring a redundant label.
+This is a bounded *script display heuristic*, not language identification,
+IME detection or cross-language score equivalence.
 
 Pure Rust tests cover Chinese corrections, Japanese kana, Korean Hangul,
 canonical accents, zero-duration handling and the exact five-unit

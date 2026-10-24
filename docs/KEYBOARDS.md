@@ -97,6 +97,16 @@ The independent SQLite assertion verified `input_mode=OS` and
 This adds an actual virtual-X11 compositor-input regression beyond the
 static AltGr symbol-inspection tests.
 
+A second disposable process in [CI 40114996096](https://github.com/sguzman/typefinch/actions/runs/40114996096)
+set the actual X11 keyboard layout to Spanish (`es`), sent physical
+XKB keycodes for **dead acute, then E**, and verified that ordinary
+OS-input mode committed exactly **one `é` grapheme with one scored
+attempt**, never scoring the uncommitted accent by itself. The SQLite
+record used `input_mode=OS` and `test_mode=custom`. The complete
+graphical regression suite passed. This is standard X11 dead-key
+composition, not a live Fcitx/IBus CJK IME or the app's full software
+AltGr/Compose feature gate.
+
 **Not accepted:** reliable left-Alt versus right-Alt event attribution in
 Typefinch's *software-emulation* path, unusual AltGr layers and combinations,
 real keyboard hardware, production Hyprland and generic IME composition.

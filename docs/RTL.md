@@ -253,10 +253,17 @@ of the raw editor. All three synthetic-only screenshots were inspected:
 the Arabic-containing, Latin, and mixed Hebrew/Arabic lines remain legible
 and selection feedback follows the logical range. No text was stored.
 
-The next dedicated native X11 test also probes real mouse clicks in the
-Latin and Hebrew/Arabic paragraphs of the same disposable fixture; it
-is not accepted until its own end-to-end CI run verifies the expected
-logical indices and visually distinct shaped caret rows.
+[CI 40132170740](https://github.com/sguzman/typefinch/actions/runs/40132170740)
+passed all 222 Rust tests and the complete native GUI suite, including
+**actual mouse hit-testing** of the ordinary editable RTL source control.
+Disposable fixed-window clicks on the Latin paragraph and then the mixed
+Hebrew/Arabic paragraph moved the logical caret from grapheme **23 to 38**
+and its independent shaped preview from visual row **30 to 60 pixels**.
+The two archived screenshots were opened and visually inspected: the
+native source caret and the separate shaped caret appear on the expected
+different paragraphs, without adding a selection or modifying the source.
+This accepts those two X11 mouse-hit-test points, not arbitrary BiDi
+hit-testing, drag selection, physical keyboards or Wayland IMEs.
 
 ## Unaccepted scope
 

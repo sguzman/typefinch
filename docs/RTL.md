@@ -327,22 +327,44 @@ The acceptance tracker is [progress.json](progress.json); human-readable
 percentages are rendered from it. Failed acceptance evidence is kept
 distinct from feature planning. No real private passage is needed in CI.
 
-## Pending native Weston/Wayland RTL editor QA (not yet accepted)
+## Native Weston/Wayland RTL editing and source-isolation acceptance
 
-The native virtual-Wayland GUI fixture was extended on `main` at commits
-[`e244360`](https://github.com/sguzman/typefinch/commit/e2443602b35951db53a6413c678e885a9fe68022),
-[`3d63c41`](https://github.com/sguzman/typefinch/commit/3d63c41de129c8818af1ffedb9543380881163b4), and
-[`274604f`](https://github.com/sguzman/typefinch/commit/274604fe7eae90db46bab8234ed027cd2bb0ea73).
-It now requests, for separate Arabic and Hebrew marked-grapheme fixtures,
-selection -> native Backspace -> Undo with source-length assertions, and a
-Ctrl+Shift+End full-range selection -> Ctrl+Shift+Home retraction. It also
-archives paired synthetic-only screenshots and requires a visible image change
-on whole-range selection. The runtime exercises the existing editable egui
-TextEdit through Weston wl_keyboard, not a mocked editor or an alternate input
-implementation. Neither fixture text nor its local path is placed in reports.
+[CI 40141102036](https://github.com/sguzman/typefinch/actions/runs/40141102036)
+passed **230 Rust tests and the entire native GUI suite** on
+[`f025be5`](https://github.com/sguzman/typefinch/commit/f025be5f3d35533da6a9989507e64e71a6bb274a).
+Actual egui TextEdit input through a nested Weston Wayland session verified
+independent marked-grapheme selection, deletion, and Undo:
 
-**Evidence gate still open:** these new checks need a completed green CI run
-and inspection of the archived frames before any acceptance percentage changes.
-A passing virtual Weston test would still not establish physical Hyprland
-keyboards, native Wayland Fcitx/IBus candidate UI, or complete arbitrary BiDi
-mouse hit-testing. T804 remains partially accepted.
+- Arabic: 17 → 16 → 17 graphemes after selection, Backspace, and Undo.
+- Hebrew: 15 → 14 → 15 graphemes under the same operations.
+- Whole-range Ctrl+Shift+End / Ctrl+Shift+Home: 0 → 17 → 0 Arabic,
+  and 0 → 15 → 0 Hebrew selected graphemes.
+
+The pair of archived `typefinch-wayland-rtl-*-whole.png` screenshots was
+opened and visually inspected; the actual editable field and separately shaped
+preview both depict the full selection. The fixture additionally requires a
+pixel-difference assertion against an unselected baseline, without recording
+source text or local input paths in machine-readable reports.
+
+This test found a genuine old-editor-history bug in failed
+[CI 40140798070](https://github.com/sguzman/typefinch/actions/runs/40140798070):
+after importing the Hebrew passage, Undo incorrectly restored the
+**previous Arabic document's length** (15 → 14 → 17). Typefinch now resets
+the egui TextEdit undo history and stale cursor state whenever a new private
+file replaces the passage or a generated practice drill replaces the editor
+source. The passing rerun verifies the corrected cross-import lifecycle
+without restarting the Wayland client, which previously caused Weston teardown
+failures.
+
+The same passing native GUI suite exercised mixed Arabic/Latin/Hebrew pointer
+drags in both directions (15 selected graphemes, active caret rows 60/30).
+Production pointer-drag ranges now expand partial Arabic vowel marks, Hebrew
+niqqud or joined emoji to complete Unicode grapheme boundaries, with an
+independent Rust regression. Actual per-pointer marked-glyph hit-testing remains
+more limited than complete arbitrary BiDi editor acceptance.
+
+**Scope boundary:** virtual Weston/Xvfb input only. T804's broader RTL-tests
+acceptance check remains open for production Hyprland hardware,
+native Wayland Fcitx/IBus candidate overlays, arbitrary mixed-script editor
+hit-testing and end-to-end IME behavior. No physical-keyboard or full BiDi
+acceptance percentage is claimed from this run.

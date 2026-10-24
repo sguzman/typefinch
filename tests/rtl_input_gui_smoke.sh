@@ -15,6 +15,11 @@ cleanup(){
   fi
   [[ -z "$app_pid" ]] || { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
   [[ -z "$wm_pid" ]] || { kill "$wm_pid" 2>/dev/null || true; wait "$wm_pid" 2>/dev/null || true; }
+  if [[ -n "${GITHUB_WORKSPACE:-}" ]];then
+    for image in "$tmp"/rtl-native-mixed-*.png;do
+      [[ ! -s "$image" ]] || cp "$image" "$GITHUB_WORKSPACE/"
+    done
+  fi
   rm -rf "$tmp"
 }
 trap cleanup EXIT
@@ -210,6 +215,7 @@ xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool key --clearmodifiers F2
 sleep 0.25
+import -window "$window" "$tmp/rtl-native-mixed-start.png"
 setxkbmap -layout ara
 for code in 39 42 43 46;do
   xdotool key --clearmodifiers "$code"
@@ -217,6 +223,7 @@ for code in 39 42 43 46;do
 done
 xdotool key --clearmodifiers 65
 sleep 0.18
+import -window "$window" "$tmp/rtl-native-mixed-arabic.png"
 setxkbmap -layout us
 for code in 38 56 54;do
   xdotool key --clearmodifiers "$code"
@@ -224,12 +231,22 @@ for code in 38 56 54;do
 done
 xdotool key --clearmodifiers 65
 sleep 0.18
+import -window "$window" "$tmp/rtl-native-mixed-latin.png"
 setxkbmap -layout il
 for code in 38 45 30 32;do
   xdotool key --clearmodifiers "$code"
   sleep 0.07
 done
 sleep 0.75
+import -window "$window" "$tmp/rtl-native-mixed-hebrew.png"
+for pair in start:arabic arabic:latin latin:hebrew;do
+  earlier="${pair%%:*}" later="${pair##*:}"
+  pixels="$(compare -metric AE "$tmp/rtl-native-mixed-$earlier.png" "$tmp/rtl-native-mixed-$later.png" null: 2>&1 || true)"
+  [[ "$pixels" =~ ^[0-9]+$ && "$pixels" -gt 100 ]] || {
+    echo "Native mixed RTL visual transition absent: $pair ($pixels pixels)" >&2
+    exit 1
+  }
+done
 lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"),"Mixed native X11 score missing")

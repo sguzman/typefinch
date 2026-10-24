@@ -146,6 +146,10 @@ When no supported compositor or X11 session is available, the command emits an e
 
 F11 or Ctrl+O opens the ordinary Custom passage import path editor with keyboard focus. Enter loads a regular UTF-8 file through the same bounded importer as the button and drag-and-drop. The action is unavailable during a scored session or settings-recovery mode. Neither the path nor the passage is saved to preferences. [CI 40040560022](https://github.com/sguzman/typefinch/actions/runs/40040560022) passed 155 Rust tests and native X11 QA: F11 focused the real import path editor, Enter loaded a synthetic 16-grapheme passage, and scoring saved 16/16 correctly as Custom without persisting the passage/path. A separate symlink import produced no scored session. It does not establish Hyprland keyboard-only accessibility.
 
+## Native Tab and Enter keyboard-only profile navigation
+
+Ctrl+N focuses the real new-profile name field without creating anything automatically. Tab moves to the adjacent **Create profile** button; Enter submits through the same production UI validation path. F1 opens the visible keyboard guide. Dedicated X11 automation uses only keyboard actions for these controls, verifies a saved new profile, and checks that guide visibility changes the rendered frame. This supports keyboard accessibility while leaving a full real Hyprland/assistive-technology audit open.
+
 ## Keyboard-operated profile goals transfer
 
 F12 focuses the normal per-profile local goals JSON path field; Enter invokes the regular validated import and persists only the selected profile's goals. Shift+F12 explicitly exports the current goals. Neither action runs during an active typing test, and protected settings cannot be overwritten. The same buttons remain usable by mouse. [CI 40041334789](https://github.com/sguzman/typefinch/actions/runs/40041334789) passed 155 Rust tests and native X11 QA for both shortcuts: imported goals persisted only selected targets, and exported versioned JSON matched those targets while identity, test counts and personal bests remained unchanged. These controls do not inspect physical keyboard hardware or establish live Hyprland acceptance.

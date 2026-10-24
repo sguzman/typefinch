@@ -662,7 +662,9 @@ impl Typefinch {
                         ui.selectable_value(&mut self.prefs.active_profile, i, &profile.name);
                     }
                 });
-            ui.add(egui::TextEdit::singleline(&mut self.new_profile).hint_text("New local profile").desired_width(190.0));
+            ui.add(egui::TextEdit::singleline(&mut self.new_profile)
+                .id(egui::Id::new("new_profile_name"))
+                .hint_text("New local profile").desired_width(190.0));
             if ui.button("Create profile").clicked() {
                 let name = self.new_profile.trim();
                 if !name.is_empty() && name.chars().count() <= 32 {
@@ -1846,6 +1848,14 @@ impl eframe::App for Typefinch {
                 self.message="Enter a local goals JSON path, then press Enter to import into the selected profile.".into();
             }
         }
+        let ctrl_n=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::N)
+            .is_some_and(|modifiers|modifiers.ctrl && !modifiers.shift));
+        if ctrl_n && self.session.state!=State::Running && !self.settings_read_only {
+            // Focus the ordinary profile editor. Creation still requires
+            // Tab, then Enter/Space on its visible Create profile button.
+            ctx.memory_mut(|memory|
+                memory.request_focus(egui::Id::new("new_profile_name")));
+        }
         let ctrl_o=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::O)
             .is_some_and(|modifiers|modifiers.ctrl));
         if (ctrl_o || ctx.input(|i| i.key_pressed(egui::Key::F11)))
@@ -2012,7 +2022,7 @@ impl eframe::App for Typefinch {
                             ui.strong("Keyboard-only navigation");
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
-                            ui.label("F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
+                            ui.label("Ctrl+N: new profile name (then Tab, Enter); F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");
                             ui.small("System Light/Dark follows your desktop unless overridden in settings. Reduce animations is optional.");

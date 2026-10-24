@@ -53,6 +53,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_import_smoke.sh
       - name: Native keyboard-only profile goal transfer and isolation
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/goals_gui_smoke.sh
+      - name: Native keyboard Tab/Enter profile creation and guide visibility
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/keyboard_navigation_smoke.sh
       - name: X11 graphical smoke test (software-rendered)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/gui_smoke.sh
       - name: Build optimized Linux preview

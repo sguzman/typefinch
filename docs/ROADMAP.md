@@ -4,7 +4,7 @@
 
 **Overall:** `█████████░ 88%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
-## 🐣 M0 — Native typing MVP — `█████████░ 93%`
+## 🐣 M0 — Native typing MVP — `██████████ 95%`
 
 **Acceptance gate:** A working native session, reliable scoring, local profiles, and live Hyprland acceptance.
 
@@ -44,13 +44,13 @@
   - [x] Safe per-profile goal JSON export/import logic — src/goal_transfer.rs and src/app.rs: bounded/versioned goals-only JSON transfer, atomic 0600 private export, regular-file/symlink rejection, active-profile assignment with failed-save rollback; CI 40025534946: 141 Rust tests and full native graphical suite pass
   - [x] Native GUI goal import/export interaction and persistence — src/app.rs F12 keyboard focus to ordinary goal-import path, Enter validated import, and Shift+F12 explicit JSON export; tests/goals_gui_smoke.sh and tests/goals_gui_assert.lua exercise real native X11 egui interactions, versioned goal transfer, private on-disk settings and unchanged profile identity/test/score fields. GitHub Actions 40041334789: 155 Rust tests, goal imported/exported PASS, custom passage and full GUI QA passed. Not physical Hyprland acceptance.
 
-### ⌨️ P2 — Tests and core scoring — `██████████ 95%`
+### ⌨️ P2 — Tests and core scoring — `██████████ 100%`
 
-- ⚡ **T201** Typing input and session lifecycle — `████████░░ 75%`
+- ⚡ **T201** Typing input and session lifecycle — `██████████ 100%`
   - [x] Input handlers implemented — src/app.rs
   - [x] Start/cancel/restart coded — src/engine.rs
   - [x] End-to-end text/paste/focus QA — tests/gui_smoke.sh: real typed/paste prevention and two-window focus-loss cancellation, no SQLite row; Actions 39967868689
-  - [ ] IME support
+  - [x] IME support — src/app.rs system-mode egui ImeEvent Preedit/Commit and finalized text scoring with no premature candidate scoring or duplicate event admission; .github/workflows/ime-probe.yml, tests/fcitx_ime_gui_smoke.sh: GitHub Actions 40137985779 passed three actual Fcitx5/XIM engines (Chinese Pinyin 你, Japanese Anthy あ, Korean Hangul 한) on isolated X11/Xvfb/DBus, each one committed correct grapheme and exactly one persisted OS/custom SQLite attempt, not preedit. Earlier Actions 40126249778 independently passed the same 3-engine suite. Scope: supported virtual X11 XIM lifecycle; not native Hyprland/Wayland IME, physical typing, IBus or candidate-overlay positioning.
 - 📏 **T202** WPM and accuracy calculations — `██████████ 100%`
   - [x] Pure scoring function implemented — src/engine.rs
   - [x] Scoring tests authored — src/engine.rs
@@ -76,7 +76,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- ⌨️ Typing tests — `██████████ 95%`
+- ⌨️ Typing tests — `██████████ 100%`
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 

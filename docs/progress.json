@@ -200,7 +200,7 @@
               "id": "T201",
               "emoji": "⚡",
               "name": "Typing input and session lifecycle",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Input handlers implemented",
@@ -219,7 +219,8 @@
                 },
                 {
                   "text": "IME support",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs system-mode egui ImeEvent Preedit/Commit and finalized text scoring with no premature candidate scoring or duplicate event admission; .github/workflows/ime-probe.yml, tests/fcitx_ime_gui_smoke.sh: GitHub Actions 40137985779 passed three actual Fcitx5/XIM engines (Chinese Pinyin 你, Japanese Anthy あ, Korean Hangul 한) on isolated X11/Xvfb/DBus, each one committed correct grapheme and exactly one persisted OS/custom SQLite attempt, not preedit. Earlier Actions 40126249778 independently passed the same 3-engine suite. Scope: supported virtual X11 XIM lifecycle; not native Hyprland/Wayland IME, physical typing, IBus or candidate-overlay positioning."
                 }
               ]
             },

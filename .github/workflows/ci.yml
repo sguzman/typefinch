@@ -1,4 +1,9 @@
 name: Typefinch CI
+# GitHub commit statuses expose verified CI outcomes to repository tooling
+# that cannot enumerate Actions push runs. Only status metadata is published.
+permissions:
+  contents: read
+  statuses: write
 concurrency:
   group: typefinch-${{ github.workflow }}-${{ github.ref }}
   # Preserve running acceptance evidence when several directors push main.
@@ -132,3 +137,24 @@ jobs:
             typefinch-profile.md
             typefinch-profile.png
           if-no-files-found: ignore
+      - name: Publish machine-readable main-branch CI result
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Preserve the actual preceding job result. This status cannot
+          # make failing Rust/GUI checks pass or erase earlier failures.
+          case "${{ job.status }}" in
+            success) state=success ;;
+            failure) state=failure ;;
+            *) state=error ;;
+          esac
+          printf '{"state":"%s","context":"typefinch/full-native-ci","description":"Rust and virtual graphical acceptance","target_url":"%s/%s/actions/runs/%s"}' \
+            "$state" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" \
+            | curl --fail-with-body --silent --show-error --retry 2 \
+              -X POST -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              --data-binary @- "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+              >/dev/null

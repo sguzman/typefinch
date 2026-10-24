@@ -164,39 +164,42 @@ LUA
       exit 1
     }
     echo "Native $name writable editor cursor and shaped preview moved ($editor_delta pixels)"
-    # Genuine native partial-selection QA, not only Ctrl+A. Visual arrow
-    # direction at a bidirectional boundary can differ across platforms.
-    partial_count=0
+    # Select the *first Arabic/Hebrew logical grapheme* (including any
+    # diacritics), not the final ASCII digit in the mixed-script fixture.
+    # The visual arrow direction at an RTL boundary can differ by platform.
+    partial_status=''
     for direction in Right Left; do
-      xdotool key --clearmodifiers ctrl+End
+      xdotool key --clearmodifiers ctrl+Home
       sleep 0.15
       xdotool key --clearmodifiers "shift+$direction"
       sleep 0.3
-      partial_count="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+      partial_status="$(lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"))
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
-print(d.selected_graphemes)
+print(tostring(d.selected_graphemes)..":"..tostring(d.index))
 LUA
 )"
-      [[ "$partial_count" != 1 ]] || break
+      [[ "$partial_status" != "1:1" ]] || break
     done
-    [[ "$partial_count" == 1 ]] || {
-      echo "Native $name partial selection failed to isolate one grapheme: $partial_count" >&2
+    [[ "$partial_status" == "1:1" ]] || {
+      echo "Native $name first-script-grapheme selection failed: $partial_status" >&2
       exit 1
     }
     import -window "$window" "$tmp/rtl-$name-editor-partial.png"
     convert "$tmp/rtl-$name-editor-partial.png" \
       -crop 195x58+120+467 +repage "$tmp/$name/editor-partial-preview.png"
+    convert "$tmp/rtl-$name-editor-start.png" \
+      -crop 195x58+120+467 +repage "$tmp/$name/editor-start-preview.png"
     partial_pixels="$(compare -metric AE \
-      "$tmp/$name/editor-end-preview.png" \
+      "$tmp/$name/editor-start-preview.png" \
       "$tmp/$name/editor-partial-preview.png" null: 2>&1 || true)"
     [[ "$partial_pixels" =~ ^[0-9]+$ && "$partial_pixels" -gt 8 ]] || {
       echo "Partial $name selection did not visibly change shaped preview ($partial_pixels)" >&2
       exit 1
     }
-    echo "Native $name partial RTL selection PASS: one grapheme; $partial_pixels preview pixels changed"
+    echo "Native $name first RTL script grapheme selection PASS: one cluster; $partial_pixels preview pixels changed"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi

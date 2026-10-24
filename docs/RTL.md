@@ -326,3 +326,23 @@ prove that the UI's editable text caret or compositor IME behaves correctly.
 The acceptance tracker is [progress.json](progress.json); human-readable
 percentages are rendered from it. Failed acceptance evidence is kept
 distinct from feature planning. No real private passage is needed in CI.
+
+## Pending native Weston/Wayland RTL editor QA (not yet accepted)
+
+The native virtual-Wayland GUI fixture was extended on `main` at commits
+[`e244360`](https://github.com/sguzman/typefinch/commit/e2443602b35951db53a6413c678e885a9fe68022),
+[`3d63c41`](https://github.com/sguzman/typefinch/commit/3d63c41de129c8818af1ffedb9543380881163b4), and
+[`274604f`](https://github.com/sguzman/typefinch/commit/274604fe7eae90db46bab8234ed027cd2bb0ea73).
+It now requests, for separate Arabic and Hebrew marked-grapheme fixtures,
+selection -> native Backspace -> Undo with source-length assertions, and a
+Ctrl+Shift+End full-range selection -> Ctrl+Shift+Home retraction. It also
+archives paired synthetic-only screenshots and requires a visible image change
+on whole-range selection. The runtime exercises the existing editable egui
+TextEdit through Weston wl_keyboard, not a mocked editor or an alternate input
+implementation. Neither fixture text nor its local path is placed in reports.
+
+**Evidence gate still open:** these new checks need a completed green CI run
+and inspection of the archived frames before any acceptance percentage changes.
+A passing virtual Weston test would still not establish physical Hyprland
+keyboards, native Wayland Fcitx/IBus candidate UI, or complete arbitrary BiDi
+mouse hit-testing. T804 remains partially accepted.

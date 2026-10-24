@@ -313,3 +313,32 @@ The application does **not** infer Right Alt from egui's generic `alt`
 flag, which may represent Left Alt or AltGr depending on the compositor.
 Reliable physical Right-Alt/AltGr event attribution, scored native in-app
 modifier routing and T303's full Shift/AltGr/dead-key acceptance remain open.
+
+## Four complete English starter ANSI base/Shift layers — accepted
+
+[GitHub Actions 40143940280](https://github.com/sguzman/typefinch/actions/runs/40143940280)
+passed **230 Rust tests and the complete native graphical suite** on
+[`99acb6c`](https://github.com/sguzman/typefinch/commit/99acb6c7278f399051fc638e8d8b9a61579822cc).
+The native X11 test exercises actual physical-position key events into the
+unmodified Typefinch GUI, with one complete 21-key number/edge punctuation
+sequence at Base and again at Shift, for **42/42 correct scored graphemes**
+in each of eight isolated cases: US QWERTY, Dvorak, Colemak and Colemak-DH,
+each with libxkbcommon and with its keymap library intentionally unavailable
+(forced offline built-in tables). It also presses Ctrl, Left Alt and
+Ctrl+Shift shortcuts ahead of scoring and requires unchanged final attempts,
+correctness, per-session SQLite input provenance and no private passage/path
+persistence. An existing independent Rust parity test checks every modeled
+ANSI base/Shift key, 48 positions per starter map, against installed XKB.
+
+Eight screenshots are archived in the `typefinch-gui-smoke` artifact under
+`typefinch-starter-full-*.png`. Representative US, Dvorak, Colemak and
+Colemak-DH captures were opened and inspected: native score 42/42, full
+progress bar, active input target identity and matching keyboard preview.
+The synthetic fixtures contain no personal typing or hardware identifiers.
+
+**Boundary:** This accepts the four **starter software** layouts' explicit
+ANSI Base/Shift and punctuation behavior and suppression of ordinary
+shortcut-modified letters. It is **not** physical Right Alt/AltGr
+attribution, Caps Lock behavior on real keyboards, arbitrary ISO/JIS
+national-edge routing or a real Hyprland device/IME test. Those independent
+T303/T305/hardware criteria remain open. There is no global key interception.

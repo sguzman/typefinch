@@ -293,5 +293,52 @@ assert(back.total==start.total and back.index==0 and back.selected_graphemes==0,
 print("Native Wayland whole-range mixed-direction selection PASS: 0 -> "..
   selected.selected_graphemes.." -> 0")
 LUA
+  # Real Weston wl_pointer dragging in the native *editable* Arabic/Hebrew
+  # TextEdit. Click and drag within the rendered marked-script first line;
+  # read only logical counts, never the selected source bytes. Both drag
+  # directions should select complete grapheme clusters and leave the
+  # source unchanged. This tests a limited same-line pointer range, not
+  # arbitrary mixed BiDi visual hit testing or production Hyprland.
+  xdotool mousemove --window "$parent" 30 439 mousedown 1
+  sleep 0.12
+  xdotool mousemove --window "$parent" 92 439
+  sleep 0.25
+  xdotool mouseup 1
+  sleep 0.25
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-pointer-forward.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-pointer-forward.png"
+  xdotool mousemove --window "$parent" 92 439 mousedown 1
+  sleep 0.12
+  xdotool mousemove --window "$parent" 30 439
+  sleep 0.25
+  xdotool mouseup 1
+  sleep 0.25
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-pointer-backward.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-pointer-backward.png"
+  lua5.4 - "$tmp/$script-start.json" "$tmp/$script-pointer-forward.json" \
+      "$tmp/$script-pointer-backward.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local file=assert(io.open(path,"rb"),"Native pointer-drag audit missing")
+  local data=assert(json.decode(assert(file:read("*a"))));file:close()
+  assert(data.synthetic and data.state=="rtl-editor-caret"
+    and data.caret_positioned and type(data.index)=="number"
+    and type(data.selected_graphemes)=="number")
+  return data
+end
+local baseline,forward,backward=read(arg[1]),read(arg[2]),read(arg[3])
+assert(baseline.total>8 and forward.total==baseline.total
+  and backward.total==baseline.total,
+  "Native pointer gesture mutated the source instead of selecting it")
+assert(forward.selected_graphemes>=1 and forward.selected_graphemes<forward.total
+  and backward.selected_graphemes>=1 and backward.selected_graphemes<backward.total,
+  string.format("Native RTL pointer drag did not select a nonempty bounded range: %d/%d",
+    forward.selected_graphemes,backward.selected_graphemes))
+assert(forward.index>=0 and forward.index<=forward.total and
+  backward.index>=0 and backward.index<=backward.total)
+print("Native Wayland marked-script real pointer-drag selection PASS: "..
+  forward.selected_graphemes.." forward / "..backward.selected_graphemes..
+  " reverse logical graphemes, full source preserved")
+LUA
 done
-echo "Nested Weston Wayland Arabic/Hebrew editing and full-range selection regressions PASS"
+echo "Nested Weston Wayland Arabic/Hebrew editing, full-range and pointer-selection regressions PASS"

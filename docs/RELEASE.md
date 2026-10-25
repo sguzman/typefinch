@@ -70,6 +70,14 @@ preflight refuses symlinked notice destinations before writing a binary. Tar met
 are normalized for repeatable archives *given identical binary contents*;
 the Rust executable is not independently proven reproducible.
 
+**Acceptance evidence:** [CI 40238040039](https://github.com/sguzman/typefinch/actions/runs/40238040039)
+passed the original pinned-egui optimized build, deterministic archive
+hash check and user-local install/upgrade/rollback. The subsequent
+installer hardening additionally requires vendored upstream notices to be
+installed byte-for-byte and refuses symlinked notice destinations before
+writing the executable. These new safeguards require their own fresh
+`[package]` run; prior artifacts do not retroactively establish them.
+
 No GitHub Releases or tags are created by the CI preview job. Publication
 and MVP acceptance remain separate release gates.
 

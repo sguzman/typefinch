@@ -365,6 +365,26 @@ mod tests {
             assert_eq!(shaper.hit_test_byte(text,320,257,1.0,1.0),None);
         }
     }
+    #[test] fn shaped_pointer_hit_offsets_are_line_relative_not_document_relative(){
+        // Each newline advances the logical byte origin by one. A hit in
+        // the third visual paragraph must never resolve into the Arabic
+        // or Hebrew paragraph that preceded it.
+        let reference="ab\nשָׁלוֹם\ncd";
+        let mut painter=Renderer::new();
+        let starts=[0,3,3+"שָׁלוֹם".len()+1];
+        let ends=[2,3+"שָׁלוֹם".len(),reference.len()];
+        for (line,y) in [(0,15.0),(1,45.0),(2,75.0)]{
+            let mut hits=0;
+            for x in [2.0,12.0,48.0,110.0,200.0]{
+                if let Some(byte)=painter.hit_test_byte(reference,320,120,x,y){
+                    assert!(byte>=starts[line] && byte<=ends[line],
+                        "Visual line {line} wrongly resolved into another source paragraph: {byte}");
+                    hits+=1;
+                }
+            }
+            assert!(hits>0,"COSMIC layout did not permit an in-bounds line hit");
+        }
+    }
     #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){
         let hebrew="שָׁלוֹם";
         assert_eq!(snap_partial_selection(hebrew,1,0,0),Some(3));

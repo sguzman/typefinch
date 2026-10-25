@@ -624,6 +624,42 @@ assert(up.index>=22 and up.index<37 and up.caret_y_px>=25 and up.caret_y_px<55
 print("Native mixed BiDi drag selection PASS: "..down.selected_graphemes.." / "..
   up.selected_graphemes.." graphemes, visual rows "..down.caret_y_px.." / "..up.caret_y_px)
 LUA
+    # Cross visual rows in the shaped, noneditable preview itself.
+    # The fixture has mixed RTL/Latin first line at y≈515 and a Latin
+    # second line at y≈545. COSMIC must hand this real drag to the
+    # native source editor at correct logical newline-aware offsets.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool mousemove --window "$window" 220 516 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 80 548
+    sleep 0.25
+    xdotool mouseup 1
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-preview-cross-row.json"
+    import -window "$window" "$tmp/rtl-mixed-preview-cross-row.png"
+    lua5.4 - "$tmp/$name/mixed-preview-cross-row.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing native cross-row preview audit")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned
+  and d.total==54 and d.selected_graphemes>=8
+  and d.selected_graphemes<d.total and d.index>=22 and d.index<=54
+  and d.caret_y_px>20,
+  "Shaped preview cross-row RTL/Latin drag failed to select in the source editor")
+print("Native mixed BiDi shaped-preview cross-row drag PASS: "..
+  d.selected_graphemes.." graphemes, active caret "..d.index)
+LUA
+    convert "$tmp/rtl-mixed-editor-start.png" -crop 285x94+12+487 +repage \
+      "$tmp/$name/mixed-preview-cross-row-base.png"
+    convert "$tmp/rtl-mixed-preview-cross-row.png" -crop 285x94+12+487 +repage \
+      "$tmp/$name/mixed-preview-cross-row-highlight.png"
+    cross_row_pixels="$(compare -metric AE "$tmp/$name/mixed-preview-cross-row-base.png" \
+      "$tmp/$name/mixed-preview-cross-row-highlight.png" null: 2>&1 || true)"
+    [[ "$cross_row_pixels" =~ ^[0-9]+$ && "$cross_row_pixels" -gt 80 ]] || {
+      echo "Shaped mixed cross-row preview failed to visibly highlight selection" >&2
+      exit 1
+    }
     # Replace an actual pointer-selected range spanning Latin and RTL
     # paragraphs, then undo. The earlier test only inspected selection
     # counts; it could pass even if an edit silently corrupted equal-length

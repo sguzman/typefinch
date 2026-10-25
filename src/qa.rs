@@ -145,6 +145,10 @@ pub fn write_training_followup_audit(c:crate::training::Comparison)->Result<(),S
         "before_wpm":c.baseline_wpm,"after_wpm":c.retest_wpm,
         "before_attempts":c.baseline_attempts,
         "after_attempts":c.retest_attempts,
+        "before_reference_observed":c.baseline_opportunities.observed,
+        "before_reference_missed":c.baseline_opportunities.missed,
+        "after_reference_observed":c.retest_opportunities.observed,
+        "after_reference_missed":c.retest_opportunities.missed,
         "causal_claim":false
     });
     fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)

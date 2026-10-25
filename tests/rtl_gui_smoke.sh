@@ -367,6 +367,30 @@ LUA
       exit 1
     }
     echo "Native shaped-preview selection editing and byte-exact Undo PASS"
+    # A preview gesture may end just outside its bitmap. The renderer must
+    # clamp the active visual endpoint, retain an actual grapheme-safe editor
+    # selection, and never guess or mutate source text.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool mousemove --window "$window" 175 521 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 355 548
+    sleep 0.25
+    xdotool mouseup 1
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-edge.json"
+    import -window "$window" "$tmp/rtl-$name-preview-edge.png"
+    lua5.4 - "$tmp/$name/preview-edge.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing native RTL edge-drag audit")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned
+  and d.total>8 and d.selected_graphemes>=2
+  and d.selected_graphemes<d.total,
+  "Releasing outside the visual preview must retain a bounded source selection")
+print("Native RTL shaped-preview out-of-bounds release PASS: "..
+  d.selected_graphemes.." selected graphemes")
+LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
     # Real source mutation, not only caret painting. Select the first marked

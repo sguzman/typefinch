@@ -17,6 +17,30 @@ fragment cap are **engineering behavior**, not evidence of learning.
 - The `T502: Training efficacy tests` check in `docs/progress.json` remains
   **unaccepted** until actual comparative user-performance evidence exists.
 
+## Implemented: same-passage paired retest (not an efficacy result)
+
+The in-memory follow-up workflow in `src/training.rs` and `src/app.rs`
+now gives a completed non-lesson typing session the option to practice its
+observed difficult characters or two-grapheme pairs, then **retest the
+identical original reference**. The baseline and original target remain
+memory-only. Changing passage/settings/profile clears the trial; a changed
+input mode, layout, duration, language, scoring target or recorded seat
+provenance disqualifies the comparison. The drill itself is never treated
+as a comparable post-test. The retest shows raw accuracy change in
+percentage points, corrected WPM change, and any difference in attempt
+counts. The underlying normal scores remain per-profile SQLite aggregate
+records, but **no paired-trial identifier, passage, or character-level
+error stream is saved or uploaded**. Completing a drill alone cannot
+make the experiment show improvement.
+
+This is a **descriptive self-comparison**, useful feedback but not a test
+of causal efficacy. Retesting the same source introduces familiarity,
+practice, repetition, regression-to-the-mean and unequal-exposure biases.
+A positive, null or negative paired difference cannot pass T502's
+human training-efficacy gate. The original benchmark protocol below
+requires held-out transfer, an intervention control, counterbalanced
+order and delayed retention.
+
 ## Proposed empirical acceptance design (not implemented)
 
 A privacy-first evaluation should compare **adaptive targeting** against

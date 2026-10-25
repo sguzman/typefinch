@@ -251,6 +251,47 @@ mod tests {
         assert_eq!(snap_drag_selection(emoji,3,0),None);
         assert_eq!(snap_drag_selection(emoji,4,0),None);
     }
+    #[test] fn all_mixed_script_pointer_drags_snap_to_exact_unicode_boundaries(){
+        // Exhaustively check every ordered scalar-cursor pair rather than
+        // assuming a particular visual direction or one Arabic/Hebrew mark.
+        // These fixtures also cover flags, ZWJ sequences, decomposed Latin,
+        // Indic ligatures and adjacent RTL/LTR punctuation.
+        for text in [
+            "سَلَام 123 שָׁלוֹם",
+            "👩‍💻 شَ שָׁ e\u{301} 🇲🇽",
+            "English (שָׁלוֹם) العربية!",
+            "क्‍ष مَرْحَبًا 👨‍👩‍👧‍👦",
+        ] {
+            let total=text.chars().count();
+            let starts=text.grapheme_indices(true).map(|(offset,_)|
+                text[..offset].chars().count()).chain(std::iter::once(total))
+                .collect::<std::collections::HashSet<_>>();
+            for anchor in 0..=total {
+                for active in 0..=total {
+                    if active==anchor {
+                        assert_eq!(snap_drag_selection(text,active,anchor),None);
+                        continue;
+                    }
+                    let (fixed_active,fixed_anchor)=
+                        snap_drag_selection(text,active,anchor)
+                        .unwrap_or((active,anchor));
+                    assert!(starts.contains(&fixed_active),
+                        "active cursor split Unicode grapheme: {text:?} ({active},{anchor})");
+                    assert!(starts.contains(&fixed_anchor),
+                        "anchor cursor split Unicode grapheme: {text:?} ({active},{anchor})");
+                    let original_low=active.min(anchor);
+                    let original_high=active.max(anchor);
+                    assert!(fixed_active.min(fixed_anchor)<=original_low
+                        && fixed_active.max(fixed_anchor)>=original_high,
+                        "normalization must never shrink an actual pointer selection");
+                    assert_eq!(fixed_active<fixed_anchor,active<anchor,
+                        "normalization must preserve selection direction");
+                }
+            }
+            assert_eq!(snap_drag_selection(text,total+1,0),None);
+            assert_eq!(snap_drag_selection(text,0,total+1),None);
+        }
+    }
     #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){
         let hebrew="שָׁלוֹם";
         assert_eq!(snap_partial_selection(hebrew,1,0,0),Some(3));

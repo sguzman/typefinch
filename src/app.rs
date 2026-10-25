@@ -1787,7 +1787,41 @@ impl Typefinch {
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
             ui.label(RichText::new("RTL shaped preview (read-only)").strong());
             let response=ui.add(egui::Image::new((texture.id(),
-                egui::vec2(width as f32,height as f32))));
+                egui::vec2(width as f32,height as f32)))
+                .sense(egui::Sense::click()));
+            // Only an explicit click on the shaped preview repositions the
+            // ordinary native TextEdit caret. The preview itself remains
+            // read-only and takes no keyboard, clipboard or IME ownership.
+            // COSMIC gives a *logical* cursor from visual BiDi glyph
+            // geometry, then bounds/snaps that position to a Unicode
+            // grapheme before mapping to egui's scalar cursor index.
+            if self.rtl_raw_editor_open && self.session.state!=State::Running
+                && response.clicked()
+                && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_)))) {
+                if let Some(pointer)=response.interact_pointer_pos(){
+                    let local=pointer-response.rect.min;
+                    if let Some(at)=self.rtl_renderer.get_or_insert_with(
+                            rtl_shaping::Renderer::new)
+                        .hit_test_byte(&preview,width,height,local.x,local.y) {
+                        if let Some(byte)=skipped.checked_add(at).filter(|b|
+                            *b<=self.custom_text.len() && self.custom_text.is_char_boundary(*b)){
+                            let scalar=self.custom_text[..byte].chars().count();
+                            let id=egui::Id::new("custom_text_editor");
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id){
+                                let cursor=egui::text::CCursor::new(scalar);
+                                state.cursor.set_char_range(Some(
+                                    egui::text::CCursorRange::two(cursor,cursor)));
+                                state.store(ui.ctx(),id);
+                                ui.ctx().memory_mut(|m|m.request_focus(id));
+                                self.rtl_editor_cursor_byte=Some(byte);
+                                self.rtl_editor_selection_bytes=None;
+                                self.rtl_editor_signature.clear();
+                                ui.ctx().request_repaint();
+                            }
+                        }
+                    }
+                }
+            }
             if self.rtl_raw_editor_open
                 && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
                 if let Some((x,y))=self.rtl_editor_caret {

@@ -51,7 +51,8 @@ for form in directory file ancestor readme bin;do
     directory) ln -s "$tmp/outside" "$target" ;;
     file) mkdir -p "$target"
       ln -s "$tmp/outside/notices" "$target/LICENSE-MIT" ;;
-    ancestor) ln -s "$tmp/outside" "$(dirname "$target")" ;;
+    ancestor) rmdir "$(dirname "$target")"
+      ln -s "$tmp/outside" "$(dirname "$target")" ;;
     readme) mkdir -p "$blocked/share/doc/typefinch"
       ln -s "$tmp/outside/readme" "$blocked/share/doc/typefinch/README.md" ;;
     bin) mkdir -p "$blocked"

@@ -2731,6 +2731,7 @@ impl eframe::App for Typefinch {
                             ui.label("Tab / Shift+Tab: move focus through controls; Enter / Space: activate the focused control.");
                             ui.label("F1: guide · F2: typing focus · F3: modifier layer · F4: keyboard shape · F5: start/restart · Escape: cancel.");
                             ui.label("Ctrl+N: new profile name (Tab, Enter) · Ctrl+Shift+T: cycle System/Light/Dark theme.");
+                            ui.label("After a finished test: Ctrl+Shift+K practices missed keys; after that drill, Ctrl+Shift+R retests the identical original passage (observational only).");
                             ui.label("F11 / Ctrl+O: custom passage path; F12: profile goals import; Shift+F12: export goals.");
                             ui.label("F6: SVG + Markdown · F7: history JSON · F8: private backup · F9: PNG · F10: keyboard section.");
                             ui.label("When typing, the focus must be on the typing surface. Switching window focus cancels the current test without saving.");

@@ -28,6 +28,7 @@ start_app(){
   mkdir -p "$tmp/$label/config"
   export XDG_CONFIG_HOME="$tmp/$label/config"
   export TYPEFINCH_QA_REPORT="$tmp/$label/result.json"
+  export TYPEFINCH_QA_START_REPORT="$tmp/$label/started.json"
   ./target/debug/typefinch >"$tmp/$label/app.log" 2>&1 &
   app_pid=$!
   window=""
@@ -203,10 +204,26 @@ LUA
     xdotool type --clearmodifiers --delay 10 "$tmp/$label-source.txt"
     xdotool key --clearmodifiers Return
     sleep 0.3
+    rm -f "$TYPEFINCH_QA_START_REPORT"
     xdotool key --clearmodifiers F5
-    sleep 0.18
+    # Confirm this specific *running* native GUI session has actually
+    # accepted F5 and installed the full 42-grapheme reference before
+    # sending any rapid physical-position events.
+    running=0
+    for _ in $(seq 1 80);do
+      if [[ -s "$TYPEFINCH_QA_START_REPORT" ]] &&
+        lua5.4 - "$TYPEFINCH_QA_START_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="running" and r.expected_graphemes==42)
+LUA
+      then running=1;break;fi
+      sleep 0.15
+    done
+    ((running==1)) || { echo "Native $label never entered the expected running 42-grapheme test" >&2;exit 1; }
     xdotool key --clearmodifiers F2
-    sleep 0.18
+    sleep 0.35
     # A held Ctrl or ordinary Left Alt is a shortcut, not a printable
     # emulated position. Neither combination may add a scored attempt.
     # Real physical RightAlt/Level-3 detection remains a separate gate.
@@ -219,7 +236,21 @@ LUA
     for code in "${full_codes[@]}";do
       xdotool key --clearmodifiers "shift+$code"
     done
-    sleep 0.6
+    # The event loop may need another frame to finish/persist the
+    # last scored event. Check the real report rather than a fixed delay.
+    completed=0
+    for _ in $(seq 1 80);do
+      if [[ -s "$TYPEFINCH_QA_REPORT" ]] &&
+        lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local r=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(r.synthetic and r.state=="finished")
+LUA
+      then completed=1;break;fi
+      sleep 0.15
+    done
+    ((completed==1)) || { echo "Native $label did not finish after all physical positions" >&2;exit 1; }
     lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" \
       "$tmp/$label-source.txt" <<'LUA'
 local json=require("dkjson")

@@ -528,3 +528,52 @@ hardware Hyprland behavior, arbitrary multiline BiDi interactions, native
 Fcitx/IBus candidate positioning, or every accessibility pathway. T804's
 broader RTL-test gate remains open; its 67% task completion and the overall
 90.46% acceptance ledger are intentionally unchanged.
+
+## Native source-anchored Shift-click
+
+The shaped, **noneditable** Arabic/Hebrew preview now accepts Shift+click
+to extend an existing selection in the actual egui multiline TextEdit.
+It reuses the original logical selection anchor (including an anchor from
+a prior keyboard or pointer selection), snaps both endpoints to whole
+Unicode graphemes and preserves reverse selection orientation. Plain
+click collapses the selection; drag selection remains independently
+supported. The source TextEdit still owns all typed input, Undo and IME
+events, with no global event subscription.
+
+[Full CI 40217555758](https://github.com/sguzman/typefinch/actions/runs/40217555758)
+passed **247 Rust tests**, the complete nested Weston native Wayland GUI
+suite, and all native X11 tests:
+
+- **Wayland:** real `wl_pointer` Shift+click on Arabic extended then
+  retracted a source selection **16 → 2 graphemes**; Hebrew **12 → 2**.
+  A subsequent ordinary click collapsed the range. The existing
+  native pointer drag, IME-preedit guard and source Undo regressions
+  continued to pass.
+- **X11:** real XTest Shift+click on marked Arabic extended then
+  retracted selection **16 → 4 graphemes**; marked Hebrew **7 → 3**.
+  Ordinary click collapsed both selections.
+- **Actual edit and recovery:** the source editor replaced a
+  Shift+click-selected Arabic range of **10/17** graphemes with one
+  Latin grapheme, leaving **8** total. Native Undo restored **17**;
+  a UTF-8 clipboard comparison proved **byte-exact recovery** of
+  all original marks. The Hebrew case selected **7/15**, replacement
+  left **9**, Undo restored **15** and the same exact-source check passed.
+- **Pure unit checks:** direct whole-grapheme click mapping rejects
+  invalid offsets, plain click collapses, and repeated forward/reverse
+  Shift+click preserves the original source anchor across both scripts.
+
+The earlier failed X11 test asserted partial selection at a Hebrew
+visual coordinate that actually selected all 15 graphemes; an archived
+screenshot confirmed full native selection. Another discarded test
+replaced nearly all Arabic glyphs, causing the app correctly to exit
+RTL-preview mode, so its RTL-only numeric audit stopped updating.
+The accepted test now chooses previously measured partial-range
+positions and separately retains near-complete-selection coverage.
+Neither failure was marked as acceptance.
+
+The implementation also cancels transient RTL preedit ownership on
+application focus loss, and the preview instructions now mention
+Shift+click. This remains evidence for the specified virtual X11
+and nested Wayland behavior, **not** full native Hyprland RTL/IME
+acceptance. T804 stays **67%** and overall acceptance **90.46%** until
+the broader remaining gates can genuinely be verified.

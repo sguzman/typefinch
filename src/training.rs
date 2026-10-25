@@ -120,6 +120,31 @@ mod tests {
         assert!(FollowUp::begin(&Session::new_with_custom(0,TestMode::Lesson,"x"),
             "x","id","us","os:unknown",Mode::System).is_none());
     }
+    #[test] fn unicode_reference_and_changed_duration_must_not_create_false_transfer(){
+        let reference="سَلَام שָׁלוֹם e\u{301}";
+        let mut baseline=Session::new_with_custom(0,TestMode::Custom,reference);
+        baseline.begin();
+        baseline.type_text(reference);
+        assert_eq!(baseline.state,State::Finished);
+        let mut follow=FollowUp::begin(&baseline,"س س","private","us","os:unknown",
+            Mode::System).expect("observational study baseline");
+        follow.stage=Stage::Retest;
+        let mut identical=Session::new_with_custom(0,TestMode::Custom,reference);
+        identical.begin();
+        identical.type_text(reference);
+        assert!(follow.compare(&identical,"os:unknown","private","us",
+            Mode::System).is_some());
+        let mut timed=Session::new_with_custom(60,TestMode::Custom,reference);
+        timed.begin();
+        timed.type_text(reference);
+        assert!(follow.compare(&timed,"os:unknown","private","us",Mode::System).is_none(),
+            "different timing conditions cannot be described as comparable");
+        let mut altered=Session::new_with_custom(0,TestMode::Custom,"سَلَام שָׁלוֹם e");
+        altered.begin();
+        altered.type_text("سَلَام שָׁלוֹם e");
+        assert!(follow.compare(&altered,"os:unknown","private","us",Mode::System).is_none(),
+            "a changed private passage must never match the baseline");
+    }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,
             baseline_wpm:30.0,retest_wpm:25.0,baseline_attempts:30,retest_attempts:50};

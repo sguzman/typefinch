@@ -300,6 +300,18 @@ assert(restored.total==original.total and restored.selected_graphemes==0,
 print("Native marked RTL grapheme editing PASS: "..original.total.." -> "
   ..deleted.total.." -> "..restored.total.." after selection, Backspace and Undo")
 LUA
+    # Length recovery alone cannot prove preservation of Arabic harakat
+    # or Hebrew niqqud. Compare the native editor's Ctrl+C output against
+    # the exact disposable UTF-8 source, without logging the copied text.
+    xdotool key --clearmodifiers ctrl+a
+    xdotool key --clearmodifiers ctrl+c
+    sleep 0.35
+    timeout 5s xclip -selection clipboard -o > "$tmp/$name/editor-restored.txt"
+    cmp -s "$tmp/$name.txt" "$tmp/$name/editor-restored.txt" || {
+      echo "Native $name marked-grapheme edit/Undo damaged original Unicode bytes" >&2
+      exit 1
+    }
+    echo "Native $name marked-grapheme Backspace/Undo byte-exact source PASS"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi

@@ -171,6 +171,32 @@ LUA
   [[ -s "$TYPEFINCH_QA_EDITOR_CARET_REPORT" ]] || {
     echo "Wayland $script native editor has no caret report" >&2;exit 1;
   }
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-click-before.json"
+  # Use the ACTUAL shaped COSMIC preview to seek a non-initial logical
+  # caret with a normal native wl_pointer click. The read-only preview
+  # must not modify text, create a selection or intercept typing; it
+  # hands a grapheme-aligned cursor to egui's existing source TextEdit.
+  xdotool mousemove --window "$parent" 258 539 click 1
+  sleep 0.5
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-click-after.json"
+  lua5.4 - "$tmp/$script-click-before.json" "$tmp/$script-click-after.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"))
+  local data=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(data.synthetic and data.state=="rtl-editor-caret" and data.caret_positioned)
+  return data
+end
+local before,after=read(arg[1]),read(arg[2])
+assert(before.index==0 and before.selected_graphemes==0)
+assert(after.total==before.total and after.index>0 and after.index<after.total
+  and after.selected_graphemes==0,
+  "Real COSMIC shaped-preview click did not move the native caret without changing source")
+print("Native Weston RTL visual hit-test and source caret move PASS: 0 -> "..after.index)
+LUA
+  import -window "$parent" "typefinch-wayland-rtl-$script-preview-click.png"
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"
   direction=''
   for side in Right Left;do

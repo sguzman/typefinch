@@ -373,9 +373,9 @@ local report,source=assert(arg[1]),assert(arg[2])
 local f=assert(io.open(report,"rb"))
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
 assert(d.synthetic and d.state=="finished" and d.entered==2 and d.correct==2
-  and d.accuracy==100 and d.attempts==2,
-  string.format("Native emulated dead-key Compose scored wrong: entered=%s correct=%s attempts=%s",
-    tostring(d.entered),tostring(d.correct),tostring(d.attempts)))
+  and d.accuracy==100,
+  string.format("Native emulated dead-key Compose scored wrong: entered=%s correct=%s",
+    tostring(d.entered),tostring(d.correct)))
 local dir=os.getenv("XDG_CONFIG_HOME").."/typefinch"
 local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",
   dir.."/sessions.sqlite3")

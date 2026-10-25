@@ -1892,6 +1892,33 @@ impl Typefinch {
                     }
                 }
             }
+            // A real Wayland pointer click may be delivered as one
+            // consolidated egui response without primary_pressed() remaining
+            // true by the time this widget is built. Preserve the previously
+            // accepted click-to-caret path independently of drag tracking.
+            if can_seek && response.clicked() {
+                if let Some(pointer)=response.interact_pointer_pos() {
+                    let local=pointer-response.rect.min;
+                    if let Some(active)=self.rtl_renderer.get_or_insert_with(
+                            rtl_shaping::Renderer::new)
+                        .hit_test_byte(&preview,width,height,local.x,local.y)
+                        .and_then(|at|skipped.checked_add(at)) {
+                        if let Some(range)=rtl_preview_editor_range(
+                                &self.custom_text,active,active) {
+                            let id=egui::Id::new("custom_text_editor");
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id) {
+                                state.cursor.set_char_range(Some(range));
+                                state.store(ui.ctx(),id);
+                                ui.ctx().memory_mut(|m|m.request_focus(id));
+                                self.rtl_editor_cursor_byte=Some(active);
+                                self.rtl_editor_selection_bytes=None;
+                                self.rtl_editor_signature.clear();
+                                ui.ctx().request_repaint();
+                            }
+                        }
+                    }
+                }
+            }
             if self.rtl_raw_editor_open
                 && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
                 if let Some((x,y))=self.rtl_editor_caret {

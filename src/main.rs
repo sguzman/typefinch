@@ -25,7 +25,7 @@ use eframe::egui;
 use std::path::PathBuf;
 
 #[derive(Debug,PartialEq,Eq)]
-enum LaunchIntent {Gui,Version,Help,InspectKeyboards,ProbeWaylandSeats,VerifyBackup(PathBuf,PathBuf),
+enum LaunchIntent {Gui,Version,Help,InspectKeyboards,ProbeWaylandSeats,ProbeWaylandXkbSeats,VerifyBackup(PathBuf,PathBuf),
     StageBackup(PathBuf,PathBuf,PathBuf),Invalid}
 fn intent(args:&[String])->LaunchIntent {
     match args {
@@ -34,6 +34,7 @@ fn intent(args:&[String])->LaunchIntent {
         [flag] if flag=="--help" || flag=="-h"=>LaunchIntent::Help,
         [flag] if flag=="--inspect-keyboards"=>LaunchIntent::InspectKeyboards,
         [flag] if flag=="--_probe_wayland_seats"=>LaunchIntent::ProbeWaylandSeats,
+        [flag] if flag=="--_probe_wayland_xkb_seats"=>LaunchIntent::ProbeWaylandXkbSeats,
         [flag,settings,database] if flag=="--verify-backup"=>
             LaunchIntent::VerifyBackup(PathBuf::from(settings),PathBuf::from(database)),
         [flag,settings,database,destination] if flag=="--restore-backup-to-new-dir"=>
@@ -52,7 +53,8 @@ fn inspection_snapshot(rows:&[devices::Keyboard])->serde_json::Value {
         "inspection_id":keyboard.address,
         "reported_active_keymap":reported(&keyboard.active_keymap),
         "configured_layout":reported(&keyboard.layout),
-        "configured_variant":reported(&keyboard.variant)
+        "configured_variant":reported(&keyboard.variant),
+        "seat_xkb_groups":keyboard.seat_xkb_groups
     })).collect::<Vec<_>>();
     serde_json::json!({
         "schema":1,
@@ -86,6 +88,16 @@ fn main() -> eframe::Result {
                     eprintln!("Wayland seat inspection failed: {err}");
                     std::process::exit(2);
                 },
+            }
+            return Ok(());
+        },
+        LaunchIntent::ProbeWaylandXkbSeats=>{
+            match wayland_seat::read_xkb_seats(){
+                Ok(seats)=>println!("{}",serde_json::to_string(&seats).expect("XKB seat metadata serializable")),
+                Err(err)=>{
+                    eprintln!("Wayland XKB seat inspection failed: {err}");
+                    std::process::exit(2);
+                }
             }
             return Ok(());
         },
@@ -176,6 +188,7 @@ mod cli_tests {
         }
         assert_eq!(intent(&["--unsupported".into()]),LaunchIntent::Invalid);
         assert_eq!(intent(&["--_probe_wayland_seats".into()]),LaunchIntent::ProbeWaylandSeats);
+        assert_eq!(intent(&["--_probe_wayland_xkb_seats".into()]),LaunchIntent::ProbeWaylandXkbSeats);
         assert_eq!(intent(&["--inspect-keyboards".into()]),LaunchIntent::InspectKeyboards);
         assert_eq!(intent(&["--version".into(),"junk".into()]),LaunchIntent::Invalid);
         let expected=LaunchIntent::VerifyBackup(PathBuf::from("a.json"),PathBuf::from("b.sqlite3"));

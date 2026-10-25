@@ -586,7 +586,7 @@
               "id": "T403",
               "emoji": "🪟",
               "name": "Generic compositor fallback",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Safe Hyprland-unavailable state coded",
@@ -600,7 +600,8 @@
                 },
                 {
                   "text": "Generic XKB seat detection",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/wayland_seat.rs native Wayland protocol XKB text-v1 keymap descriptor inspection using separate unfocused short-lived connection: bounded 4 MiB keymap compile, <=16 validated offered group labels, no event logging or physical-device inference; legacy capability-only probe remains unaffected. src/devices.rs parses strict aggregate seat group metadata and refuses malformed/double/oversized rows; src/app.rs displays offered groups while keeping active group unattributed; src/main.rs read-only inspect JSON exposes seat_xkb_groups, reported_active_keymap remains null. tests/wayland_virtual_seat_smoke.sh real nested Weston X11 virtual keyboard seat supplied actual XKB group labels through internal probe and public inspector; input-disabled and headless Weston, eight synthetic bad metadata/timeouts and no-attribution assertions retained. GitHub Actions 40148518400: 231 Rust tests and full native graphical suite passed. Accepted scope is generic XKB *keymap group detection* only; active group, physical keyboard identity and all generic Wayland OS-input attribution remain unknown."
                 },
                 {
                   "text": "X11 fallback",

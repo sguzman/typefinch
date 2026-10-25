@@ -41,6 +41,19 @@ export XDG_SESSION_TYPE=wayland WINIT_UNIX_BACKEND=wayland
 export TYPEFINCH_QA_REPORT="$tmp/geometry.json" TYPEFINCH_QA_PREVIEW_SHAPE=1
 # Disposable profile: never open the user's existing settings/database.
 cargo build --locked >/dev/null
+# Real, read-only compositor inventory parity. Keep names and opaque addresses
+# exclusively in the throwaway QA directory; report counts only.
+./target/debug/typefinch --inspect-keyboards >"$tmp/typefinch-devices.json"
+hyprctl -j devices >"$tmp/hyprland-devices.json"
+jq -e '.schema==1 and .capture_policy=="inspection-only" and
+  .input_attribution=="aggregate seat; no per-device key-event attribution"
+  and (.rows | type=="array")' "$tmp/typefinch-devices.json" >/dev/null ||
+  { echo "Typefinch live keyboard inspection is not read-only" >&2;exit 1; }
+observed="$(jq -r '.rows | length' "$tmp/typefinch-devices.json")"
+connected="$(jq -r '.keyboards | length' "$tmp/hyprland-devices.json")"
+[[ "$observed" =~ ^[0-9]+$ && "$connected" =~ ^[0-9]+$ &&
+   "$connected" -gt 0 && "$observed" == "$connected" ]] ||
+  { echo "Actual Hyprland keyboard inventory parity failed" >&2;exit 1; }
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app=$!
 found=0
@@ -148,7 +161,9 @@ if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
   done
 fi
 jq -n --argjson help_pixels "$pixels" --argjson theme_pixels "$theme_pixels" \
+  --argjson connected "$connected" \
   '{state:"passed",compositor:"real-hyprland",profile:"disposable",
+    actual_keyboard_inspection_rows:$connected,
     input:"targeted compositor shortcuts F1 F4 F10 Ctrl+Shift+T",
     help_changed_pixels:$help_pixels,light_dark_changed_pixels:$theme_pixels,
     illustrated_geometry:["ISO","JIS","navigation","keypad"],

@@ -23,6 +23,8 @@ impl Comparison {
 }
 pub struct FollowUp {
     pub reference:String,
+    /// Ephemeral generated practice target; never persisted in settings/history.
+    pub drill_reference:String,
     pub mode:TestMode,
     pub language:Language,
     pub difficulty:WordDifficulty,
@@ -36,14 +38,14 @@ pub struct FollowUp {
     pub comparison:Option<Comparison>,
 }
 impl FollowUp {
-    pub fn begin(session:&Session,profile_id:&str,chosen_layout:&str,
+    pub fn begin(session:&Session,drill:&str,profile_id:&str,chosen_layout:&str,
         recorded_layout:&str,input:Mode)->Option<Self>{
         if session.state!=State::Finished || session.mode==TestMode::Lesson
-            || session.target.is_empty() {return None;}
+            || session.target.is_empty() || drill.is_empty() {return None;}
         let baseline=session.score();
         if baseline.entered==0 || baseline.attempts==0 {return None;}
         Some(Self {
-            reference:session.target.clone(),mode:session.mode,
+            reference:session.target.clone(),drill_reference:drill.into(),mode:session.mode,
             language:session.language,difficulty:session.difficulty,
             duration:session.duration,profile_id:profile_id.into(),
             chosen_layout:chosen_layout.into(),recorded_layout:recorded_layout.into(),
@@ -86,7 +88,7 @@ mod tests {
         baseline.begin();
         baseline.type_text("xn an");
         assert_eq!(baseline.state,State::Finished);
-        let mut follow=FollowUp::begin(&baseline,"profile","us","us",Mode::Emulated).unwrap();
+        let mut follow=FollowUp::begin(&baseline,"n n","profile","us","us",Mode::Emulated).unwrap();
         assert_eq!(follow.stage,Stage::Drill);
         let mut after=Session::new_with_custom(0,TestMode::Custom,"an an");
         after.begin();
@@ -106,7 +108,7 @@ mod tests {
         let mut before=Session::new_with_custom(0,TestMode::Custom,"abc");
         before.begin();
         before.type_text("axc");
-        let mut follow=FollowUp::begin(&before,"id","us","os:unknown",Mode::System).unwrap();
+        let mut follow=FollowUp::begin(&before,"b b","id","us","os:unknown",Mode::System).unwrap();
         follow.stage=Stage::Retest;
         let mut drill=Session::new_with_custom(0,TestMode::Custom,"x x x");
         drill.begin();
@@ -114,9 +116,9 @@ mod tests {
         assert!(follow.compare(&drill,"os:unknown","id","us",Mode::System).is_none());
         assert!(follow.compare(&before,"os:unknown","id","us",Mode::System).is_some());
         assert!(FollowUp::begin(&Session::new_with_custom(0,TestMode::Custom,"x"),
-            "id","us","os:unknown",Mode::System).is_none());
+            "x","id","us","os:unknown",Mode::System).is_none());
         assert!(FollowUp::begin(&Session::new_with_custom(0,TestMode::Lesson,"x"),
-            "id","us","os:unknown",Mode::System).is_none());
+            "x","id","us","os:unknown",Mode::System).is_none());
     }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,

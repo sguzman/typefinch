@@ -74,6 +74,19 @@ fn rtl_preview_click_range(text:&str,active_byte:usize,
     }else{active_byte};
     rtl_preview_editor_range(text,active_byte,anchor)
 }
+/// Double-click selects the Unicode word under COSMIC's visual hit-test;
+/// the source remains owned by native TextEdit. Never include punctuation,
+/// whitespace, joined emoji or a partial combining-mark cluster.
+fn rtl_preview_word_range(text:&str,clicked_byte:usize)
+    ->Option<egui::text::CCursorRange> {
+    rtl_preview_editor_range(text,clicked_byte,clicked_byte)?;
+    let words=text.unicode_word_indices().map(|(start,word)|
+        (start,start+word.len())).collect::<Vec<_>>();
+    let bounds=words.iter().copied().find(|&(start,end)|
+        start<=clicked_byte && clicked_byte<end)
+        .or_else(||words.iter().copied().find(|&(_,end)|end==clicked_byte))?;
+    rtl_preview_editor_range(text,bounds.1,bounds.0)
+}
 fn rtl_preview_clamp_drag_endpoint(local:egui::Pos2,width:usize,height:usize)
     ->Option<egui::Pos2> {
     if width==0 || height==0 || width>2048 || height>256
@@ -1926,7 +1939,7 @@ impl Typefinch {
             // consolidated egui response without primary_pressed() remaining
             // true by the time this widget is built. Preserve the previously
             // accepted click-to-caret path independently of drag tracking.
-            if can_seek && response.clicked() {
+            if can_seek && (response.clicked() || response.double_clicked()) {
                 // A completed click is not a drag; discard its temporary
                 // press anchor after preserving the pre-click TextEdit range.
                 self.rtl_preview_drag_anchor=None;
@@ -1942,19 +1955,24 @@ impl Typefinch {
                         .and_then(|at|skipped.checked_add(at)) {
                         let id=egui::Id::new("custom_text_editor");
                         if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id) {
-                            if let Some(range)=rtl_preview_click_range(
-                                &self.custom_text,active,
-                                state.cursor.char_range(),shift_click) {
+                            let chosen=if response.double_clicked() {
+                                rtl_preview_word_range(&self.custom_text,active)
+                            }else{
+                                rtl_preview_click_range(&self.custom_text,active,
+                                    state.cursor.char_range(),shift_click)
+                            };
+                            if let Some(range)=chosen {
+                                let caret=rtl_shaping::editor_caret_byte(
+                                    &self.custom_text,range.primary.index).unwrap_or(active);
                                 let anchor=rtl_shaping::editor_caret_byte(
-                                    &self.custom_text,range.secondary.index)
-                                    .unwrap_or(active);
+                                    &self.custom_text,range.secondary.index).unwrap_or(caret);
                                 state.cursor.set_char_range(Some(range));
                                 state.store(ui.ctx(),id);
                                 ui.ctx().memory_mut(|m|m.request_focus(id));
-                                self.rtl_editor_cursor_byte=Some(active);
+                                self.rtl_editor_cursor_byte=Some(caret);
                                 self.rtl_editor_selection_bytes=
-                                    (active!=anchor).then_some((
-                                        active.min(anchor),active.max(anchor)));
+                                    (caret!=anchor).then_some((
+                                        caret.min(anchor),caret.max(anchor)));
                                 self.rtl_editor_signature.clear();
                                 ui.ctx().request_repaint();
                             }
@@ -1972,7 +1990,7 @@ impl Typefinch {
             }
             let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
                 self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
-            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click to move the caret, Shift+click to extend a selection, or drag across the shaped preview; only the source field above edits text. Complete BiDi/IME editing remains unverified.",
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click to move the caret, Shift+click or drag to extend a selection, or double-click a word; only the source field above edits text. Complete BiDi/IME editing remains unverified.",
                 first.saturating_add(1),last));
         }
     }
@@ -3316,6 +3334,29 @@ mod palette_tests {
             assert!(rtl_preview_clamp_drag_endpoint(
                 egui::pos2(1.0,1.0),w,h).is_none());
         }
+    }
+    #[test] fn shaped_preview_double_click_selects_whole_unicode_words() {
+        for source in [
+            "سَلَام, Latin (שָׁלוֹם)!",
+            "English 42, עברית; مَرْحَبًا",
+            "👩‍💻 شَ שָׁ cafe\\u{301} 🇲🇽",
+        ] {
+            for (start,word) in source.unicode_word_indices() {
+                let end=start+word.len();
+                if rtl_preview_editor_range(source,end,start).is_none() {continue;}
+                let selected=rtl_preview_word_range(source,start)
+                    .expect("Unicode lexical word must be selectable");
+                assert_eq!(selected.primary.index,source[..end].chars().count());
+                assert_eq!(selected.secondary.index,source[..start].chars().count());
+            }
+        }
+        let passage="שָׁלוֹם, مرحبا";
+        let comma=passage.find(',').unwrap();
+        assert!(rtl_preview_word_range(passage,comma+1).is_none(),
+            "punctuation/space boundary must not select an adjacent word");
+        assert!(rtl_preview_word_range(passage,"ש".len()).is_none(),
+            "no caret may bisect the Hebrew niqqud cluster");
+        assert!(rtl_preview_word_range(passage,passage.len()+1).is_none());
     }
     #[test] fn shaped_preview_shift_click_uses_native_anchor_in_both_directions() {
         let source="سَلَام Latin שָׁלוֹם";

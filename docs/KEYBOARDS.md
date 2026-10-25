@@ -23,7 +23,12 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 
 [Production CI 40235788506](https://github.com/sguzman/typefinch/actions/runs/40235788506) passed the complete locked native suite. Its physical-key fixture runs the actual Typefinch GUI on an isolated Xvfb/X11 seat with **host XKB set to US** and in-app emulation set to **German**. Real XTest key positions scored **6/6** expected graphemes: ordinary E, RightAlt+E (€), RightAlt+Q (@), ordinary E, ISO 102nd Base (<), and ISO 102nd Shift (>). A physical LeftAlt+E control did not add an attempt. SQLite reported the correct layout, Emulated input mode, and six correct attempts. Private source text and its path were absent from settings.
 
-This is not the older OS-committed-text AltGr test: RightAlt has a distinct egui 0.35 event, not a guessed `Modifiers.alt` flag. The app synthesizes the XKB modifier only after observing RightAlt, and refuses to treat LeftAlt as AltGr. The ISO extra key maps to Linux evdev **86** / X11 **94**. Source and tests are in `src/app.rs`, `src/xkb.rs` and `tests/egui035_physical_emulation_smoke.sh`; the latter is a permanent production CI gate.
+This is not the older OS-committed-text AltGr test: RightAlt has a distinct egui 0.35 event, not a guessed `Modifiers.alt` flag. The app synthesizes the XKB modifier only after observing RightAlt, and refuses to treat LeftAlt as AltGr. The ISO extra key maps to Linux evdev **86** / X11 **94**. Source and tests are in `src/app.rs`, `src/xkb.rs` and `tests/egui035_physical_emulation_smoke.sh`; the latter is a permanent production CI gate. An expanded
+[production run 40236809646](https://github.com/sguzman/typefinch/actions/runs/40236809646)
+passed an **8/8** physical-position sequence including RightAlt+ISO (`|`)
+and German Shift+RightAlt+S (`ẞ`); LeftAlt remained non-scoring.
+This accepts T303's scored XKB modifier and Compose criterion for its
+specified virtual input paths, not T305's broader JIS or hardware routing.
 
 The egui upgrade also exposed [upstream RTL glyph-index bug #8576](https://github.com/emilk/egui/issues/8576). Typefinch pins the narrowly patched third-party `epaint 0.35.0` source under `third_party/epaint-0.35.0` ([provenance and licenses](../third_party/epaint-0.35.0/UPSTREAM.md)). The locked native tests verify glyph/cursor extent and Arabic/Hebrew editing/Undo in X11 and nested Weston. No installed Cargo cache is patched during a production build.
 
@@ -187,10 +192,11 @@ graphical regression suite passed. This is standard X11 dead-key
 composition, not a live Fcitx/IBus CJK IME or the app's full software
 AltGr/Compose feature gate.
 
-**Not accepted:** reliable left-Alt versus right-Alt event attribution in
-Typefinch's *software-emulation* path, unusual AltGr layers and combinations,
-real keyboard hardware, production Hyprland and generic IME composition.
-T303's complete modifier criterion stays open.
+**Historical boundary of these older OS-input fixtures:** they did not test
+Typefinch's in-app LeftAlt/RightAlt distinction, Shift+AltGr layers,
+real keyboard hardware, production Hyprland or generic IME composition.
+A later native in-app emulation run now covers the former two under virtual X11.
+T303's app-local XKB Shift/AltGr/Compose criterion is accepted with the later production egui 0.35 virtual-X11 evidence; see the production section above. Real Hyprland/IME and per-device input remain separate open gates.
 
 ## Illustrative ANSI, ISO, JIS and split previews
 

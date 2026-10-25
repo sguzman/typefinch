@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 90%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 91%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `██████████ 95%`
 
@@ -80,11 +80,11 @@
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 84%`
+## 🗺️ M1 — Keyboard layout laboratory — `█████████░ 87%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
-### 🧬 P3 — Recognition, emulation and geometry — `█████████░ 92%`
+### 🧬 P3 — Recognition, emulation and geometry — `██████████ 97%`
 
 - 📖 **T301** Known layout catalog — `██████████ 100%`
   - [x] Curated identifiers and names coded — src/layouts.rs
@@ -95,10 +95,10 @@
   - [x] Physical key event handling coded — src/app.rs
   - [x] Native mapping QA — src/app.rs physical-key emulation and custom-layout event path exercised in GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
   - [x] Full modifiers and punctuation layers — src/layouts.rs all four 48-position English ANSI base/Shift symbol tables cross-checked against installed XKB; tests/starter_layout_gui_smoke.sh 8 real Xvfb/winit/egui native UI scoring cases: US QWERTY, Dvorak, Colemak and Colemak-DH each 42/42 with installed XKB and forced-offline fallback, including punctuation, Shift and negative Ctrl/left-Alt shortcut presses. SQLite layout/input mode/test mode/attempt counts and source non-persistence audited. GitHub Actions 40143940280: 230 Rust tests and entire graphical suite passed. Eight screenshots archived, sample US/Dvorak/Colemak/Colemak-DH frames inspected. This is starter ANSI software emulation, not native Hyprland hardware or trustworthy physical AltGr routing (T303/T305).
-- 🌐 **T303** libxkbcommon-backed full emulation — `████████░░ 75%`
+- 🌐 **T303** libxkbcommon-backed full emulation — `██████████ 100%`
   - [x] Compile installed keymaps — src/xkb.rs; GitHub Actions 39868627924 successfully compiled nine installed XKB layouts and passed mapping tests
   - [x] Session-local XKB Compose for ANSI dead keys and one-grapheme scoring — src/xkb.rs and src/app.rs: session-local XKB Compose, reset on restart/Backspace/cancel/focus loss; GitHub Actions 39985958620: 106 Rust tests and native X11 graphical suite passed
-  - [ ] Shift/AltGr/dead-key handling
+  - [x] Shift/AltGr/dead-key handling — Production egui 0.35 distinguishes physical LeftAlt and RightAlt; native virtual-X11 German software-emulation sequence scored 8/8 (E, RightAlt+E/Q, ISO 102nd Base/Shift/Level3, Shift+RightAlt+S Level4 U+1E9E) while LeftAlt+E did not score; complete GitHub Actions 40236809646 passed. Session-local Spanish XKB dead-acute + E emits one scored é and supports Shift+E, cancellation/reset; established in CI 39985958620 and subsequent green production regressions. Scope: virtual X11/software emulation, not live physical Hyprland or JIS extras.
   - [x] Layout regression corpus — src/xkb.rs: 20 golden symbol cases across US, German, French, Spanish, Latin American, Dvorak, Colemak, Russian, Greek, Hebrew and Arabic, including Shift, AltGr inspection and Unicode; GitHub Actions 39986908299: 107 Rust tests and native X11 graphical suite passed
 - 🛠️ **T304** User-editable custom layouts — `██████████ 100%`
   - [x] Editor and geometry — src/custom_layout.rs ANSI base/shift mapping with egui editor, validation; GitHub Actions run 39953436230: 79 Rust tests and native X11 graphical suite passed
@@ -135,7 +135,7 @@
 **Feature inventory** (computed from associated task progress):
 
 - 🗺️ Layout recognition — `█████████░ 89%`
-- 🔀 Software layout emulation — `█████████░ 90%`
+- 🔀 Software layout emulation — `██████████ 96%`
 - 🔌 Multi-keyboard selection — `███████░░░ 67%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`

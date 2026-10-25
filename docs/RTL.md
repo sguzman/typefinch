@@ -582,5 +582,5 @@ The implementation also cancels transient RTL preedit ownership on
 application focus loss, and the preview instructions now mention
 Shift+click. This remains evidence for the specified virtual X11
 and nested Wayland behavior, **not** full native Hyprland RTL/IME
-acceptance. T804 stays **67%** and overall acceptance **90.46%** until
+acceptance. T804 stays **67%** and overall acceptance as reported in the current roadmap until
 the broader remaining gates can genuinely be verified.

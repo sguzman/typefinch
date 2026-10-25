@@ -447,7 +447,7 @@
               "id": "T303",
               "emoji": "🌐",
               "name": "libxkbcommon-backed full emulation",
-              "progress": 75,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Compile installed keymaps",
@@ -461,7 +461,8 @@
                 },
                 {
                   "text": "Shift/AltGr/dead-key handling",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "Production egui 0.35 distinguishes physical LeftAlt and RightAlt; native virtual-X11 German software-emulation sequence scored 8/8 (E, RightAlt+E/Q, ISO 102nd Base/Shift/Level3, Shift+RightAlt+S Level4 U+1E9E) while LeftAlt+E did not score; complete GitHub Actions 40236809646 passed. Session-local Spanish XKB dead-acute + E emits one scored é and supports Shift+E, cancellation/reset; established in CI 39985958620 and subsequent green production regressions. Scope: virtual X11/software emulation, not live physical Hyprland or JIS extras."
                 },
                 {
                   "text": "Layout regression corpus",

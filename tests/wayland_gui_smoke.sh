@@ -295,6 +295,52 @@ LUA
     echo "Weston $script shaped-preview drag selection not visibly painted: $preview_pixels" >&2
     exit 1
   }
+  # Native Wayland Shift+click from the *shaped preview* extends the
+  # original source editor anchor. A second Shift+click moves the active
+  # cursor back; a plain visual click then collapses the selection.
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.25
+  xdotool keydown Shift_L
+  xdotool mousemove --window "$parent" 228 539 click 1
+  sleep 0.25
+  xdotool keyup Shift_L
+  sleep 0.45
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-preview-shift-first.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-preview-shift-first.png"
+  xdotool keydown Shift_L
+  xdotool mousemove --window "$parent" 325 539 click 1
+  sleep 0.25
+  xdotool keyup Shift_L
+  sleep 0.45
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-preview-shift-second.json"
+  lua5.4 - "$tmp/$script-preview-shift-first.json" \
+    "$tmp/$script-preview-shift-second.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native Wayland Shift-click audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local first,second=read(arg[1]),read(arg[2])
+assert(first.total>8 and first.selected_graphemes>=2
+  and first.selected_graphemes<first.total,
+  "Wayland shaped-preview Shift-click failed to extend source caret")
+assert(second.total==first.total and second.selected_graphemes<first.selected_graphemes,
+  "Wayland shaped-preview second Shift-click failed to keep original source anchor")
+print("Native Weston shaped-preview Shift-click PASS: "..
+  first.selected_graphemes.." -> "..second.selected_graphemes.." selected graphemes")
+LUA
+  xdotool mousemove --window "$parent" 275 539 click 1
+  sleep 0.4
+  lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret"
+  and d.caret_positioned and d.selected_graphemes==0,
+  "Wayland ordinary visual click failed to collapse extended selection")
+LUA
   xdotool key --clearmodifiers ctrl+Home
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"

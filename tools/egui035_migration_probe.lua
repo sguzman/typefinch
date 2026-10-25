@@ -204,6 +204,7 @@ replace([[let range=range.map(|mut range|{
                                     let mapped=egui::text::CCursorRange{
                                         primary:galley.cursor_from_pos(active-edit_output.galley_pos),
                                         secondary:galley.cursor_from_pos(anchor-edit_output.galley_pos),
+                                        h_pos:None,
                                     };
                                     if std::env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT").is_some() {
                                         eprintln!("egui035-wayland-cursor-reprojection valid={} primary={} anchor={} original={:?}",

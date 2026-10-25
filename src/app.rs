@@ -1785,7 +1785,7 @@ impl Typefinch {
             }
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
-            ui.label(RichText::new("RTL shaped preview (read-only)").strong());
+            ui.label(RichText::new("RTL shaped preview (click to position editor caret)").strong());
             let response=ui.add(egui::Image::new((texture.id(),
                 egui::vec2(width as f32,height as f32)))
                 .sense(egui::Sense::click()));
@@ -1832,7 +1832,7 @@ impl Typefinch {
             }
             let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
                 self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
-            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Editing stays in the native field above. The shaped preview colors selected glyphs; complete BiDi/IME editing remains unverified.",
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click the shaped preview to position the native source caret; only the field above edits text. Complete BiDi/IME editing remains unverified.",
                 first.saturating_add(1),last));
         }
     }

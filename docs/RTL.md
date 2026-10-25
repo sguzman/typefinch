@@ -499,3 +499,32 @@ remain outside these tests. T804's overall RTL acceptance check therefore
 remains **open at its previous 67%**, and the overall 41-task percentage is
 **unchanged at 90.46%**. The narrower editor regressions do not justify
 claiming general-purpose production RTL editing is complete.
+
+## Focus loss, bounded drag release and mixed visual rows
+
+- [CI 40209863359](https://github.com/sguzman/typefinch/actions/runs/40209863359)
+  passed 245 Rust tests and complete GUI regression. A native X11
+  pointer drag released beyond the shaped preview's right image edge
+  retained a bounded editable selection of **10 marked Arabic** or
+  **7 marked Hebrew** graphemes. Release is clamped to a finite,
+  resource-bounded image point; press must originate inside the preview.
+- [CI 40211286846](https://github.com/sguzman/typefinch/actions/runs/40211286846)
+  passed the complete suite after adding focus-loss and source-replacement
+  cancellation. An unfinished preview drag does not retain a stale
+  selection anchor across a lost app focus or a newly loaded private passage.
+- [CI 40211634328](https://github.com/sguzman/typefinch/actions/runs/40211634328)
+  passed **246 Rust tests** and the complete graphical suite. Its new
+  narrow wrapping test asserts that lower visual rows of a single long
+  mixed RTL paragraph resolve into later *logical* byte offsets without
+  splitting marked graphemes. The native X11 GUI then dragged across
+  the actual shaped preview from a mixed RTL line into a Latin line:
+  the editable source reported **18 selected graphemes**, active caret
+  index **28**, and visible selection paint. Replacing that range with
+  a Latin grapheme and Undo recovered the exact UTF-8 source bytes.
+
+These tests establish bounded and focus-safe drag interactions over the
+specified synthetic X11 and nested Weston scenarios. They do not certify
+hardware Hyprland behavior, arbitrary multiline BiDi interactions, native
+Fcitx/IBus candidate positioning, or every accessibility pathway. T804's
+broader RTL-test gate remains open; its 67% task completion and the overall
+90.46% acceptance ledger are intentionally unchanged.

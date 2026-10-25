@@ -71,13 +71,16 @@ and managed executable paths before writing a binary. Tar metadata and gzip head
 are normalized for repeatable archives *given identical binary contents*;
 the Rust executable is not independently proven reproducible.
 
-**Acceptance evidence:** [CI 40238040039](https://github.com/sguzman/typefinch/actions/runs/40238040039)
-passed the original pinned-egui optimized build, deterministic archive
-hash check and user-local install/upgrade/rollback. The subsequent
-installer hardening additionally requires vendored upstream notices to be
-installed byte-for-byte and refuses symlinked notice destinations before
-writing the executable. These new safeguards require their own fresh
-`[package]` run; prior artifacts do not retroactively establish them.
+**Acceptance evidence:** [production CI 40242423798](https://github.com/sguzman/typefinch/actions/runs/40242423798)
+passed 254 Rust tests and the complete X11/nested-Wayland suite, including
+4/4 native JIS RO/YEN Base/Shift scores and negative Japanese mode-key controls.
+[Optimized release CI 40242737495](https://github.com/sguzman/typefinch/actions/runs/40242737495)
+then passed the complete graphical suite, locked optimized build, archive/checksum,
+install/upgrade/rollback, and byte-for-byte installed notices for all three
+vendored egui 0.35 components. Its `typefinch-linux-preview` Actions artifact
+contains the tested unsigned archive and checksum. This proves the described
+Linux preview packaging and installer behavior, **not** bit-identical builds,
+real Hyprland keyboard attribution, or the remaining MVP acceptance gate.
 
 No GitHub Releases or tags are created by the CI preview job. Publication
 and MVP acceptance remain separate release gates.

@@ -33,15 +33,15 @@ if [[ "${1:-}" == --self-test ]];then
   for counterexample in \
     'Nested Weston real Wayland wl_keyboard PASS:' \
     'Native Weston wl_keyboard did not deliver the complete test';do
-    printf '%s\\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
       'Connection reset by peer' 'No scored native Wayland typing result' \
       "$counterexample" >"$file"
     if weston_pre_score_crash "$file";then exit 1;fi
   done
-  printf '%s\\n' 'Native application scoring mismatch' \
+  printf '%s\n' 'Native application scoring mismatch' \
     'No scored native Wayland typing result' >"$file"
   if weston_pre_score_crash "$file";then exit 1;fi
-  printf '%s\\n' 'Segmentation fault weston --backend=x11-backend.so' \
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
     'Native input wrong: 2/3' >"$file"
   if weston_pre_score_crash "$file";then exit 1;fi
   echo "External Weston pre-score retry guard positive/negative cases PASS"

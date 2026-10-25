@@ -214,7 +214,7 @@ impl Renderer {
         let cursor=borrowed.hit(x,y)?;
         // COSMIC's Cursor.index is line-relative BYTE position. Build
         // the same line-relative offset model used by render_with_caret.
-        let mut start=0;
+        let mut start=0_usize;
         let mut line=cursor.line;
         for piece in text.split('\n') {
             if line==0 {

@@ -186,6 +186,25 @@ replace([[let range=range.map(|mut range|{
                             let rendered_glyphs=edit_output.galley.rows.iter()
                                 .flat_map(|row|row.row.glyphs.iter().map(|glyph|glyph.chr))
                                 .collect::<String>();
+                            let glyph_chars=rendered_glyphs.chars().collect::<Vec<_>>();
+                            let mut cursor=0usize;
+                            let mut matched=Vec::new();
+                            for ch in self.custom_text.chars() {
+                                if let Some(rel)=glyph_chars[cursor..].iter().position(|g|*g==ch) {
+                                    cursor+=rel;
+                                    matched.push(cursor);
+                                    cursor+=1;
+                                } else {break;}
+                            }
+                            let coarse=|ch:char|->char {
+                                if ch.is_ascii_digit(){'D'} else if ch.is_whitespace(){'_'}
+                                else if ch.is_alphabetic(){'L'} else if ch.is_ascii_punctuation(){'P'}
+                                else {'x'}
+                            };
+                            eprintln!("egui035-wayland-glyph-map source_pattern={} glyph_pattern={} matching_prefix={} matched_glyph_indices={:?}",
+                                self.custom_text.chars().map(coarse).collect::<String>(),
+                                rendered_glyphs.chars().map(coarse).collect::<String>(),
+                                matched.len(),matched);
                             eprintln!("egui035-wayland-rtl-qa pointer focus={} source_chars={} source_bytes={} galley_chars={} galley_bytes={} galley_end={} rows={:?} glyphs_match_source={} output={:?} stored={:?} used={:?}",
                                 edit.has_focus(),self.custom_text.chars().count(),
                                 self.custom_text.len(),edit_output.galley.text().chars().count(),

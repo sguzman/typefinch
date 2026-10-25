@@ -21,7 +21,7 @@ The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommo
 
 ## Multiple keyboards
 
-- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland inspection rows and reported active keymaps. Other Wayland compositors expose **aggregate `wl_seat` capability metadata**, without active keymaps; genuine X11 sessions use `setxkbmap -query` for a single **configured aggregate seat**. None of these APIs attributes Typefinch typing events to physical keyboards.
+- **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland inspection rows and reported active keymaps. Other Wayland compositors expose **aggregate `wl_seat` capability metadata and configured XKB keymap group names**, not the active group; genuine X11 sessions use `setxkbmap -query` for a single **configured aggregate seat**. None of these APIs attributes Typefinch typing events to physical keyboards.
 - **Not implemented:** selecting a keyboard as an exclusive input source. Ordinary Wayland `wl_keyboard` is seat-level and can aggregate multiple physical keyboards.
 - **Future:** per-device event attribution only where a compositor-specific protocol or authorized opt-in evdev/libinput capture allows it. Never secretly capture keys or modify OS keyboard configuration.
 - If none of these inspectors is available, regular native typing remains available and the detection limitation is displayed.
@@ -236,7 +236,7 @@ Hyprland reports with any unaddressed, malformed, or duplicate keyboard identity
 
 ## Generic Wayland seat-capability fallback
 
-In a non-Hyprland Wayland session (declared `XDG_SESSION_TYPE=wayland` and a Wayland socket), Typefinch can query the standard `wl_registry` and `wl_seat` interfaces through the Rust `wayland-client` library. It obtains **seat names and a boolean keyboard-capability flag**, not key events or active keyboard layouts. It does **not** request `wl_keyboard`, derive individual physical devices, open `/dev/input`, or change compositor settings. Hyprland metadata remains the preferred inspector when available; the X11 aggregate fallback is used only for actual X11 sessions. The read-only Wayland probe is isolated in a short-lived subprocess with the existing three-second timeout and bounded output. Selecting an aggregate seat never offers a guessed XKB emulation target, and its input provenance remains `os:unknown`.
+In a non-Hyprland Wayland session (declared `XDG_SESSION_TYPE=wayland` and a Wayland socket), Typefinch queries the standard `wl_registry`/`wl_seat` interfaces through Rust `wayland-client`. It obtains **seat names and keyboard-capability flags**. A separate short-lived **unfocused** internal inspector also requests `wl_keyboard` solely to receive the offered XKB keymap descriptor and extract its human-readable group names. It does **not** create a Wayland surface, read/log/score key events, derive individual physical devices, open `/dev/input` or change compositor settings. It ignores every non-keymap keyboard event rather than treating it as input. The previous capability-only `--_probe_wayland_seats` diagnostic still never binds `wl_keyboard`. Hyprland metadata remains preferred when available, and X11 aggregate fallback is used only in X11 sessions. The inspector is bounded by a three-second subprocess deadline, at most 16 XKB groups per map and four MiB of descriptor data; only bounded seat/group labels leave the child. Configured groups are **not the active group**, are not valid physical input attribution, cannot become an emulation target via inferred layout, and all generic Wayland OS-input scores remain `os:unknown`.
 
 A read-only compositor query is triggered on startup, manual refresh, and focus-aware polling; generic Wayland seats are not presented as independently attributable keyboards. `wl_seat` may be absent or report no keyboard capability, in which case the inspector returns no seat rows and ordinary native typing remains available. Wayland's descriptive seat name is not guaranteed unique. Typefinch therefore distinguishes keyboard-capable seats using their `wl_registry` global IDs, accepting duplicate names while rejecting duplicate IDs. These identifiers are valid only for the current compositor instance and inspection context; they are **not** persistent physical-device identifiers or proof of key-event attribution.
 
@@ -250,9 +250,9 @@ Protocol: [Wayland core wl_seat](https://wayland.app/protocols/wayland) and [Way
 
 ## Read-only keyboard inspector CLI
 
-`typefinch --inspect-keyboards` launches no GUI and reads the same bounded, read-only compositor metadata as the keyboard panel. It outputs JSON with `schema: 1`, `capture_policy: "inspection-only"`, and `rows`. Each row has a descriptive `label`, opaque compositor-local `inspection_id`, and nullable `reported_active_keymap`, `configured_layout`, and `configured_variant`. Null means that information is not available. The X11 layout describes configured groups, **not the active input group**; standard Wayland seats have no verified active keymap, even when keyboard-capable. IDs are not physical input sources.
+`typefinch --inspect-keyboards` launches no GUI and reads the same bounded, read-only compositor metadata as the keyboard panel. It outputs JSON with `schema: 1`, `capture_policy: "inspection-only"`, and `rows`. Each row has a descriptive `label`, opaque compositor-local `inspection_id`, nullable `reported_active_keymap`, `configured_layout`, `configured_variant`, and a `seat_xkb_groups` array (the offered keymap groups; empty for other inspector backends). Null means that information is not available. The X11 layout describes configured groups, **not the active input group**; standard Wayland seats have no verified active keymap, even when keyboard-capable. IDs are not physical input sources.
 
-When no supported compositor or X11 session is available, the command emits an error on stderr, exits nonzero, and prints no success JSON. It never subscribes to `wl_keyboard`, opens raw input devices, intercepts keys, writes settings, or accesses saved profiles and sessions.
+When no supported compositor or X11 session is available, the command emits an error on stderr, exits nonzero, and prints no success JSON. It never creates a focused Wayland surface, reads raw input devices, records typing events, writes settings, or accesses saved profiles and sessions. Generic Wayland inspection briefly binds an unfocused `wl_keyboard` for the keymap descriptor only; this is **not** an active keyboard-event collector.
 
 [CI 40037472601](https://github.com/sguzman/typefinch/actions/runs/40037472601) passed 151 Rust tests and end-to-end CLI checks under actual nested Weston keyboard-capable and input-disabled virtual seats, an X11/Xvfb aggregate seat, and a disconnected session. The full native graphical suite passed separately in the same run. These tests do **not** establish live physical keyboard attribution, hardware hotplug, or active generic XKB seat detection.
 
@@ -377,3 +377,36 @@ stable through reordering and resets safely after removal.
 evidence of a real physical keyboard being attached or removed under Hyprland,
 per-device keyboard attribution, an opt-in key-event capture backend or real
 Hyprland visual QA. T401, T404 and T902 remain explicitly unaccepted.
+
+## Generic Wayland XKB keymap group discovery — accepted
+
+[GitHub Actions 40148518400](https://github.com/sguzman/typefinch/actions/runs/40148518400)
+passed **231 Rust tests and the complete native graphical suite** on
+[`52f69cd`](https://github.com/sguzman/typefinch/commit/52f69cdbb8cf9ffc1845cdf00f3c9c36fd9ed354).
+Under isolated **nested Weston/Xvfb**, the new
+`typefinch --_probe_wayland_xkb_seats` executable queried a
+keyboard-capable virtual `wl_seat` and returned the compositor's actual
+offered **XKB keymap group labels**. The ordinary
+`typefinch --inspect-keyboards` CLI independently exposed the same group's
+names in the `seat_xkb_groups` field, while
+`reported_active_keymap` remained null. Synthetic tests retained their
+eight malformed, duplicate, timeout and disconnected-compositor scenarios.
+The legacy `--_probe_wayland_seats` capability-only mode still never requests
+`wl_keyboard`, and the no-input virtual Weston seat still produces zero
+inspected keyboard rows.
+
+The keymap inspector uses a separate short-lived Wayland connection with
+**no input surface**, accepts only an XKB text-v1 keymap descriptor,
+compiles a bounded four-MiB-or-less keymap in the child, validates at most
+16 group names (max 128 bytes each), and returns only seat/group metadata.
+Every non-keymap keyboard protocol event is ignored without inspecting or
+storing it. The parent enforces its independent three-second deadline and
+16-KiB response size limit. Invalid keymaps fail closed and do not preserve
+stale trusted metadata.
+
+This satisfies **generic XKB seat *keymap* detection**, NOT active-group
+detection. Wayland's independent unfocused metadata client cannot establish
+the active group or which physical keyboard generated typed events.
+No `detected/*` label is inferred for generic Wayland typing: scored OS input
+remains `os:unknown`. Real physical-device attribution, physical Hyprland
+hotplug, and optional compositor-authorized per-device capture remain open.

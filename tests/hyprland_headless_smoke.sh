@@ -14,6 +14,9 @@ cleanup(){
   [[ -z "$parent" ]] || { kill "$parent" 2>/dev/null; wait "$parent" 2>/dev/null; }
   if ((code!=0));then
     echo "Headless Hyprland failed" >&2
+    for log in "$tmp"/cache/hyprland/hyprlandCrashReport*.txt;do
+      [[ ! -f "$log" ]] || tail -n 180 "$log" >&2
+    done
     [[ ! -f "$tmp/hyprland.log" ]] || tail -n 100 "$tmp/hyprland.log" >&2
     [[ ! -f "$tmp/weston.log" ]] || tail -n 50 "$tmp/weston.log" >&2
     for log in "$XDG_RUNTIME_DIR"/hypr/*/hyprland.log;do
@@ -30,12 +33,16 @@ export XDG_RUNTIME_DIR="$tmp/runtime" XDG_CONFIG_HOME="$tmp/config"
 export XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache"
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland
 export LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
-export HYPRLAND_NO_SD_NOTIFY=1
+export HYPRLAND_NO_SD_NOTIFY=1 HYPRLAND_TRACE=1 AQ_TRACE=1
 unset DISPLAY WAYLAND_SOCKET WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE
 # Current Aquamarine cannot create a GPU-less stand-alone backend. The
 # disposable software-rendered parent Weston supplies a legitimate Wayland
 # allocator/surface; Hyprland itself still owns the real child compositor.
-weston --backend=headless-backend.so --renderer=pixman --socket=parent-wayland \
+# Aquamarine's nested Wayland backend needs a dmabuf-capable EGL parent;
+# the Pixman-only Weston parent lacks the required allocation protocols.
+# Exercise Weston software GLES via llvmpipe instead of pretending a
+# Pixman-only Wayland socket is an acceptable Hyprland host.
+weston --backend=headless-backend.so --renderer=gl --socket=parent-wayland \
   --no-config --idle-time=0 --width=1280 --height=900 \
   --log="$tmp/weston.log" >"$tmp/weston-stdout.log" 2>&1 &
 parent=$!

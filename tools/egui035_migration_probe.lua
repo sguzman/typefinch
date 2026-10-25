@@ -188,6 +188,37 @@ replace([[let range=range.map(|mut range|{
                                 edit_output.galley.text()==self.custom_text.as_str(),
                                 native_cursor_range.map(ix),saved.map(ix),range.map(ix));
                         }
+                        let pointer_geometry=ui.input(|i|(
+                            i.pointer.primary_released(),i.pointer.press_origin(),
+                            i.pointer.interact_pos()));
+                        let range=if edit.has_focus() && pointer_selection && !ime_event
+                            && !shift_arrow && !plain_arrow
+                            && range.as_ref().is_some_and(|r|{
+                                let limit=self.custom_text.chars().count();
+                                r.primary.index.0>limit || r.secondary.index.0>limit
+                            }) && pointer_geometry.0 {
+                            if let (Some(anchor),Some(active))=(pointer_geometry.1,pointer_geometry.2) {
+                                if edit_output.text_clip_rect.contains(anchor)
+                                    && edit_output.text_clip_rect.contains(active) {
+                                    let galley=&edit_output.galley;
+                                    let mapped=egui::text::CCursorRange{
+                                        primary:galley.cursor_from_pos(active-edit_output.galley_pos),
+                                        secondary:galley.cursor_from_pos(anchor-edit_output.galley_pos),
+                                    };
+                                    if std::env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT").is_some() {
+                                        eprintln!("egui035-wayland-cursor-reprojection valid={} primary={} anchor={} original={:?}",
+                                            mapped.primary.index.0!=mapped.secondary.index.0,
+                                            mapped.primary.index.0,mapped.secondary.index.0,
+                                            range.map(|r|(r.primary.index.0,r.secondary.index.0)));
+                                    }
+                                    if let Some(mut native)=egui::TextEdit::load_state(ui.ctx(),editor_id) {
+                                        native.cursor.set_char_range(Some(mapped));
+                                        native.store(ui.ctx(),editor_id);
+                                    }
+                                    Some(mapped)
+                                }else{range}
+                            }else{range}
+                        }else{range};
                         let range=range.map(|mut range|{
                             let scalars=self.custom_text.chars().count();]],1)
 

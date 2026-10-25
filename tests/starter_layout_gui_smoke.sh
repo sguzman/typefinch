@@ -32,7 +32,9 @@ start_app(){
   app_pid=$!
   window=""
   for _ in $(seq 1 200);do
-    window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null|head -n1||true)"
+    # Match THIS live instance by PID; a stale Typefinch X11
+    # window from the previous case must never steal the next F11.
+    window="$(xdotool search --onlyvisible --pid "$app_pid" --name 'Typefinch' 2>/dev/null|head -n1||true)"
     [[ -z "$window" ]] || break
     kill -0 "$app_pid" 2>/dev/null || { echo "Starter emulation app exited" >&2;exit 1; }
     sleep 0.25
@@ -41,6 +43,28 @@ start_app(){
   xdotool windowactivate --sync "$window" 2>/dev/null || true
   xdotool windowfocus --sync "$window"
   sleep 0.35
+}
+select_custom_mode(){
+  local label="$1"
+  local cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
+  # The compositor can display a window before egui first processes input
+  # or persists settings. Retry only while Custom is still absent, so F11
+  # cannot inadvertently toggle a mode back to a different value.
+  for _ in $(seq 1 30);do
+    if [[ -f "$cfg" ]] && grep -q '"test_mode": "custom"' "$cfg";then
+      return 0
+    fi
+    kill -0 "$app_pid" 2>/dev/null || {
+      echo "Starter $label app terminated before Custom mode" >&2
+      return 1
+    }
+    xdotool windowactivate --sync "$window" 2>/dev/null || true
+    xdotool windowfocus "$window" 2>/dev/null || true
+    xdotool key --clearmodifiers F11
+    sleep 0.2
+  done
+  echo "Custom mode not selected by active Typefinch window for $label" >&2
+  return 1
 }
 stop_app(){
   kill "$app_pid" 2>/dev/null || true
@@ -60,12 +84,8 @@ for label in dvorak colemak-dh dvorak-offline colemak-dh-offline;do
   fi
   printf '%s' "$passage" >"$tmp/$label-source.txt"
   start_app "$label"
-  xdotool key --clearmodifiers F11
-  sleep 0.45
+  select_custom_mode "$label"
   cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
-  grep -q '"test_mode": "custom"' "$cfg" || {
-    echo "F11 failed to select Custom mode for $label" >&2;exit 1;
-  }
   stop_app
   lua5.4 - "$cfg" "$layout" <<'LUA'
 local json=require("dkjson")
@@ -160,12 +180,8 @@ assert(#base==21 and #shift==21,
 local f=assert(io.open(path,"wb"));assert(f:write(base,shift));assert(f:close())
 LUA
     start_app "$label"
-    xdotool key --clearmodifiers F11
-    sleep 0.3
+    select_custom_mode "$label"
     cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
-    grep -q '"test_mode": "custom"' "$cfg" || {
-      echo "Custom mode could not be selected for $label" >&2;exit 1;
-    }
     stop_app
     lua5.4 - "$cfg" "$layout" <<'LUA'
 local json=require("dkjson")

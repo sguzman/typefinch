@@ -1,13 +1,10 @@
 name: Typefinch experimental headless Hyprland GUI
 # Isolated virtual compositor: never physical-device acceptance.
 # The hosted runner has no working Aquamarine GPU/allocator backend.
-# Experimental on-push validation is isolated and never counts as physical hardware acceptance.
+# This hosted runner has no usable Aquamarine DRM/allocator backend and
+# its nested compositor lacks required protocol versions. Keep this experiment
+# opt-in until a render-capable runner is configured; no hardware acceptance.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/hyprland-headless.yml'
-      - 'tests/hyprland_headless_smoke.sh'
   workflow_dispatch:
 jobs:
   native-hyprland:

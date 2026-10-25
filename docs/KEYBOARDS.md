@@ -410,3 +410,28 @@ the active group or which physical keyboard generated typed events.
 No `detected/*` label is inferred for generic Wayland typing: scored OS input
 remains `os:unknown`. Real physical-device attribution, physical Hyprland
 hotplug, and optional compositor-authorized per-device capture remain open.
+
+## Hosted experimental Hyprland limitations (October 25, 2026)
+
+The experimental `.github/workflows/hyprland-headless.yml` tried to
+launch real **Hyprland 0.53.3** in an isolated Ubuntu 26.04 container,
+rather than accepting synthetic `hyprctl` fixtures as evidence.
+
+- [Experimental run 40203842796](https://github.com/sguzman/typefinch/actions/runs/40203842796)
+  failed before opening Typefinch: Aquamarine could not establish a backend
+  with a Pixman-only Weston parent.
+- [Experimental run 40204104287](https://github.com/sguzman/typefinch/actions/runs/40204104287)
+  failed even with Mesa llvmpipe and a Weston GL parent. Aquamarine found
+  no usable DRM/KMS device, could not open `/dev/dri/card1` and also
+  encountered a parent compositor `wl_compositor` protocol version mismatch
+  (advertised v5, requested v6). The log reports `CBackend::create() failed`.
+
+Both are **external runner/compositor initialization failures**. Neither
+execution reached the Typefinch application, therefore neither proves a
+Typefinch defect nor passes its live Hyprland gates. The experimental
+workflow remains manually dispatchable but is not a required on-push gate
+on hosted runners known to lack the necessary allocator/device/protocol
+support. Further virtual validation needs a compatible render-capable host;
+real connected keyboards, physical-device attribution, native compositor
+IME handling and system theme transitions still need appropriately
+authorized live acceptance. Standard X11 and nested Weston CI stay separate.

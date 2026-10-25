@@ -33,6 +33,8 @@ replace("local_dummy_invalid",
 replace("egui::TopBottomPanel::top(", "egui::Panel::top(", 1)
 replace("egui::SidePanel::left(", "egui::Panel::left(", 1)
 replace(".default_width(295.0)", ".default_size(295.0)", 1)
+replace(".min_width(255.0)", ".min_size(255.0)", 1)
+replace(".max_width(370.0)", ".max_size(370.0)", 1)
 replace(".show(ctx, |ui| {", ".show(root_ui, |ui| {", 3)
 replace("cc.egui_ctx.style().animation_time",
   "cc.egui_ctx.style_of(cc.egui_ctx.theme()).animation_time", 1)

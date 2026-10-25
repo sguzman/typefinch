@@ -184,6 +184,10 @@ mod tests {
         assert_eq!(es.translate_composed(Key::Quote, false, &mut compose), None);
         assert_eq!(es.translate_composed(Key::E, false, &mut compose).as_deref(), Some("é"));
         assert_eq!(es.translate_composed(Key::E, false, &mut compose).as_deref(), Some("e"));
+        // Shift applies to physical E after Spanish dead-acute;
+        // Compose must return one uppercase accented grapheme.
+        assert_eq!(es.translate_composed(Key::Quote, false, &mut compose), None);
+        assert_eq!(es.translate_composed(Key::E, true, &mut compose).as_deref(), Some("É"));
     }
     #[test] fn explicit_level_three_compose_respects_real_german_symbols() {
         let de=Emulator::compile("de").unwrap();

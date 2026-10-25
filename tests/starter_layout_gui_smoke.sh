@@ -294,12 +294,12 @@ echo 'All four native starter ANSI number/punctuation/Shift layers PASS (XKB + o
 
 # Genuine X11 native physical positions through Typefinch's *emulated*
 # Spanish XKB layout, not the X11 OS layout. A dead-acute + E emits one
-# grapheme; pending dead-acute then Backspace must cancel only composition,
-# not erase the previously scored é. The next plain E scores one 'e'.
+# grapheme; Shift+E emits uppercase É; pending dead-acute then Backspace
+# must cancel only composition without erasing either scored grapheme.
 # The target and local path are disposable and never persist to settings.
 label="es-compose-native"
 mkdir -p "$tmp/$label"
-printf '%s' 'ée' > "$tmp/$label-source.txt"
+printf '%s' 'éÉe' > "$tmp/$label-source.txt"
 setxkbmap -layout us
 start_app "$label"
 select_custom_mode "$label"
@@ -329,7 +329,7 @@ for _ in $(seq 1 60);do
 local json=require("dkjson")
 local f=assert(io.open(arg[1],"rb"))
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
-assert(d.synthetic and d.state=="running" and d.expected_graphemes==2)
+assert(d.synthetic and d.state=="running" and d.expected_graphemes==3)
 LUA
   then running=1;break;fi
   sleep 0.15
@@ -347,8 +347,18 @@ sleep 0.3
 xdotool key --clearmodifiers 26
 sleep 0.25
 [[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
-  echo "One composed grapheme prematurely completed two-grapheme target" >&2;exit 1;
+  echo "One composed grapheme prematurely completed three-grapheme target" >&2;exit 1;
 }
+# Repeat the dead accent with physical Shift+E: one uppercase É, not
+# two scored characters or an unaccented E.
+xdotool key --clearmodifiers 48
+sleep 0.15
+xdotool key --clearmodifiers shift+26
+sleep 0.25
+[[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
+  echo "Two composed graphemes prematurely completed three-grapheme target" >&2;exit 1;
+}
+# Cancel the next pending accent with Backspace; plain E must still score.
 xdotool key --clearmodifiers 48
 sleep 0.15
 xdotool key --clearmodifiers BackSpace
@@ -372,7 +382,7 @@ local json=require("dkjson")
 local report,source=assert(arg[1]),assert(arg[2])
 local f=assert(io.open(report,"rb"))
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
-assert(d.synthetic and d.state=="finished" and d.entered==2 and d.correct==2
+assert(d.synthetic and d.state=="finished" and d.entered==3 and d.correct==3
   and d.accuracy==100,
   string.format("Native emulated dead-key Compose scored wrong: entered=%s correct=%s",
     tostring(d.entered),tostring(d.correct)))
@@ -382,15 +392,15 @@ local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,en
 local pipe=assert(io.popen(cmd,"r"))
 local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
 assert(#rows==1 and rows[1].layout=="es" and rows[1].input_mode=="Emulated"
-  and rows[1].test_mode=="custom" and rows[1].entered==2 and
-  rows[1].correct==2 and rows[1].attempts==2,
+  and rows[1].test_mode=="custom" and rows[1].entered==3 and
+  rows[1].correct==3 and rows[1].attempts==3,
   "Emulated Spanish Compose produced wrong persisted session identity or scores")
 local sf=assert(io.open(dir.."/settings.json","rb"))
 local settings=assert(sf:read("*a"));sf:close()
 local pf=assert(io.open(source,"rb"));local passage=assert(pf:read("*a"));pf:close()
 assert(not settings:find(passage,1,true) and not settings:find(source,1,true),
   "Private Spanish Compose fixture/path persisted")
-print("Native X11 Spanish emulated dead-acute + E and cancelled accent PASS: 2/2 attempts")
+print("Native X11 Spanish dead-acute + E, Shift+E and cancelled accent PASS: 3/3 attempts")
 LUA
 stop_app
 

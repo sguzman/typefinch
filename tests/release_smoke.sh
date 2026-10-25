@@ -41,19 +41,24 @@ mkdir -p "$foreign/bin"
 printf '#!/bin/sh\necho foreign\n' >"$foreign/bin/typefinch"
 chmod 755 "$foreign/bin/typefinch"
 if sh "$root/install.sh" --prefix "$foreign"; then echo "Overwrote foreign executable" >&2; exit 1; fi
-# Refuse symlinked notice destinations before writing the binary.
-for form in directory file;do
+# Refuse symlinked managed directories and notice files before writing
+# the binary. Nothing may be redirected outside the opted-in prefix.
+for form in directory file ancestor readme bin;do
   blocked="$tmp/symlink-notice-$form"
   target="$blocked/share/doc/typefinch/third-party/epaint-0.35.0"
   mkdir -p "$(dirname "$target")" "$tmp/outside"
-  if [ "$form" = directory ];then
-    ln -s "$tmp/outside" "$target"
-  else
-    mkdir -p "$target"
-    ln -s "$tmp/outside/notices" "$target/LICENSE-MIT"
-  fi
+  case "$form" in
+    directory) ln -s "$tmp/outside" "$target" ;;
+    file) mkdir -p "$target"
+      ln -s "$tmp/outside/notices" "$target/LICENSE-MIT" ;;
+    ancestor) ln -s "$tmp/outside" "$(dirname "$target")" ;;
+    readme) mkdir -p "$blocked/share/doc/typefinch"
+      ln -s "$tmp/outside/readme" "$blocked/share/doc/typefinch/README.md" ;;
+    bin) mkdir -p "$blocked"
+      ln -s "$tmp/outside" "$blocked/bin" ;;
+  esac
   if sh "$root/install.sh" --prefix "$blocked";then
-    echo "Installed through a symlinked notice destination" >&2;exit 1
+    echo "Installed through a symlinked managed path" >&2;exit 1
   fi
   [ ! -e "$blocked/bin/typefinch" ] || { echo "Partially installed executable" >&2;exit 1; }
 done

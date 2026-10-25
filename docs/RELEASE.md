@@ -66,7 +66,8 @@ currently includes a narrowly patched egui RTL shaping dependency.
 third-party originals, alongside the existing checksum, install, upgrade,
 rollback and unmanaged-file refusal tests. Installation also places these
 notices under the user's `share/doc/typefinch/third-party/` prefix;
-preflight refuses symlinked notice destinations before writing a binary. Tar metadata and gzip headers
+preflight refuses symlinked notice files, their parent directories,
+and managed executable paths before writing a binary. Tar metadata and gzip headers
 are normalized for repeatable archives *given identical binary contents*;
 the Rust executable is not independently proven reproducible.
 

@@ -16,6 +16,17 @@ base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 bin="$prefix/bin"; data="$prefix/share/typefinch"
 exe="$bin/typefinch"; previous="$data/previous-binary"
 marker="$data/installed.version"; prior="$data/previous.version"
+vendor_target="$prefix/share/doc/typefinch/third-party/epaint-0.35.0"
+# Check every managed path component BEFORE creating directories or replacing
+# binaries. Refuse redirection through a pre-existing symlinked ancestor.
+for managed_path in "$bin" "$prefix/share" "$data" \
+    "$prefix/share/doc" "$prefix/share/doc/typefinch" \
+    "$prefix/share/doc/typefinch/third-party" "$vendor_target" \
+    "$prefix/share/doc/typefinch/README.md" \
+    "$prefix/share/doc/typefinch/LICENSE"; do
+  [ ! -L "$managed_path" ] ||
+    { echo "Refusing symlinked managed installation path" >&2; exit 1; }
+done
 mkdir -p "$bin" "$data"
 if [ -L "$exe" ] || [ -L "$marker" ] || [ -L "$previous" ]; then
   echo "Refusing symlink install targets" >&2; exit 1
@@ -32,7 +43,6 @@ fi
 [ -f "$base/bin/typefinch" ] && [ -f "$base/METADATA.txt" ] ||
   { echo "Incomplete preview archive" >&2; exit 1; }
 vendor_source="$base/share/doc/typefinch/third-party/epaint-0.35.0"
-vendor_target="$prefix/share/doc/typefinch/third-party/epaint-0.35.0"
 for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
   [ -s "$vendor_source/$notice" ] || { echo "Incomplete upstream epaint notices" >&2; exit 1; }
   [ ! -L "$vendor_target" ] && [ ! -L "$vendor_target/$notice" ] ||

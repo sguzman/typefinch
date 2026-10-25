@@ -291,3 +291,106 @@ LUA
   done
 done
 echo 'All four native starter ANSI number/punctuation/Shift layers PASS (XKB + offline fallback)'
+
+# Genuine X11 native physical positions through Typefinch's *emulated*
+# Spanish XKB layout, not the X11 OS layout. A dead-acute + E emits one
+# grapheme; pending dead-acute then Backspace must cancel only composition,
+# not erase the previously scored é. The next plain E scores one 'e'.
+# The target and local path are disposable and never persist to settings.
+label="es-compose-native"
+mkdir -p "$tmp/$label"
+printf '%s' 'ée' > "$tmp/$label-source.txt"
+setxkbmap -layout us
+start_app "$label"
+select_custom_mode "$label"
+cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
+stop_app
+lua5.4 - "$cfg" <<'LUA'
+local json=require("dkjson")
+local path=assert(arg[1])
+local f=assert(io.open(path,"rb"))
+local prefs=assert(json.decode(assert(f:read("*a"))));f:close()
+prefs.layout="es"
+local out=assert(io.open(path,"wb"))
+assert(out:write(json.encode(prefs,{indent=true})));assert(out:close())
+LUA
+start_app "$label"
+xdotool key --clearmodifiers F11
+sleep 0.3
+xdotool type --clearmodifiers --delay 20 "$tmp/$label-source.txt"
+xdotool key --clearmodifiers Return
+sleep 0.35
+rm -f "$TYPEFINCH_QA_REPORT" "$TYPEFINCH_QA_START_REPORT"
+xdotool key --clearmodifiers F5
+running=0
+for _ in $(seq 1 60);do
+  if [[ -s "$TYPEFINCH_QA_START_REPORT" ]] &&
+    lua5.4 - "$TYPEFINCH_QA_START_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="running" and d.expected_graphemes==2)
+LUA
+  then running=1;break;fi
+  sleep 0.15
+done
+((running==1)) || { echo "Spanish emulated Compose session did not start" >&2;exit 1; }
+xdotool key --clearmodifiers F2
+sleep 0.25
+# X11 physical keycode 48 = ANSI quote (Linux evdev40), not a Spanish
+# OS keymap lookup; code 26 = E (Linux evdev18).
+xdotool key --clearmodifiers 48
+sleep 0.3
+[[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
+  echo "Emulated Spanish dead key prematurely completed test" >&2;exit 1;
+}
+xdotool key --clearmodifiers 26
+sleep 0.25
+[[ ! -s "$TYPEFINCH_QA_REPORT" ]] || {
+  echo "One composed grapheme prematurely completed two-grapheme target" >&2;exit 1;
+}
+xdotool key --clearmodifiers 48
+sleep 0.15
+xdotool key --clearmodifiers BackSpace
+sleep 0.15
+xdotool key --clearmodifiers 26
+finished=0
+for _ in $(seq 1 60);do
+  if [[ -s "$TYPEFINCH_QA_REPORT" ]] &&
+    lua5.4 - "$TYPEFINCH_QA_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="finished")
+LUA
+  then finished=1;break;fi
+  sleep 0.15
+done
+((finished==1)) || { echo "Native emulated Spanish Compose did not finish" >&2;exit 1; }
+lua5.4 - "$TYPEFINCH_QA_REPORT" "$tmp/$label-source.txt" <<'LUA'
+local json=require("dkjson")
+local report,source=assert(arg[1]),assert(arg[2])
+local f=assert(io.open(report,"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="finished" and d.entered==2 and d.correct==2
+  and d.accuracy==100 and d.attempts==2,
+  string.format("Native emulated dead-key Compose scored wrong: entered=%s correct=%s attempts=%s",
+    tostring(d.entered),tostring(d.correct),tostring(d.attempts)))
+local dir=os.getenv("XDG_CONFIG_HOME").."/typefinch"
+local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",
+  dir.."/sessions.sqlite3")
+local pipe=assert(io.popen(cmd,"r"))
+local rows=assert(json.decode(assert(pipe:read("*a"))));assert(pipe:close())
+assert(#rows==1 and rows[1].layout=="es" and rows[1].input_mode=="Emulated"
+  and rows[1].test_mode=="custom" and rows[1].entered==2 and
+  rows[1].correct==2 and rows[1].attempts==2,
+  "Emulated Spanish Compose produced wrong persisted session identity or scores")
+local sf=assert(io.open(dir.."/settings.json","rb"))
+local settings=assert(sf:read("*a"));sf:close()
+local pf=assert(io.open(source,"rb"));local passage=assert(pf:read("*a"));pf:close()
+assert(not settings:find(passage,1,true) and not settings:find(source,1,true),
+  "Private Spanish Compose fixture/path persisted")
+print("Native X11 Spanish emulated dead-acute + E and cancelled accent PASS: 2/2 attempts")
+LUA
+stop_app
+

@@ -60,7 +60,7 @@ start_app(){
   xdotool windowactivate --sync "$parent" 2>/dev/null || true
   xdotool windowfocus "$parent" 2>/dev/null || true
   xdotool mousemove --window "$parent" 500 340 click 1
-  sleep 0.40
+  sleep 0.65
 }
 stop_app(){
   kill "$app" 2>/dev/null || true

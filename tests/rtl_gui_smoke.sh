@@ -473,6 +473,53 @@ assert(up.index>=22 and up.index<37 and up.caret_y_px>=25 and up.caret_y_px<55
 print("Native mixed BiDi drag selection PASS: "..down.selected_graphemes.." / "..
   up.selected_graphemes.." graphemes, visual rows "..down.caret_y_px.." / "..up.caret_y_px)
 LUA
+    # Replace an actual pointer-selected range spanning Latin and RTL
+    # paragraphs, then undo. The earlier test only inspected selection
+    # counts; it could pass even if an edit silently corrupted equal-length
+    # graphemes. Exercise the real egui editor and verify exact recovery.
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-before-replace.json"
+    xdotool type --clearmodifiers --delay 35 "Z"
+    sleep 0.4
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-after-replace.json"
+    import -window "$window" "$tmp/rtl-mixed-editor-replaced.png"
+    xdotool key --clearmodifiers ctrl+z
+    sleep 0.4
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/mixed-after-undo.json"
+    import -window "$window" "$tmp/rtl-mixed-editor-undo.png"
+    lua5.4 - "$tmp/$name/mixed-before-replace.json" \
+      "$tmp/$name/mixed-after-replace.json" \
+      "$tmp/$name/mixed-after-undo.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native mixed-direction editing audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  assert(type(d.total)=="number" and type(d.selected_graphemes)=="number")
+  return d
+end
+local selected,changed,undone=read(arg[1]),read(arg[2]),read(arg[3])
+assert(selected.total==54 and selected.selected_graphemes>=8,
+  "BiDi replacement did not begin with a real multi-grapheme drag selection")
+assert(changed.total==selected.total-selected.selected_graphemes+1
+  and changed.selected_graphemes==0,
+  "Replacing a mixed-direction range did not insert one Latin grapheme")
+assert(undone.total==selected.total and undone.selected_graphemes==0,
+  "Undo did not restore the mixed-direction source length")
+print("Native mixed-script pointer selection, replacement and Undo counts PASS")
+LUA
+    # The fixture is entirely synthetic and lives in an isolated X11 CI
+    # session. Clipboard comparison is performed only here, with no source
+    # bytes printed or published. A length-only check cannot detect a
+    # changed Arabic/Hebrew combining mark or equal-length substitution.
+    xdotool key --clearmodifiers ctrl+a
+    xdotool key --clearmodifiers ctrl+c
+    sleep 0.35
+    timeout 5s xclip -selection clipboard -o > "$tmp/$name/mixed-restored.txt"
+    cmp -s "$tmp/mixed.txt" "$tmp/$name/mixed-restored.txt" || {
+      echo "Native mixed BiDi edit/Undo changed the original Unicode source" >&2
+      exit 1
+    }
+    echo "Native mixed BiDi replacement/Undo byte-exact recovery PASS"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
   fi

@@ -11,37 +11,12 @@ tar -tzf "$archive" >"$tmp/members"
 ! grep -E '^/|(^|/)\.\.(/|$)' "$tmp/members"
 tar -xzf "$archive" -C "$tmp"
 root="$tmp/typefinch-${version}-linux-x86_64"
-# Third-party notices are shipped unchanged with this source-built binary.
+# Original epaint notices are required byte-for-byte in every preview archive.
 for item in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
   notice="$root/share/doc/typefinch/third-party/epaint-0.35.0/$item"
   [[ -s "$notice" ]] || { echo "Missing pinned epaint notice: $item" >&2;exit 1; }
   cmp "third_party/epaint-0.35.0/$item" "$notice"
 done
-prefix="$tmp/prefix"
-sh "$root/install.sh" --prefix "$prefix"
-test -x "$prefix/bin/typefinch"
-cmp "$root/bin/typefinch" "$prefix/bin/typefinch"
-"$prefix/bin/typefinch" --version | grep -Fx "typefinch $version"
-original="$(sha256sum "$prefix/bin/typefinch" | cut -d' ' -f1)"
-printf '#!/bin/sh\necho upgraded\n' >"$root/bin/typefinch"
-chmod 755 "$root/bin/typefinch"
-sh "$root/install.sh" --prefix "$prefix"
-updated="$(sha256sum "$prefix/bin/typefinch" | cut -d' ' -f1)"
-[[ "$updated" != "$original" ]]
-sh "$root/install.sh" --prefix "$prefix" --rollback
-restored="$(sha256sum "$prefix/bin/typefinch" | cut -d' ' -f1)"
-[[ "$restored" == "$original" ]]
-"$prefix/bin/typefinch" --version | grep -Fx "typefinch $version"
-foreign="$tmp/foreign"
-mkdir -p "$foreign/bin"
-printf '#!/bin/sh\necho foreign\n' >"$foreign/bin/typefinch"
-chmod 755 "$foreign/bin/typefinch"
-if sh "$root/install.sh" --prefix "$foreign"; then echo "Overwrote foreign executable" >&2; exit 1; fi
-echo "Versioned Linux packaging, install/upgrade/rollback and collision tests PASS"
- "$tmp/members")" -eq 8 ]]
-! grep -E '^/|(^|/)\.\.(/|$)' "$tmp/members"
-tar -xzf "$archive" -C "$tmp"
-root="$tmp/typefinch-${version}-linux-x86_64"
 prefix="$tmp/prefix"
 sh "$root/install.sh" --prefix "$prefix"
 test -x "$prefix/bin/typefinch"

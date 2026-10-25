@@ -296,6 +296,17 @@ fn emulated_level3_key_accepted(repeat:bool,modifiers:egui::Modifiers,
     right_alt:bool,left_alt:bool)->bool {
     !repeat && right_alt && !left_alt && !modifiers.ctrl && !modifiers.command
 }
+/// Abandon transient in-app key modifiers when a different widget owns
+/// focus. Neither a held key nor an uncommitted dead accent may survive
+/// a focus transfer back into the scored typing surface.
+fn clear_unfocused_emulated_input(
+    right_alt:&mut bool,left_alt:&mut bool,
+    compose:Option<&mut xkbcommon::xkb::compose::State>,
+) {
+    *right_alt=false;
+    *left_alt=false;
+    if let Some(compose)=compose {compose.reset();}
+}
 fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::Modifiers> {
     events.iter().find_map(|event| match event {
         egui::Event::Key{key,pressed:true,repeat:false,modifiers,..} if *key==desired=>
@@ -905,6 +916,12 @@ impl Typefinch {
         }
         if !ctx.memory(|m| m.has_focus(egui::Id::new("typing_surface"))) {
             // Deliberately do not count keystrokes aimed at settings/profile widgets.
+            // Discard a RightAlt/LeftAlt press whose release might occur while
+            // another widget has focus, as well as pending dead-key Compose.
+            clear_unfocused_emulated_input(
+                &mut self.emulated_right_alt_held,&mut self.emulated_left_alt_held,
+                self.composition.as_mut(),
+            );
             return;
         }
         let events = ctx.input(|i| i.events.clone());
@@ -3558,6 +3575,17 @@ mod palette_tests {
             "software emulation must preserve its existing cancellation rules");
         assert!(!ime_owns_navigation(Mode::System,&mut candidate,egui::Key::Enter),
             "Enter is handled independently to avoid confirming IME candidates");
+    }
+    #[test] fn typing_widget_blur_resets_held_alt_and_uncommitted_compose() {
+        let es=Emulator::compile("es").expect("installed Spanish XKB layout");
+        let mut state=es.compose_state().expect("XKB Compose locale");
+        let mut right_alt=true;
+        let mut left_alt=true;
+        assert_eq!(es.translate_composed(egui::Key::Quote,false,&mut state),None);
+        assert_eq!(state.status(),xkbcommon::xkb::compose::Status::Composing);
+        clear_unfocused_emulated_input(&mut right_alt,&mut left_alt,Some(&mut state));
+        assert!(!right_alt && !left_alt);
+        assert_eq!(es.translate_composed(egui::Key::E,false,&mut state).as_deref(),Some("e"));
     }
     #[test] fn explicit_right_alt_gates_emulated_level_three_without_left_alt_leak() {
         let plain=egui::Modifiers::default();

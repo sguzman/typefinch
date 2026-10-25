@@ -22,6 +22,13 @@ run("install -m 755 target/release/typefinch "..q(root.."/bin/typefinch"))
 run("install -m 755 tools/install_release.sh "..q(root.."/install.sh"))
 run("install -m 644 README.md "..q(root.."/share/doc/typefinch/README.md"))
 run("install -m 644 LICENSE "..q(root.."/share/doc/typefinch/LICENSE"))
+-- Retain upstream notices for the exact egui 0.35 RTL shaping backport.
+local vendor_docs=root.."/share/doc/typefinch/third-party/epaint-0.35.0"
+run("mkdir -p "..q(vendor_docs))
+for _,filename in ipairs({"LICENSE-MIT","LICENSE-APACHE","UPSTREAM.md"}) do
+    run("install -m 644 "..q("third_party/epaint-0.35.0/"..filename)..
+        " "..q(vendor_docs.."/"..filename))
+end
 local meta=assert(io.open(root.."/METADATA.txt","wb"))
 assert(meta:write("TYPEFINCH_VERSION="..version.."\nGIT_SHA="..sha..
     "\nTARGET=x86_64-unknown-linux-gnu\nCHANNEL=development-preview\n"))

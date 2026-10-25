@@ -330,6 +330,43 @@ print("Native RTL preview forward/reverse selection PASS: "..
   forward.selected_graphemes.." graphemes; active caret "..
   forward.index.." -> "..reverse.index)
 LUA
+    # The selected range must remain owned by the *editable* TextEdit:
+    # replace it with one Latin grapheme, Undo, and verify exact restoration
+    # of every Arabic/Hebrew combining mark. Counts alone are insufficient.
+    xdotool type --clearmodifiers --delay 35 x
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-replaced.json"
+    xdotool key --clearmodifiers ctrl+z
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-undo.json"
+    lua5.4 - "$tmp/$name/preview-drag-reverse.json" \
+      "$tmp/$name/preview-replaced.json" "$tmp/$name/preview-undo.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing preview replacement audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local selected,replaced,restored=read(arg[1]),read(arg[2]),read(arg[3])
+assert(selected.selected_graphemes>=2,
+  "Expected a multi-grapheme reverse preview selection")
+assert(replaced.total==selected.total-selected.selected_graphemes+1
+  and replaced.selected_graphemes==0,
+  "The shaped-preview selection failed to replace in the native TextEdit")
+assert(restored.total==selected.total and restored.selected_graphemes==0,
+  "Native Undo did not restore preview-selected grapheme count")
+print("Native shaped-preview selected-range edit/Undo counts PASS")
+LUA
+    xdotool key --clearmodifiers ctrl+a
+    xdotool key --clearmodifiers ctrl+c
+    sleep 0.35
+    timeout 5s xclip -selection clipboard -o > "$tmp/$name/preview-restored.txt"
+    cmp -s "$tmp/$name.txt" "$tmp/$name/preview-restored.txt" || {
+      echo "Native shaped-preview edit/Undo changed original Unicode bytes" >&2
+      exit 1
+    }
+    echo "Native shaped-preview selection editing and byte-exact Undo PASS"
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
     # Real source mutation, not only caret painting. Select the first marked

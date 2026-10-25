@@ -1,0 +1,89 @@
+[package]
+name = "egui"
+version = "0.35.0"
+authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
+description = "An easy-to-use immediate mode GUI that runs on both web and native"
+edition = "2024"
+rust-version = "1.92"
+homepage = "https://github.com/emilk/egui"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/emilk/egui"
+categories = ["gui", "game-development"]
+keywords = ["gui", "imgui", "immediate", "portable", "gamedev"]
+include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml", "README.md", "UPSTREAM.md"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--generate-link-to-definition"]
+
+[lib]
+
+
+[features]
+default = ["default_fonts"]
+
+## [`bytemuck`](https://docs.rs/bytemuck) enables you to cast [`epaint::Vertex`], [`emath::Vec2`] etc to `&[u8]`.
+bytemuck = ["epaint/bytemuck"]
+
+## Show a debug-ui on hover including the stacktrace to the hovered item.
+## This is very useful in finding the code that creates a part of the UI.
+## Does not work on web.
+callstack = ["dep:backtrace"]
+
+## [`cint`](https://docs.rs/cint) enables interoperability with other color libraries.
+cint = ["epaint/cint"]
+
+## Enable the [`hex_color`] macro.
+color-hex = ["epaint/color-hex"]
+
+## If set, egui will use `include_bytes!` to bundle some fonts.
+## If you plan on specifying your own fonts you may disable this feature.
+default_fonts = ["epaint/default_fonts"]
+
+## [`mint`](https://docs.rs/mint) enables interoperability with other math libraries such as [`glam`](https://docs.rs/glam) and [`nalgebra`](https://docs.rs/nalgebra).
+mint = ["epaint/mint"]
+
+## Enable persistence of memory (window positions etc).
+persistence = ["serde", "epaint/serde", "ron"]
+
+
+## Enable parallel tessellation using [`rayon`](https://docs.rs/rayon).
+##
+## This can help performance for graphics-intense applications.
+rayon = ["epaint/rayon"]
+
+## Allow serialization using [`serde`](https://docs.rs/serde).
+serde = ["dep:serde", "epaint/serde", "accesskit/serde"]
+
+## Change Vertex layout to be compatible with unity
+unity = ["epaint/unity"]
+
+## Override and disable the unity feature
+## This exists, so that when testing with --all-features, snapshots render correctly.
+_override_unity = ["epaint/_override_unity"]
+
+
+[dependencies]
+emath = { version = "=0.35.0", default-features = false }
+epaint = { version = "=0.35.0", default-features = false }
+
+accesskit = "0.24.1"
+ahash = { version = "0.8.12", default-features = false, features = ["no-rng", "std"] }
+bitflags = "2.13"
+itertools = "0.14.0"
+log = { version = "0.4.33", features = ["std"] }
+nohash-hasher = "0.2.0"
+profiling = { version = "1.0", default-features = false }
+smallvec = "1.15"
+unicode-segmentation = "1.13"
+
+#! ### Optional dependencies
+
+backtrace = { version = "0.3.76", optional = true }
+
+## Enable this when generating docs.
+document-features = { version = "0.2.12", optional = true }
+
+ron = { version = "0.12.2", optional = true }
+serde = { version = "1.0", optional = true, features = ["derive", "rc"] }

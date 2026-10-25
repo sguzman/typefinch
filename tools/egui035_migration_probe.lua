@@ -183,9 +183,9 @@ replace([[let range=range.map(|mut range|{
                                 .and_then(|st|st.cursor.char_range());
                             eprintln!("egui035-wayland-rtl-qa pointer focus={} source_chars={} source_bytes={} galley_chars={} galley_bytes={} same_text={} output={:?} stored={:?} used={:?}",
                                 edit.has_focus(),self.custom_text.chars().count(),
-                                self.custom_text.len(),edit_output.galley.text.chars().count(),
-                                edit_output.galley.text.len(),
-                                edit_output.galley.text==self.custom_text,
+                                self.custom_text.len(),edit_output.galley.text().chars().count(),
+                                edit_output.galley.text().len(),
+                                edit_output.galley.text()==self.custom_text.as_str(),
                                 native_cursor_range.map(ix),saved.map(ix),range.map(ix));
                         }
                         let range=range.map(|mut range|{

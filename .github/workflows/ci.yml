@@ -56,6 +56,8 @@ jobs:
           ./target/debug/typefinch --version | grep -Fx "typefinch $(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"
           ./target/debug/typefinch --help | grep -F "GUI shortcuts:"
           if ./target/debug/typefinch --unsupported; then exit 1; fi
+      - name: Native Wayland GUI synthetic Hyprland inventory attach/detach and recovery
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/hotplug_gui_smoke.sh
       - name: Synthetic Hyprland two-keyboard inventory lifecycle
         run: bash tests/hyprland_fixture_smoke.sh
       - name: Synthetic Wayland parent subprocess and metadata validation
@@ -127,6 +129,7 @@ jobs:
             typefinch-hidpi.png
             typefinch-geometry-*.png
             typefinch-starter-full-*.png
+            typefinch-hotplug-*.png
             typefinch-reference-*.png
             typefinch-recovery.png
             typefinch-heatmap.png

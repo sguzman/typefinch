@@ -249,7 +249,6 @@ pub struct Session {
     last_key_at:Option<Instant>,
     pending_completion: Option<Instant>,
 }
-#[derive(Clone, Copy, Debug, Default)]
 /// Counts *distinct* eligible reference positions, not wrong raw-key events.
 #[derive(Clone,Copy,Debug,Default,PartialEq,Eq)]
 pub struct OpportunityCounts {
@@ -261,6 +260,7 @@ impl OpportunityCounts {
         (self.observed>0).then(||100.0*self.missed as f64/self.observed as f64)
     }
 }
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Score {
     pub wpm: f64,
     /// Correct final reference grapheme clusters per minute. This measures

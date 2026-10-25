@@ -1972,7 +1972,7 @@ impl Typefinch {
             }
             let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
                 self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
-            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click to position or drag across the shaped preview to select in the native editor; only the field above edits text. Complete BiDi/IME editing remains unverified.",
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click to move the caret, Shift+click to extend a selection, or drag across the shaped preview; only the source field above edits text. Complete BiDi/IME editing remains unverified.",
                 first.saturating_add(1),last));
         }
     }
@@ -2690,6 +2690,10 @@ impl eframe::App for Typefinch {
             // focus. Never carry an unfinished RTL selection gesture into
             // a future focused interaction.
             self.rtl_preview_drag_anchor=None;
+            // The compositor may cancel a native RTL IME candidate without
+            // emitting its final Disabled event after focus leaves this window.
+            // Never keep stale preedit ownership across focus reacquisition.
+            self.rtl_editor_preedit_active=false;
             self.device_inventory_fresh=false;
             self.pending_device_obsolete=self.pending_device_query.is_some();
             let safer=layout_after_focus_change(

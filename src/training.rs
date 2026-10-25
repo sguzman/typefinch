@@ -182,6 +182,29 @@ mod tests {
             Mode::System).is_none(),
             "replaying an identical benchmark must not count as fresh benchmark evidence");
     }
+    #[test] fn every_word_quote_number_and_paragraph_source_roundtrips_as_custom(){
+        for language in Language::ALL {
+            for difficulty in [
+                WordDifficulty::Easy,WordDifficulty::Standard,
+                WordDifficulty::Challenge,
+            ] {
+                for mode in [
+                    TestMode::Words,TestMode::Quotes,TestMode::Numbers,
+                    TestMode::Punctuation,TestMode::Paragraphs,
+                ] {
+                    let original=Session::new_with_settings(
+                        0,mode,"",language,difficulty);
+                    assert!(!original.target.is_empty());
+                    let retest=Session::new_with_settings(
+                        0,TestMode::Custom,&original.target,language,difficulty);
+                    assert_eq!(retest.target,original.target,
+                        "Original benchmark text must replay exactly as a Custom session");
+                    assert!(!retest.mode.counts_for_benchmark());
+                    assert_eq!(retest.history_mode(),"custom");
+                }
+            }
+        }
+    }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,
             baseline_wpm:30.0,retest_wpm:25.0,baseline_attempts:30,retest_attempts:50};

@@ -1570,7 +1570,13 @@ impl Typefinch {
                 let is_wayland=k.address.starts_with("wayland:seat:");
                 ui.label(inspected_row_summary(k,verified));
                 if is_wayland {
-                    ui.small("Standard wl_seat gives no physical keyboard identity or active XKB layout. No key events are requested.");
+                    ui.small("Generic Wayland seat keymap is aggregate, not a physical keyboard. The separate unfocused inspector never records key events.");
+                    if !k.seat_xkb_groups.is_empty() {
+                        ui.small(format!("Offered XKB groups (active group not verified): {}",
+                            k.seat_xkb_groups.join(", ")));
+                    } else {
+                        ui.small("No XKB keymap groups reported; active group remains unknown.");
+                    }
                 } else if is_x11 {
                     ui.small("setxkbmap reports configured groups, not the active input group.");
                     ui.small("This is one aggregate seat, never a physical keyboard.");

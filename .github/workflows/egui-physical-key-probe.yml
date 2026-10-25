@@ -9,6 +9,7 @@ on:
       - .github/workflows/egui-physical-key-probe.yml
       - tools/egui035_migration_probe.lua
       - tools/egui035_physical_probe.lua
+      - tests/egui035_physical_emulation_smoke.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -48,6 +49,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_gui_smoke.sh
       - name: Verify existing AltGr and Spanish OS Compose through native X11
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/altgr_gui_smoke.sh
+      - name: Verify physical RightAlt and ISO extra-key routing in native X11 emulation
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/egui035_physical_emulation_smoke.sh
       - name: Save an isolated dependency graph for review
         if: always()
         uses: actions/upload-artifact@v4

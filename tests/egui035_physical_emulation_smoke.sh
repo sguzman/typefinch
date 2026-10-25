@@ -112,7 +112,9 @@ local file=assert(io.open(result_path,"rb"),"Physical Level-3/ISO fixture did no
 local result=assert(json.decode(file:read("*a")));file:close()
 assert(result.synthetic and result.state=="finished" and result.entered==6
   and result.correct==6 and result.accuracy==100,
-  "Emulated right Alt/ISO input failed six-grapheme native scoring")
+  string.format("Native emulation mismatch state=%s entered=%s correct=%s accuracy=%s",
+    tostring(result.state),tostring(result.entered),tostring(result.correct),
+    tostring(result.accuracy)))
 local database=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",database)
 local p=assert(io.popen(cmd,"r"))

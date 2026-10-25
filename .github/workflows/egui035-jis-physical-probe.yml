@@ -32,6 +32,10 @@ jobs:
           cargo clean -p egui -p egui-winit
       - name: Check physical JIS key maps against pinned XKB
         run: cargo test --locked --all-targets
+      - name: Build the isolated JIS-enabled native GUI
+        run: cargo build --locked
+      - name: Exercise true X11 JIS RO/YEN physical events and unscored IME controls
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/jis_physical_emulation_smoke.sh
       - name: Assert production source and dependency lock remain unchanged
         if: always()
         run: git diff --exit-code -- Cargo.toml Cargo.lock

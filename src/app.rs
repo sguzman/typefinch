@@ -110,6 +110,23 @@ fn reference_layout_job(target:&str,typed:&str,start:usize,end:usize,
 }
 const MAX_IME_PREEDIT_GRAPHEMES:usize=64;
 const MAX_IME_PREEDIT_BYTES:usize=4096;
+// Keep raw-editor IME composition ownership across frames. A visual click
+// must not relocate the native text caret while a candidate is uncommitted.
+// No preedit text is stored here; only a transient in-memory boolean.
+fn next_rtl_editor_preedit_state(previous:bool,events:&[egui::Event])->bool{
+    let mut composing=previous;
+    for event in events {
+        match event {
+            egui::Event::Ime(egui::ImeEvent::Preedit(text))=>{
+                composing=!text.is_empty();
+            },
+            egui::Event::Ime(egui::ImeEvent::Commit(_)
+                |egui::ImeEvent::Disabled)=>composing=false,
+            _=>{},
+        }
+    }
+    composing
+}
 fn limited_ime_preedit(text:&str)->String {
     let mut visible=String::new();
     for grapheme in text.graphemes(true).take(MAX_IME_PREEDIT_GRAPHEMES) {
@@ -471,6 +488,7 @@ pub struct Typefinch {
     rtl_editor_selection_bytes:Option<(usize,usize)>,
     rtl_editor_caret:Option<(f32,f32)>,
     rtl_raw_editor_open:bool,
+    rtl_editor_preedit_active:bool,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -590,6 +608,7 @@ impl Typefinch {
             rtl_editor_texture:None,rtl_editor_signature:String::new(),
             rtl_editor_cursor_byte:None,rtl_editor_selection_bytes:None,rtl_editor_caret:None,
             rtl_raw_editor_open:false,
+            rtl_editor_preedit_active:false,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -1352,6 +1371,11 @@ impl Typefinch {
                                 .desired_width(ui.available_width())
                                 .hint_text("Edit private source text"));
                         if edit.changed(){self.rebuild_session();}
+                        if edit.has_focus() || self.rtl_editor_preedit_active {
+                            self.rtl_editor_preedit_active=ui.input(|i|
+                                next_rtl_editor_preedit_state(
+                                    self.rtl_editor_preedit_active,&i.events));
+                        }
                         if edit.has_focus() {
                             ui.scroll_to_rect(edit.rect,Some(egui::Align::Center));
                         }
@@ -1422,6 +1446,7 @@ impl Typefinch {
                                 primary.min(secondary),primary.max(secondary)))
                         });
                     } else {
+                        self.rtl_editor_preedit_active=false;
                         self.rtl_editor_cursor_byte=None;
                         self.rtl_editor_selection_bytes=None;
                     }
@@ -1796,7 +1821,7 @@ impl Typefinch {
             // geometry, then bounds/snaps that position to a Unicode
             // grapheme before mapping to egui's scalar cursor index.
             if self.rtl_raw_editor_open && self.session.state!=State::Running
-                && response.clicked()
+                && !self.rtl_editor_preedit_active && response.clicked()
                 && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_)))) {
                 if let Some(pointer)=response.interact_pointer_pos(){
                     let local=pointer-response.rect.min;

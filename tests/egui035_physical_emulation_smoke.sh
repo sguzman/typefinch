@@ -89,13 +89,10 @@ sleep 0.14
 
 # Right Alt is a distinct physical key: held across native input frames,
 # never inferred from the collapsed modifiers.alt bit.
-xdotool keydown Alt_R
-sleep 0.18
-xdotool key 26
-sleep 0.15
-xdotool key 24
-sleep 0.15
-xdotool keyup Alt_R
+# Deliver one continuous XTEST sequence using the *numeric physical*
+# RightAlt keycode (108 = evdev 100 + 8). Separate xdotool processes can
+# reconfigure modifier bookkeeping between the down and character events.
+xdotool keydown 108 sleep 0.18 key 26 sleep 0.15 key 24 sleep 0.15 keyup 108
 sleep 0.17
 # Negative control: an ordinary left-Alt+E must not become either e or €.
 xdotool key --clearmodifiers Alt_L+26

@@ -615,6 +615,50 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
   fi
+  if [[ "$name" == hebrew-long ]];then
+    # Actual egui/COSMIC editor viewport of a long, marked RTL passage.
+    # A fixed 160-grapheme preview overflows narrow windows; require
+    # width-bounded source slices and a positioned caret at both ends.
+    focus_window
+    xdotool key --clearmodifiers ctrl+e
+    sleep 0.4
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.4
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/long-editor-start.json"
+    import -window "$window" "$tmp/rtl-hebrew-long-editor-start.png"
+    xdotool key --clearmodifiers ctrl+End
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/long-editor-end.json"
+    import -window "$window" "$tmp/rtl-hebrew-long-editor-end.png"
+    lua5.4 - "$tmp/$name/long-editor-start.json" \
+      "$tmp/$name/long-editor-end.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native RTL long viewport audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local before,after=read(arg[1]),read(arg[2])
+assert(before.total>160 and before.index==0 and before.visible_start==0,
+  "Long Hebrew editor did not start at logical source beginning")
+assert(after.total==before.total and after.index==after.total
+  and after.visible_end==after.total and after.visible_start>0,
+  "Long RTL native editor failed to follow logical end caret")
+assert(after.visible_end-after.visible_start<=125
+  and before.visible_end-before.visible_start<=125,
+  "Long RTL editor texture exceeds width-sensitive preview window")
+assert(type(after.caret_y_px)=="number" and after.caret_y_px>=0
+  and after.caret_y_px<240,
+  "Long Hebrew native caret is clipped outside the shaped texture")
+print("Native long RTL editor bounded viewport PASS: "..
+  before.visible_start.."–"..before.visible_end.." -> "..
+  after.visible_start.."–"..after.visible_end..
+  " of "..after.total.." graphemes")
+LUA
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.25
+  fi
   if [[ "$name" == mixed ]];then
     # Three actual script directions over three logical paragraphs. This
     # checks native editor caret positioning against the shaped preview,

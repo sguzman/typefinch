@@ -55,4 +55,6 @@ jobs:
             Cargo.toml
             Cargo.lock
             egui-physical-key-probe.log
+            rtl-*.png
+            typefinch-*.png
           if-no-files-found: ignore

@@ -72,7 +72,7 @@ fn parse_xkb_keymap(fd:OwnedFd,size:u32)->Result<Vec<String>,String>{
         return Err("Wayland XKB keymap size invalid or excessive.".into());
     }
     let mut bytes=Vec::new();
-    File::from(fd).take(u64::from(size)+1).read_to_end(&mut bytes)
+    File::from(fd).take(u64::from(size)).read_to_end(&mut bytes)
         .map_err(|_|"Wayland XKB keymap read failed.")?;
     if bytes.len()!=size as usize || bytes.pop()!=Some(0){
         return Err("Wayland XKB keymap truncated or missing terminator.".into());
@@ -146,13 +146,19 @@ impl Dispatch<wl_keyboard::WlKeyboard,u32> for State {
     fn event(state:&mut Self,_:&wl_keyboard::WlKeyboard,
         event:wl_keyboard::Event,id:&u32,_:&Connection,_:&QueueHandle<Self>) {
         if let wl_keyboard::Event::Keymap{format,fd,size}=event {
-            if !matches!(format,WEnum::Value(wl_keyboard::KeymapFormat::XkbV1)){
-                state.invalid_keymap=true;
-                return;
-            }
-            match parse_xkb_keymap(fd,size){
-                Ok(groups)=>{state.keymaps.insert(*id,groups);},
-                Err(_)=>{state.invalid_keymap=true;},
+            match format {
+                // NoKeymap is a legal compositor response. It does NOT
+                // expose an XKB mapping, but the seat can still type.
+                WEnum::Value(wl_keyboard::KeymapFormat::NoKeymap)=>{
+                    state.keymaps.insert(*id,Vec::new());
+                },
+                WEnum::Value(wl_keyboard::KeymapFormat::XkbV1)=>{
+                    match parse_xkb_keymap(fd,size){
+                        Ok(groups)=>{state.keymaps.insert(*id,groups);},
+                        Err(_)=>{state.invalid_keymap=true;},
+                    }
+                },
+                _=>{state.invalid_keymap=true;},
             }
         }
     }

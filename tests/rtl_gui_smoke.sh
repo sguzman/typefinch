@@ -374,7 +374,7 @@ LUA
     sleep 0.2
     xdotool mousemove --window "$window" 175 521 mousedown 1
     sleep 0.15
-    xdotool mousemove --window "$window" 355 548
+    xdotool mousemove --window "$window" 355 521
     sleep 0.25
     xdotool mouseup 1
     sleep 0.45

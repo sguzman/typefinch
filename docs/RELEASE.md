@@ -58,7 +58,13 @@ a bit-identical executable across different machines is **not yet proven**.
 Maintainers can build with `cargo build --release --locked` and run
 `lua5.4 tools/package_release.lua VERSION COMMIT_SHA` followed by
 `bash tests/release_smoke.sh`. The explicit file allowlist excludes private
-profiles, exports and arbitrary local files. Tar metadata and gzip headers
+profiles, exports and arbitrary local files. It also includes the exact
+`epaint 0.35.0` MIT and Apache-2.0 license files and upstream provenance
+under `share/doc/typefinch/third-party/epaint-0.35.0/`, because Typefinch
+currently includes a narrowly patched egui RTL shaping dependency.
+`tests/release_smoke.sh` verifies these three files against the checked-in
+third-party originals, alongside the existing checksum, install, upgrade,
+rollback and unmanaged-file refusal tests. Tar metadata and gzip headers
 are normalized for repeatable archives *given identical binary contents*;
 the Rust executable is not independently proven reproducible.
 

@@ -480,7 +480,12 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
     xdotool mousemove --window "$window" 220 521
-    xdotool click --repeat 2 --delay 100 1
+    # Direct XTest events can be coalesced into a single egui frame when
+    # --repeat is used. Separate the clicks by real GUI frames but stay
+    # inside egui's double-click interval (<300 ms).
+    xdotool click 1
+    sleep 0.16
+    xdotool click 1
     sleep 0.5
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-double-word.json"
     import -window "$window" "$tmp/rtl-$name-preview-double-word.png"
@@ -488,6 +493,8 @@ LUA
 local json=require("dkjson")
 local f=assert(io.open(arg[1],"rb"),"Missing native word double-click audit")
 local d=assert(json.decode(assert(f:read("*a"))));f:close()
+print("Native shaped RTL word-click audit: "..tostring(d.selected_graphemes)..
+  "/"..tostring(d.total).." selected graphemes")
 assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned
   and d.total>8 and d.selected_graphemes>=2
   and d.selected_graphemes<d.total,

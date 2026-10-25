@@ -36,6 +36,8 @@ jobs:
         run: lua5.4 tools/roadmap.lua --check
       - name: Audit brand swatch and semantic accent contrast
         run: lua5.4 tools/color_audit.lua --check
+      - name: Validate opt-in real Hyprland QA script parser without live input
+        run: bash tests/live_hyprland_acceptance.sh --self-test
       - name: Assert tracked dependency resolution
         run: |
           git ls-files --error-unmatch Cargo.lock

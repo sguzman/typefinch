@@ -458,3 +458,9 @@ support. Further virtual validation needs a compatible render-capable host;
 real connected keyboards, physical-device attribution, native compositor
 IME handling and system theme transitions still need appropriately
 authorized live acceptance. Standard X11 and nested Weston CI stay separate.
+
+## 🖥️ Opt-in local Hyprland acceptance handoff
+
+`tests/live_hyprland_acceptance.sh` prepares the existing T001/T902 live-foreground QA for an authorized **local Codex agent**, not a human doing manual QA. It requires an actual Hyprland session and explicit `TYPEFINCH_QA_CONSENT=1`; it never runs automatically on a local machine. The script compiles the locked app, launches with disposable XDG state, proves its window PID/focus through real Hyprland IPC, and dispatches F1 only to that window. It compares two window-bounded local screenshots and restores prior focus. Evidence is deleted by default; an optional already-existing `TYPEFINCH_QA_OUTPUT_DIR` keeps a screenshot locally, never uploads it. The CI `--self-test` covers only pure JSON parsing and does not claim live acceptance.
+
+This does **not** demonstrate a physical keyboard event, per-device attribution, actual system-theme transition, arbitrary IME behavior or global input capture. Those gates remain open until a local agent executes and independently verifies them. No root, `/dev/input` or unconsented access is required.

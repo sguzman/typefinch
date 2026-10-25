@@ -46,9 +46,9 @@ impl Emulator {
     }
 
     /// Compose translation for an explicitly known physical Level-3 state.
-    /// Currently the scored egui input path cannot distinguish left Alt from
-    /// physical Right Alt, so it deliberately calls the non-Level-3 wrapper.
-    /// A caller must never infer alt_gr=true solely from Modifiers.alt.
+    /// Production egui 0.35 has distinct Left/Right Alt physical-key events.
+    /// Only an expressly observed Right Alt press may authorize Level 3.
+    /// Never infer alt_gr=true solely from Modifiers.alt.
     pub fn translate_composed_layer(
         &self, physical: Key, shift: bool, alt_gr: bool,
         compose: &mut xkb::compose::State,
@@ -108,8 +108,9 @@ impl Emulator {
     }
     /// Inspect XKB's selected modifier level. Right-Alt (evdev 100) is an
     /// explicit Level-3 modifier in layouts that bind ISO_Level3_Shift.
-    /// This is a preview facility; egui does not reliably distinguish
-    /// physical left-Alt from AltGr input on every compositor.
+    /// This is also used by the production software-emulation input path
+    /// after an explicit Right Alt event. Every compositor/hardware path
+    /// remains independently subject to native acceptance tests.
     pub fn translate_layer(&self,physical:Key,shift:bool,alt_gr:bool)->Option<String> {
         self.translate_evdev_layer(evdev_code(physical)?, shift, alt_gr)
     }
@@ -120,7 +121,8 @@ impl Emulator {
         if result.is_empty() || result.chars().any(char::is_control) {None} else {Some(result)}
     }
 }
-/// Common ANSI key positions; ISO/JIS extra key positions have separate roadmap gates.
+/// Common ANSI positions plus the physically distinct ISO 102nd key.
+/// Other ISO/JIS physical positions remain separate acceptance gates.
 /// Linux evdev keycodes + 8 are XKB keycodes.
 fn evdev_code(key: Key) -> Option<u32> {
     const ROWS: [[u32;10];3] = [
@@ -148,6 +150,10 @@ mod tests {
         assert_eq!(de.translate_layer(Key::IntlBackslash,false,false).as_deref(),Some("<"));
         assert_eq!(de.translate_layer(Key::IntlBackslash,true,false).as_deref(),Some(">"));
         assert_ne!(evdev_code(Key::IntlBackslash),evdev_code(Key::Backslash));
+        assert_eq!(de.translate_layer(Key::IntlBackslash,false,true).as_deref(),Some("|"),
+            "German ISO extra key Level 3 must use real XKB position");
+        assert_eq!(de.translate_layer(Key::S,true,true).as_deref(),Some("ẞ"),
+            "German Shift+RightAlt must resolve Level 4 rather than Shift or AltGr alone");
     }
     #[test] fn common_system_xkb_layouts_compile() {
         for id in ["us", "de", "fr", "es", "latam", "ru", "gr", "ara", "il", "jp"] {

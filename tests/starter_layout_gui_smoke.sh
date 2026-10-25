@@ -232,9 +232,11 @@ LUA
     xdotool key --clearmodifiers ctrl+shift+b
     for code in "${full_codes[@]}";do
       xdotool key --clearmodifiers "$code"
+      sleep 0.03
     done
     for code in "${full_codes[@]}";do
       xdotool key --clearmodifiers "shift+$code"
+      sleep 0.03
     done
     # The event loop may need another frame to finish/persist the
     # last scored event. Check the real report rather than a fixed delay.

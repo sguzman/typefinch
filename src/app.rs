@@ -1966,6 +1966,15 @@ impl Typefinch {
                 ui.label(format!("{:.1} s left",self.session.seconds_left()));
             }
         });
+        if self.session.state==State::Finished {
+            let opportunities=self.session.opportunity_counts();
+            if let Some(rate)=opportunities.missed_percent(){
+                ui.small(format!(
+                    "Distinct missed reference positions: {} / {} reached ({rate:.1}%).",
+                    opportunities.missed,opportunities.observed))
+                    .on_hover_text("A position is counted once even after repeated mistakes, combining marks or Backspace corrections. These private position counters live in memory only, are not persisted, and are not training-efficacy evidence.");
+            }
+        }
         ui.add(egui::ProgressBar::new(
             session_progress_fraction(&self.session)
         ).show_percentage());

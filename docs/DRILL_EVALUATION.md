@@ -33,6 +33,25 @@ records, but **no paired-trial identifier, passage, or character-level
 error stream is saved or uploaded**. Completing a drill alone cannot
 make the experiment show improvement.
 
+**Native GUI acceptance (synthetic only):**
+[CI 40153854777](https://github.com/sguzman/typefinch/actions/runs/40153854777)
+passed **235 Rust tests and the full graphical suite**. Its actual Xvfb/egui
+frontend received a deliberately mistyped three-character source
+(`aba` attempted as `axa`), invoked **Ctrl+Shift+K** to complete an
+eight-repeat missed-character drill, then invoked **Ctrl+Shift+R** to
+retype the **identical original source** accurately. The standard
+per-profile SQLite database contained exactly three aggregate scores:
+2/3 initial correctness, 15/15 drill correctness, 3/3 retest correctness,
+with unchanged input-mode provenance. A separate synthetic-only QA report
+contained just numeric before/after raw accuracy (66.7% → 100%) and
+explicitly set `causal_claim: false`. The app did not persist the custom
+passage, source path, generated drill or trial metadata to settings.
+The 1060×760 native screenshot `typefinch-training-followup.png` was
+archived and visually inspected; it renders the 66.7% → 100% change
+beside a **slower** corrected WPM, and explicitly warns against inferring
+causation. **None of these deliberately authored inputs came from a
+real learner.** They validate feature mechanics, not efficacy.
+
 This is a **descriptive self-comparison**, useful feedback but not a test
 of causal efficacy. Retesting the same source introduces familiarity,
 practice, repetition, regression-to-the-mean and unequal-exposure biases.

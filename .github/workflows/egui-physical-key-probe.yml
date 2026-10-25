@@ -40,6 +40,10 @@ jobs:
           EG="$(find "$ROOT" -path '*/egui-0.35.0/src/text_selection/text_cursor_state.rs' -print -quit)"
           test -n "$EP" && test -n "$EG"
           lua5.4 tools/egui035_rtl_upstream_backport.lua "$EP" "$EG"
+          # Registry sources are normally immutable; cached Rust fingerprints
+          # must not silently reuse pre-backport epaint/egui artifacts.
+          cargo clean -p epaint
+          cargo clean -p egui
       - name: Apply egui 0.35 compatibility edits in temporary checkout
         run: |
           lua5.4 tools/egui035_migration_probe.lua

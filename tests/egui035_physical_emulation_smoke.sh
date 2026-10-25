@@ -20,8 +20,9 @@ trap cleanup EXIT
 export XDG_CONFIG_HOME="$tmp/config"
 export TYPEFINCH_QA_REPORT="$tmp/result.json" TYPEFINCH_QA_START_REPORT="$tmp/started.json"
 mkdir -p "$XDG_CONFIG_HOME"
-# Physical ISO extra-key output uses the German 105-key XKB map.
-setxkbmap -layout de -model pc105
+# Keep the host OS on US: this is explicitly SOFTWARE emulation of de.
+# AltGr symbols must come from the app, never native German OS composition.
+setxkbmap -layout us -model pc105
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm=$!
 sleep 0.4
@@ -81,10 +82,9 @@ sleep 0.3
 xdotool key --clearmodifiers F2
 sleep 0.3
 
-# Ordinary physical E. Left Alt+E must NOT score the next expected €.
+# Ordinary physical E. Test Right Alt before the negative Left-Alt
+# shortcut, so XTEST modifier restoration cannot confound Level-3 state.
 xdotool key --clearmodifiers 26
-sleep 0.14
-xdotool key --clearmodifiers Alt_L+26
 sleep 0.14
 
 # Right Alt is a distinct physical key: held across native input frames,
@@ -97,6 +97,9 @@ xdotool key 24
 sleep 0.15
 xdotool keyup Alt_R
 sleep 0.17
+# Negative control: an ordinary left-Alt+E must not become either e or €.
+xdotool key --clearmodifiers Alt_L+26
+sleep 0.14
 xdotool key --clearmodifiers 26
 sleep 0.14
 # X11 keycode 94 = Linux evdev 86 + 8 = ISO 102nd key.

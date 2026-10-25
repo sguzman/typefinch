@@ -16,6 +16,7 @@ use crate::{
     publish,
     registry::{self, InstalledLayout},
     rtl_shaping,
+    training::{FollowUp,Stage},
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
@@ -435,6 +436,7 @@ pub struct Typefinch {
     layout_draft:Option<CustomLayout>,
     layout_import_path:String,
     history: Vec<Record>,
+    training_followup:Option<FollowUp>,
     earned_badges: Vec<achievements::Achievement>,
     all_history:Vec<Record>,
     history_only_matching: bool,
@@ -574,6 +576,7 @@ impl Typefinch {
         }
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, unicode_fonts, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(), installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
+             training_followup:None,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
@@ -729,6 +732,22 @@ impl Typefinch {
         self.save();
         if let Err(err) = crate::qa::write_smoke_report(&self.session, completed_tests) {
             self.message = format!("QA report failed: {err}");
+        }
+        // Compare only after the identical source retest was successfully
+        // persisted. Never turn generated-drill performance into a success
+        // claim, and invalidate a changed profile, layout or input mode.
+        if let Some(trial)=self.training_followup.as_mut() {
+            if trial.stage==Stage::Retest {
+                let result=trial.compare(&self.session,&self.session_layout,
+                    &identity,&self.prefs.layout,self.mode);
+                if let Some(comparison)=result {
+                    trial.stage=Stage::Compared;
+                    trial.comparison=Some(comparison);
+                } else {
+                    self.training_followup=None;
+                    self.message="Practice comparison not available: retest context or passage changed.".into();
+                }
+            }
         }
     }
     fn rebuild_session(&mut self) {
@@ -1617,6 +1636,11 @@ impl Typefinch {
         ui.small("Inspection only. Neither Wayland seat-level typing nor X11 configuration metadata provides per-device key attribution.");
     }
     fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
+        // The source and baseline exist only in memory, scoped to this one
+        // profile, keyboard layout and app invocation.
+        self.training_followup=FollowUp::begin(&self.session,&drill,
+            &self.prefs.profiles[self.prefs.active_profile].id,
+            &self.prefs.layout,&self.session_layout,self.mode);
         self.custom_text=drill;
         Self::reset_custom_editor_history(ctx);
         self.prefs.test_mode=TestMode::Custom;
@@ -1624,6 +1648,37 @@ impl Typefinch {
         self.save();
         self.start_test(ctx);
         self.message="Practice drill started using missed reference patterns. Text stays in memory only.".into();
+    }
+    fn start_training_retest(&mut self,ctx:&egui::Context){
+        let Some(mut trial)=self.training_followup.take() else{return;};
+        if trial.stage!=Stage::Drill
+            || self.session.state!=State::Finished
+            || self.session.mode!=TestMode::Custom
+            || self.session.target!=trial.drill_reference
+            || !trial.same_context(&self.prefs.profiles[self.prefs.active_profile].id,
+                &self.prefs.layout,self.mode) {
+            self.message="Practice retest unavailable: source, profile or input context changed.".into();
+            return;
+        }
+        self.prefs.test_mode=trial.mode;
+        self.prefs.language=trial.language;
+        self.prefs.word_difficulty=trial.difficulty;
+        self.prefs.duration_seconds=trial.duration.as_secs();
+        if trial.mode==TestMode::Custom {
+            self.custom_text=trial.reference.clone();
+            Self::reset_custom_editor_history(ctx);
+        }
+        self.rebuild_session();
+        if self.session.target!=trial.reference
+            || self.session.duration!=trial.duration {
+            self.message="Original passage could not be reconstructed exactly; no comparison made.".into();
+            return;
+        }
+        trial.stage=Stage::Retest;
+        self.training_followup=Some(trial);
+        self.save();
+        self.start_test(ctx);
+        self.message="Original passage retest started. Before/after scores are observational, not proof that the drill caused improvement.".into();
     }
     /// Recompute only when reference window, score colors or input changes.
     /// No screenshot or entered text leaves the in-memory native widget.
@@ -1753,6 +1808,16 @@ impl Typefinch {
                         self.start_weak_drill(drill,ctx);
                     }
                 }
+                let can_retest=self.training_followup.as_ref().is_some_and(|trial|
+                    trial.stage==Stage::Drill
+                    && self.session.mode==TestMode::Custom
+                    && self.session.target==trial.drill_reference
+                    && trial.same_context(
+                        &self.prefs.profiles[self.prefs.active_profile].id,
+                        &self.prefs.layout,self.mode));
+                if can_retest && ui.button("Retest original passage").clicked() {
+                    self.start_training_retest(ctx);
+                }
             }
             ui.label(match self.session.state {
                 State::Ready=>"Ready · press Start to capture typing",
@@ -1763,6 +1828,24 @@ impl Typefinch {
                 State::Finished=>"Finished · result saved to this local profile",
             });
         });
+        if self.session.state==State::Finished {
+            if let Some(trial)=self.training_followup.as_ref(){
+                if trial.stage==Stage::Compared {
+                    if let Some(c)=trial.comparison {
+                        ui.separator();
+                        ui.label(RichText::new("Same-passage practice follow-up").strong());
+                        ui.label(format!("Raw accuracy: {:.1}% → {:.1}% ({:+.1} pp). Corrected WPM: {:.1} → {:.1} ({:+.1}).",
+                            c.baseline_accuracy,c.retest_accuracy,c.accuracy_change_pp(),
+                            c.baseline_wpm,c.retest_wpm,c.speed_change_wpm()));
+                        if !c.same_attempt_count() {
+                            ui.small(format!("Input attempts differed ({} before, {} after); rates are not equal-sized samples.",
+                                c.baseline_attempts,c.retest_attempts));
+                        }
+                        ui.small("One within-user retest is observational. Repeating the source alone can improve performance; this does not establish drill efficacy. Source text and comparison remain in memory only.");
+                    }
+                }
+            }
+        }
         if self.session.state==State::Running && self.mode==Mode::Emulated
             && self.composition.as_ref().is_some_and(|state|
                 state.status()==xkbcommon::xkb::compose::Status::Composing) {

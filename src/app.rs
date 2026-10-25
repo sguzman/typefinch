@@ -751,6 +751,9 @@ impl Typefinch {
         }
     }
     fn rebuild_session(&mut self) {
+        // A new source, preference or profile invalidates an in-memory trial.
+        // The explicit retest path temporarily takes and restores it.
+        self.training_followup=None;
         self.ime_preedit.clear();
         // Textures and their cache signatures can contain pixels/strings from
         // a previously loaded private passage. Discard them when the source
@@ -769,6 +772,11 @@ impl Typefinch {
         self.session = Session::new_with_settings(duration, self.prefs.test_mode, input, self.prefs.language, self.prefs.word_difficulty);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
+        // Results from an earlier finished follow-up never decorate the
+        // next independent test.
+        if self.training_followup.as_ref().is_some_and(|t|t.stage==Stage::Compared) {
+            self.training_followup=None;
+        }
         self.ime_preedit.clear();
         if self.session.target.is_empty() {
             self.message = "Enter some custom text before starting this test.".into();
@@ -1638,13 +1646,14 @@ impl Typefinch {
     fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
         // The source and baseline exist only in memory, scoped to this one
         // profile, keyboard layout and app invocation.
-        self.training_followup=FollowUp::begin(&self.session,&drill,
+        let trial=FollowUp::begin(&self.session,&drill,
             &self.prefs.profiles[self.prefs.active_profile].id,
             &self.prefs.layout,&self.session_layout,self.mode);
         self.custom_text=drill;
         Self::reset_custom_editor_history(ctx);
         self.prefs.test_mode=TestMode::Custom;
         self.rebuild_session();
+        self.training_followup=trial;
         self.save();
         self.start_test(ctx);
         self.message="Practice drill started using missed reference patterns. Text stays in memory only.".into();

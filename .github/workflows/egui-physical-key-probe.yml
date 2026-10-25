@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/egui-physical-key-probe.yml
       - tools/egui035_migration_probe.lua
+      - tools/egui035_rtl_upstream_backport.lua
       - tools/egui035_physical_probe.lua
       - tests/egui035_physical_emulation_smoke.sh
   workflow_dispatch:
@@ -31,6 +32,14 @@ jobs:
           grep -F 'eframe = { version = "=0.35.0"' Cargo.toml
           cargo update -p eframe
           cargo tree -i egui | head -30
+      - name: Backport upstream RTL glyph-count fix in disposable Cargo cache
+        run: |
+          cargo fetch
+          ROOT="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+          EP="$(find "$ROOT" -path '*/epaint-0.35.0/src/text/text_layout.rs' -print -quit)"
+          EG="$(find "$ROOT" -path '*/egui-0.35.0/src/text_selection/text_cursor_state.rs' -print -quit)"
+          test -n "$EP" && test -n "$EG"
+          lua5.4 tools/egui035_rtl_upstream_backport.lua "$EP" "$EG"
       - name: Apply egui 0.35 compatibility edits in temporary checkout
         run: |
           lua5.4 tools/egui035_migration_probe.lua

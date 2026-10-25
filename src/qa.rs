@@ -150,3 +150,18 @@ pub fn write_training_followup_audit(c:crate::training::Comparison)->Result<(),S
     fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
         .map_err(|e|e.to_string())
 }
+
+/// Synthetic-only indication that the actual native typing session started
+/// and owns the expected Unicode reference length. No source text, keycodes,
+/// device identity, typed events or file path is included in the payload.
+pub fn write_test_started_audit(session:&Session)->Result<(),String>{
+    if env::var_os("TYPEFINCH_QA_REPORT").is_none(){return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_START_REPORT") else{return Ok(());};
+    use unicode_segmentation::UnicodeSegmentation;
+    let data=serde_json::json!({
+        "state":"running","synthetic":true,
+        "expected_graphemes":session.target.graphemes(true).count(),
+    });
+    fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

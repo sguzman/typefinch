@@ -68,6 +68,8 @@ jobs:
         run: bash tests/wayland_seat_smoke.sh
       - name: Nested Weston virtual keyboard seat probe (no physical device)
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/wayland_virtual_seat_smoke.sh
+      - name: Weston crash-guard positive and negative controls
+        run: bash tests/wayland_gui_guarded.sh --self-test
       - name: Nested Weston Wayland GUI typing and aggregate provenance
         run: bash tests/wayland_gui_guarded.sh
       - name: X11 aggregate seat fallback (read-only)

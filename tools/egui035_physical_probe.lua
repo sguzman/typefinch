@@ -149,4 +149,27 @@ edit("src/app.rs",{
                         if let Some(text) = mapped { self.session.type_text(&text); }]]}
 })
 
+
+-- Include rejected key events, not just accepted scoring events. This
+-- distinguishes a compositor/XIM omission from our own modifier gate.
+-- Scope is synthetic physical-key metadata only, never input text.
+edit("src/app.rs",{
+    {[[        for event in events {
+            match event {]],
+     [[        for event in events {
+            if std::env::var_os("TYPEFINCH_QA_XKB_COMPOSE").is_some()
+                && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+                if let egui::Event::Key{key,physical_key,pressed,repeat,modifiers}= &event {
+                    if matches!(physical_key,
+                        Some(egui::Key::E|egui::Key::Q|egui::Key::AltRight
+                            |egui::Key::AltLeft|egui::Key::IntlBackslash)) {
+                        eprintln!("egui035-key-raw key={key:?} physical={physical_key:?} pressed={pressed} repeat={repeat} alt={} ctrl={} shift={} command={} held_right={} held_left={}",
+                            modifiers.alt,modifiers.ctrl,modifiers.shift,modifiers.command,
+                            self.emulated_right_alt_held,self.emulated_left_alt_held);
+                    }
+                }
+            }
+            match event {]]}
+})
+
 print("Isolated egui 0.35 physical AltGr + ISO input probe patched");

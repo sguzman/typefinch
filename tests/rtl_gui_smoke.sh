@@ -296,6 +296,40 @@ LUA
       echo "Shaped $name preview selection not visibly painted: $preview_pixels" >&2
       exit 1
     }
+    # Reverse the visual gesture across the same glyphs. The primary
+    # caret must follow the new pointer endpoint rather than retaining the
+    # first drag's primary CCursor, and the underlying source stays intact.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool mousemove --window "$window" 265 521 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 175 521
+    sleep 0.25
+    xdotool mouseup 1
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-drag-reverse.json"
+    import -window "$window" "$tmp/rtl-$name-preview-drag-reverse.png"
+    lua5.4 - "$tmp/$name/preview-drag.json" \
+      "$tmp/$name/preview-drag-reverse.json" <<'LUA'
+local json=require("dkjson")
+local function read(file)
+  local f=assert(io.open(file,"rb"),"Missing native shaped-preview drag audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local forward,reverse=read(arg[1]),read(arg[2])
+assert(reverse.total==forward.total and reverse.selected_graphemes>=2
+  and reverse.selected_graphemes<reverse.total,
+  "Reverse shaped-preview gesture did not retain a partial selection")
+assert(reverse.selected_graphemes==forward.selected_graphemes,
+  "Identical reverse visual range selected a different number of graphemes")
+assert(reverse.index~=forward.index,
+  "Reverse preview drag did not move the primary native caret endpoint")
+print("Native RTL preview forward/reverse selection PASS: "..
+  forward.selected_graphemes.." graphemes; active caret "..
+  forward.index.." -> "..reverse.index)
+LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
     # Real source mutation, not only caret painting. Select the first marked

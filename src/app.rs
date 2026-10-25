@@ -954,6 +954,7 @@ impl Typefinch {
                 self.custom_text=passage;
                 Self::reset_custom_editor_history(ctx);
                 self.rtl_raw_editor_open=false;
+                self.rtl_preview_drag_anchor=None;
                 self.rebuild_session();
                 // Only an explicitly opted-in, synthetic CI process records
                 // coarse script metadata; ordinary imports never write text.
@@ -1852,7 +1853,7 @@ impl Typefinch {
             // manipulate the ordinary native TextEdit selection, not a
             // separate input method or synthetic keyboard stream.
             let can_seek=self.rtl_raw_editor_open && self.session.state!=State::Running
-                && !self.rtl_editor_preedit_active
+                && self.last_window_focused && !self.rtl_editor_preedit_active
                 && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_))));
             let (pressed,released,press_origin,current_pos)=ui.input(|i|(
                 i.pointer.primary_pressed(),i.pointer.primary_released(),
@@ -2656,6 +2657,10 @@ impl eframe::App for Typefinch {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let focused=ctx.input(|i|i.focused);
         if self.last_window_focused && !focused {
+            // A pointer release may be lost when the native window loses
+            // focus. Never carry an unfinished RTL selection gesture into
+            // a future focused interaction.
+            self.rtl_preview_drag_anchor=None;
             self.device_inventory_fresh=false;
             self.pending_device_obsolete=self.pending_device_query.is_some();
             let safer=layout_after_focus_change(

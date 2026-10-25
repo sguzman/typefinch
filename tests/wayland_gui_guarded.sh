@@ -13,6 +13,7 @@ weston_pre_score_crash(){
   ! grep -F 'Nested Weston real Wayland wl_keyboard PASS:' "$log" >/dev/null &&
   ! grep -F 'Native Weston wl_keyboard did not deliver the complete test' "$log" >/dev/null &&
   { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null ||
+    grep -F 'Nested Weston died before native input stabilization' "$log" >/dev/null ||
     { grep -F 'Connection reset by peer' "$log" >/dev/null &&
       grep -F 'No scored native Wayland typing result' "$log" >/dev/null; }; }
 }
@@ -23,6 +24,9 @@ if [[ "${1:-}" == --self-test ]];then
   trap 'rm -f "$file"' EXIT
   printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
     'Typefinch exited before native Wayland keyboard input' >"$file"
+  weston_pre_score_crash "$file" || exit 1
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Nested Weston died before native input stabilization' >"$file"
   weston_pre_score_crash "$file" || exit 1
   printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
     'Connection reset by peer' \

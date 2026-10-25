@@ -114,3 +114,20 @@ mod import_audit_tests {
         assert_eq!(synthetic_script_class("abc 123"),"other");
     }
 }
+
+/// Test-only observer for the inspector's actual native GUI lifecycle.
+/// Writes no compositor names, keyboard identifiers, layouts, source text,
+/// window titles, raw key events or profile metadata.
+pub fn write_hotplug_audit(count:usize,selected:usize,fresh:bool,
+    uniform_known_layout:bool)->Result<(),String>{
+    if env::var_os("TYPEFINCH_QA_REPORT").is_none(){return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_HOTPLUG_REPORT") else{return Ok(());};
+    let report=serde_json::json!({
+        "state":"keyboard-inventory","synthetic":true,
+        "count":count,"selected_index":selected,
+        "fresh":fresh,"layout_detected":uniform_known_layout,
+        "inspection_only":true,
+    });
+    fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

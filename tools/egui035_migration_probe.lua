@@ -181,11 +181,16 @@ replace([[let range=range.map(|mut range|{
                                 (r.primary.index.0,r.secondary.index.0);
                             let saved=egui::TextEdit::load_state(ui.ctx(),editor_id)
                                 .and_then(|st|st.cursor.char_range());
-                            eprintln!("egui035-wayland-rtl-qa pointer focus={} source_chars={} source_bytes={} galley_chars={} galley_bytes={} same_text={} output={:?} stored={:?} used={:?}",
+                            let row_glyphs=edit_output.galley.rows.iter()
+                                .map(|row|row.row.glyphs.len()).collect::<Vec<_>>();
+                            let rendered_glyphs=edit_output.galley.rows.iter()
+                                .flat_map(|row|row.row.glyphs.iter().map(|glyph|glyph.chr))
+                                .collect::<String>();
+                            eprintln!("egui035-wayland-rtl-qa pointer focus={} source_chars={} source_bytes={} galley_chars={} galley_bytes={} galley_end={} rows={:?} glyphs_match_source={} output={:?} stored={:?} used={:?}",
                                 edit.has_focus(),self.custom_text.chars().count(),
                                 self.custom_text.len(),edit_output.galley.text().chars().count(),
-                                edit_output.galley.text().len(),
-                                edit_output.galley.text()==self.custom_text.as_str(),
+                                edit_output.galley.text().len(),edit_output.galley.end().index.0,
+                                row_glyphs,rendered_glyphs==self.custom_text,
                                 native_cursor_range.map(ix),saved.map(ix),range.map(ix));
                         }
                         let pointer_geometry=ui.input(|i|(

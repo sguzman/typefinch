@@ -69,7 +69,7 @@ fn rtl_preview_click_range(text:&str,active_byte:usize,
     let anchor=if extend {
         existing.as_ref()
             .and_then(|range|rtl_shaping::editor_caret_byte(
-                text,range.secondary.index))
+                text,range.secondary.index.0))
             .unwrap_or(active_byte)
     }else{active_byte};
     rtl_preview_editor_range(text,active_byte,anchor)
@@ -179,7 +179,7 @@ fn next_rtl_editor_preedit_state(previous:bool,events:&[egui::Event])->bool{
     let mut composing=previous;
     for event in events {
         match event {
-            egui::Event::Ime(egui::ImeEvent::Preedit(text))=>{
+            egui::Event::Ime(egui::ImeEvent::Preedit {text, ..})=>{
                 composing=!text.is_empty();
             },
             egui::Event::Ime(egui::ImeEvent::Commit(_)
@@ -204,7 +204,7 @@ fn score_system_committed_event(session:&mut Session,preedit:&mut String,
             preedit.clear();
             false
         },
-        egui::Event::Ime(egui::ImeEvent::Preedit(text))=>{
+        egui::Event::Ime(egui::ImeEvent::Preedit {text, ..})=>{
             *preedit=limited_ime_preedit(text);
             false
         },
@@ -237,7 +237,7 @@ fn score_system_frame_event(session:&mut Session,preedit:&mut String,
         egui::Event::Ime(egui::ImeEvent::Commit(text))=>Some((true,text.as_str())),
         egui::Event::Text(text)=>Some((false,text.as_str())),
         egui::Event::Ime(egui::ImeEvent::Enabled
-            |egui::ImeEvent::Preedit(_)|egui::ImeEvent::Disabled)=>{
+            |egui::ImeEvent::Preedit { .. }|egui::ImeEvent::Disabled)=>{
             dedup.last=None;
             None
         },
@@ -288,6 +288,13 @@ fn ime_owns_navigation(mode:Mode,preedit:&mut String,key:egui::Key)->bool {
 }
 fn emulated_key_accepted(repeat:bool,modifiers:egui::Modifiers)->bool {
     !repeat && !modifiers.command && !modifiers.ctrl && !modifiers.alt
+}
+/// An AltGr layer is enabled only by an expressly observed in-focus
+/// physical right-Alt press. Modifiers.alt alone is NOT AltGr; left Alt,
+/// Ctrl, command and auto-repeat do not score. No device is attributed.
+fn emulated_level3_key_accepted(repeat:bool,modifiers:egui::Modifiers,
+    right_alt:bool,left_alt:bool)->bool {
+    !repeat && right_alt && !left_alt && !modifiers.ctrl && !modifiers.command
 }
 fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::Modifiers> {
     events.iter().find_map(|event| match event {
@@ -510,6 +517,8 @@ pub struct Typefinch {
     emulator: Option<Emulator>,
     composition: Option<xkbcommon::xkb::compose::State>,
     ime_preedit:String,
+    emulated_right_alt_held:bool,
+    emulated_left_alt_held:bool,
     installed_layouts: Vec<InstalledLayout>,
     layout_search: String,
     layout_draft:Option<CustomLayout>,
@@ -591,7 +600,7 @@ impl Typefinch {
         // Use only installed system Unicode fallbacks, retaining egui's
         // preferred fonts. No glyph assets are bundled or fetched.
         let unicode_fonts=fonts::install(&cc.egui_ctx);
-        let normal_animation_time=cc.egui_ctx.style().animation_time;
+        let normal_animation_time=cc.egui_ctx.style_of(cc.egui_ctx.theme()).animation_time;
         cc.egui_ctx.all_styles_mut(|s| {
             s.animation_time=motion_seconds(prefs.reduce_motion,normal_animation_time);
             s.spacing.item_spacing = egui::vec2(10.0, 9.0);
@@ -655,7 +664,8 @@ impl Typefinch {
                 preview_shape.label(),&prefs.layout,preview_section.label(),
                 &geometry::section_slots(preview_shape,preview_section));
         }
-        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, unicode_fonts, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(), installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
+        Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, unicode_fonts, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(),
+             emulated_right_alt_held:false, emulated_left_alt_held:false, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
              training_followup:None,
                device_index: 0, last_window_focused:true,
@@ -863,6 +873,8 @@ impl Typefinch {
             self.training_followup=None;
         }
         self.ime_preedit.clear();
+        self.emulated_right_alt_held=false;
+        self.emulated_left_alt_held=false;
         if self.session.target.is_empty() {
             self.message = "Enter some custom text before starting this test.".into();
             return;
@@ -884,6 +896,8 @@ impl Typefinch {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
             self.ime_preedit.clear();
+            self.emulated_right_alt_held=false;
+            self.emulated_left_alt_held=false;
             if let Some(compose) = self.composition.as_mut() { compose.reset(); }
             let _=crate::qa::write_focus_lost_report();
             self.message = "Session canceled on window focus loss. No result saved.".into();
@@ -898,6 +912,18 @@ impl Typefinch {
         let mut system_frame_dedup=SystemFrameCommitDedup::default();
         for event in events {
             match event {
+                egui::Event::Key {key,physical_key,pressed,..}
+                    if self.mode==Mode::Emulated
+                    && (key==egui::Key::AltRight
+                        || physical_key==Some(egui::Key::AltRight))=>{
+                    self.emulated_right_alt_held=pressed;
+                }
+                egui::Event::Key {key,physical_key,pressed,..}
+                    if self.mode==Mode::Emulated
+                    && (key==egui::Key::AltLeft
+                        || physical_key==Some(egui::Key::AltLeft))=>{
+                    self.emulated_left_alt_held=pressed;
+                }
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                     if !ime_owns_navigation(self.mode,&mut self.ime_preedit,egui::Key::Escape) {
                         self.session.state = State::Ready;
@@ -940,22 +966,27 @@ impl Typefinch {
                     enter_scored_in_frame=false;
                 }
                 egui::Event::Key { key, physical_key, pressed: true, repeat, modifiers, .. }
-                    if self.mode == Mode::Emulated && emulated_key_accepted(repeat,modifiers) =>
+                    if self.mode == Mode::Emulated
+                     && ((!self.emulated_left_alt_held && !self.emulated_right_alt_held
+                         && emulated_key_accepted(repeat,modifiers))
+                      || emulated_level3_key_accepted(repeat,modifiers,
+                             self.emulated_right_alt_held,self.emulated_left_alt_held)) =>
                 {
                     // Crucially use the physical key, not an OS-translated logical letter.
                     // If unavailable, do not silently claim emulation works.
                     if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
+                        let alt_gr=self.emulated_right_alt_held && !self.emulated_left_alt_held;
                         let mapped = if let Some(personal)=self.prefs.custom_layouts.iter()
                             .find(|l|l.id==self.prefs.layout) {
-                            personal.translate(physical,modifiers.shift)
+                            if alt_gr {None} else {personal.translate(physical,modifiers.shift)}
                         } else if let Some(emulator) = &self.emulator {
                             if let Some(compose) = self.composition.as_mut() {
-                                emulator.translate_composed(physical, modifiers.shift, compose)
+                                emulator.translate_composed_layer(physical,modifiers.shift,alt_gr,compose)
                             } else {
-                                emulator.translate(physical, modifiers.shift)
+                                emulator.translate_layer(physical,modifiers.shift,alt_gr)
                             }
                         } else {
-                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
+                            if alt_gr {None} else {layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())}
                         };
                         if let Some(text) = mapped { self.session.type_text(&text); }
                     }
@@ -1430,13 +1461,35 @@ impl Typefinch {
                             egui::TextEdit::load_state(ui.ctx(),editor_id)
                                 .and_then(|state|state.cursor.char_range())
                         }else{None};
-                        let edit=ui.add_enabled(self.session.state!=State::Running,
-                            egui::TextEdit::multiline(&mut self.custom_text)
+                        let mut edit_output=None;
+                        ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
+                            edit_output=Some(egui::TextEdit::multiline(&mut self.custom_text)
                                 .id(editor_id)
                                 .desired_rows(4)
                                 .desired_width(ui.available_width())
-                                .hint_text("Edit private source text"));
+                                .hint_text("Edit private source text")
+                                .show(ui));
+                        });
+                        let edit_output=edit_output.expect("native text editor output");
+                        let native_cursor_range=edit_output.cursor_range;
+                        let edit=edit_output.response;
                         if edit.changed(){self.rebuild_session();}
+                        let plain_undo=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::Key{
+                                key:egui::Key::Z,pressed:true,repeat:false,modifiers,..
+                            } if modifiers.ctrl && !modifiers.alt
+                                && !modifiers.shift && !modifiers.command)));
+                        if edit.has_focus() && plain_undo && !self.rtl_editor_preedit_active {
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id){
+                                if let Some(mut range)=state.cursor.char_range(){
+                                    if range.primary.index!=range.secondary.index {
+                                        range.secondary=range.primary;
+                                        state.cursor.set_char_range(Some(range));
+                                        state.store(ui.ctx(),editor_id);
+                                    }
+                                }
+                            }
+                        }
                         if edit.has_focus() || self.rtl_editor_preedit_active {
                             self.rtl_editor_preedit_active=ui.input(|i|
                                 next_rtl_editor_preedit_state(
@@ -1457,14 +1510,14 @@ impl Typefinch {
                                     if let Some(mut range)=state.cursor.char_range() {
                                         let endpoint=if shift_arrow {
                                             rtl_shaping::snap_partial_selection(
-                                                &self.custom_text,range.primary.index,
-                                                range.secondary.index,previous_range.primary.index)
+                                                &self.custom_text,range.primary.index.0,
+                                                range.secondary.index.0,previous_range.primary.index.0)
                                         }else if plain_arrow
-                                            && previous_range.primary.index==previous_range.secondary.index
-                                            && range.primary.index==range.secondary.index {
+                                            && previous_range.primary.index.0==previous_range.secondary.index.0
+                                            && range.primary.index.0==range.secondary.index.0 {
                                             rtl_shaping::snap_moved_caret(
-                                                &self.custom_text,range.primary.index,
-                                                previous_range.primary.index)
+                                                &self.custom_text,range.primary.index.0,
+                                                previous_range.primary.index.0)
                                         }else{None};
                                         if let Some(endpoint)=endpoint {
                                             // Preserve the native horizontal preferred position,
@@ -1487,7 +1540,7 @@ impl Typefinch {
                             if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id){
                                 if let Some(mut range)=state.cursor.char_range(){
                                     if let Some((active,anchor))=rtl_shaping::snap_drag_selection(
-                                        &self.custom_text,range.primary.index,range.secondary.index){
+                                        &self.custom_text,range.primary.index.0,range.secondary.index.0){
                                         range.primary=egui::text::CCursor::new(active);
                                         range.secondary=egui::text::CCursor::new(anchor);
                                         state.cursor.set_char_range(Some(range));
@@ -1497,17 +1550,22 @@ impl Typefinch {
                             }
                         }
                         let range=if edit.has_focus(){
-                            egui::TextEdit::load_state(ui.ctx(),editor_id)
-                                .and_then(|state|state.cursor.char_range())
+                            let stored=egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|state|state.cursor.char_range());
+                            if shift_arrow || plain_arrow || pointer_selection || plain_undo {
+                                stored.or(native_cursor_range)
+                            }else{
+                                native_cursor_range.or(stored)
+                            }
                         }else{None};
                         self.rtl_editor_cursor_byte=range.as_ref()
                             .and_then(|range|rtl_shaping::editor_caret_byte(
-                                &self.custom_text,range.primary.index));
+                                &self.custom_text,range.primary.index.0));
                         self.rtl_editor_selection_bytes=range.and_then(|range|{
                             let primary=rtl_shaping::editor_caret_byte(
-                                &self.custom_text,range.primary.index)?;
+                                &self.custom_text,range.primary.index.0)?;
                             let secondary=rtl_shaping::editor_caret_byte(
-                                &self.custom_text,range.secondary.index)?;
+                                &self.custom_text,range.secondary.index.0)?;
                             (primary!=secondary).then_some((
                                 primary.min(secondary),primary.max(secondary)))
                         });
@@ -1970,9 +2028,9 @@ impl Typefinch {
                             };
                             if let Some(range)=chosen {
                                 let caret=rtl_shaping::editor_caret_byte(
-                                    &self.custom_text,range.primary.index).unwrap_or(active);
+                                    &self.custom_text,range.primary.index.0).unwrap_or(active);
                                 let anchor=rtl_shaping::editor_caret_byte(
-                                    &self.custom_text,range.secondary.index).unwrap_or(caret);
+                                    &self.custom_text,range.secondary.index.0).unwrap_or(caret);
                                 state.cursor.set_char_range(Some(range));
                                 state.store(ui.ctx(),id);
                                 ui.ctx().memory_mut(|m|m.request_focus(id));
@@ -2183,7 +2241,7 @@ impl Typefinch {
                     rect.left_top()+egui::vec2(16.0,16.0),
                     egui::vec2(1.0,22.0)));
             ctx.output_mut(|out|out.ime=Some(egui::output::IMEOutput{
-                rect,cursor_rect:cursor
+                rect,cursor_rect:cursor,should_interrupt_composition:false
             }));
         }
         if self.session.state == State::Running { ctx.request_repaint_after(Duration::from_millis(50)); }
@@ -2708,7 +2766,9 @@ impl Typefinch {
     }
 }
 impl eframe::App for Typefinch {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, root_ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx_owned=root_ui.ctx().clone();
+        let ctx=&ctx_owned;
         let focused=ctx.input(|i|i.focused);
         if self.last_window_focused && !focused {
             // A pointer release may be lost when the native window loses
@@ -2870,9 +2930,9 @@ impl eframe::App for Typefinch {
             self.session.tick();
         }
         if before == State::Running && self.session.state == State::Finished { self.finish(); }
-        egui::TopBottomPanel::top("typefinch-header")
-            .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)).fill(ctx.style().visuals.panel_fill))
-            .show(ctx, |ui| {
+        egui::Panel::top("typefinch-header")
+            .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(24, 15)).fill(ctx.style_of(ctx.theme()).visuals.panel_fill))
+            .show(root_ui, |ui| {
                 ui.horizontal(|ui| {
                     let (rect, _) = ui.allocate_exact_size(egui::vec2(46.0, 46.0), egui::Sense::hover());
                     let painter = ui.painter();
@@ -2902,13 +2962,13 @@ impl eframe::App for Typefinch {
             });
         let wide = ctx.content_rect().width() >= 900.0;
         if wide {
-            egui::SidePanel::left("typefinch-tools")
+            egui::Panel::left("typefinch-tools")
                 .resizable(true)
-                .default_width(295.0)
-                .min_width(255.0)
-                .max_width(370.0)
-                .frame(egui::Frame::default().inner_margin(egui::Margin::same(18)).fill(ctx.style().visuals.panel_fill))
-                .show(ctx, |ui| {
+                .default_size(295.0)
+                .min_size(255.0)
+                .max_size(370.0)
+                .frame(egui::Frame::default().inner_margin(egui::Margin::same(18)).fill(ctx.style_of(ctx.theme()).visuals.panel_fill))
+                .show(root_ui, |ui| {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         ui.add_space(6.0);
                         self.show_profile(ui);
@@ -2925,8 +2985,8 @@ impl eframe::App for Typefinch {
                 });
         }
         egui::CentralPanel::default()
-            .frame(egui::Frame::default().inner_margin(egui::Margin::same(24)).fill(ctx.style().visuals.panel_fill))
-            .show(ctx, |ui| {
+            .frame(egui::Frame::default().inner_margin(egui::Margin::same(24)).fill(ctx.style_of(ctx.theme()).visuals.panel_fill))
+            .show(root_ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     if !wide {
                         egui::CollapsingHeader::new("Profiles, appearance and keyboard settings")
@@ -2997,6 +3057,9 @@ impl eframe::App for Typefinch {
 #[cfg(test)]
 mod palette_tests {
     use super::*;
+    fn synthetic_preedit(text:String)->egui::ImeEvent {
+        egui::ImeEvent::Preedit{text,active_range_chars:None}
+    }
     fn brightness(c:Color32)->f64 {
         let v=[c.r(),c.g(),c.b()].map(|v|{
             let x=v as f64/255.0;
@@ -3036,7 +3099,7 @@ mod palette_tests {
             assert_eq!(job.text,target,"rendered text cannot be reversed");
             assert!(!job.sections.is_empty());
             let spans=job.sections.iter().map(|s|
-                (&job.text[s.byte_range.clone()],s.format.color)).collect::<Vec<_>>();
+                (&job.text[s.byte_range.start.0..s.byte_range.end.0],s.format.color)).collect::<Vec<_>>();
             assert_eq!(spans.iter().map(|(text,_)|*text).collect::<String>(),target);
             assert!(spans.iter().any(|(_,color)|*color==correct_ink(dark)));
             assert!(spans.iter().any(|(_,color)|*color==error_ink(dark)));
@@ -3172,7 +3235,7 @@ mod palette_tests {
             let mut pending=String::new();
             let initial=text.graphemes(true).next().unwrap();
             assert!(!score_system_committed_event(&mut session,&mut pending,
-                &egui::Event::Ime(egui::ImeEvent::Preedit(initial.to_owned()))));
+                &egui::Event::Ime(synthetic_preedit(initial.to_owned()))));
             assert!(session.typed.is_empty(),"RTL preedit must remain unscored");
             assert!(score_system_committed_event(&mut session,&mut pending,
                 &egui::Event::Ime(egui::ImeEvent::Commit(initial.to_owned()))));
@@ -3246,7 +3309,7 @@ mod palette_tests {
         let mut preedit=String::new();
         let mut guard=SystemFrameCommitDedup::default();
         assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
-            &egui::Event::Ime(egui::ImeEvent::Preedit("ni hao".into()))));
+            &egui::Event::Ime(synthetic_preedit("ni hao".into()))));
         assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
             &egui::Event::Ime(egui::ImeEvent::Commit("你好".into()))));
         assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
@@ -3299,11 +3362,11 @@ mod palette_tests {
         assert!(!score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Ime(egui::ImeEvent::Enabled)));
         assert!(!score_system_committed_event(&mut session,&mut preedit,
-            &egui::Event::Ime(egui::ImeEvent::Preedit("ni".into()))));
+            &egui::Event::Ime(synthetic_preedit("ni".into()))));
         assert_eq!(preedit,"ni");
         assert_eq!(session.typed,"");
         assert!(!score_system_committed_event(&mut session,&mut preedit,
-            &egui::Event::Ime(egui::ImeEvent::Preedit("你好".into()))));
+            &egui::Event::Ime(synthetic_preedit("你好".into()))));
         assert_eq!(preedit,"你好");
         assert!(!score_system_committed_event(&mut session,&mut preedit,
             &egui::Event::Paste("你好世界".into())));
@@ -3370,8 +3433,8 @@ mod palette_tests {
                 if rtl_preview_editor_range(source,end,start).is_none() {continue;}
                 let selected=rtl_preview_word_range(source,start)
                     .expect("Unicode lexical word must be selectable");
-                assert_eq!(selected.primary.index,source[..end].chars().count());
-                assert_eq!(selected.secondary.index,source[..start].chars().count());
+                assert_eq!(selected.primary.index.0,source[..end].chars().count());
+                assert_eq!(selected.secondary.index.0,source[..start].chars().count());
             }
         }
         let passage="שָׁלוֹם, مرحبا";
@@ -3389,19 +3452,19 @@ mod palette_tests {
             .collect::<Vec<_>>();
         let pos=|i:usize| starts[i];
         let original=rtl_preview_click_range(source,pos(3),None,false).unwrap();
-        assert_eq!(original.primary.index,original.secondary.index);
+        assert_eq!(original.primary.index.0,original.secondary.index.0);
         let extended=rtl_preview_click_range(source,pos(9),Some(original),true)
             .expect("Shift-click should extend from original source caret");
-        assert_eq!(extended.primary.index,source[..pos(9)].chars().count());
-        assert_eq!(extended.secondary.index,source[..pos(3)].chars().count());
+        assert_eq!(extended.primary.index.0,source[..pos(9)].chars().count());
+        assert_eq!(extended.secondary.index.0,source[..pos(3)].chars().count());
         let reversed=rtl_preview_click_range(source,pos(1),Some(extended),true)
             .expect("Reverse Shift-click must retain the original anchor");
-        assert_eq!(reversed.primary.index,source[..pos(1)].chars().count());
-        assert_eq!(reversed.secondary.index,source[..pos(3)].chars().count());
+        assert_eq!(reversed.primary.index.0,source[..pos(1)].chars().count());
+        assert_eq!(reversed.secondary.index.0,source[..pos(3)].chars().count());
         let collapsed=rtl_preview_click_range(source,pos(5),Some(reversed),false)
             .expect("Plain click should clear the prior source selection");
-        assert_eq!(collapsed.primary.index,collapsed.secondary.index);
-        assert_eq!(collapsed.primary.index,source[..pos(5)].chars().count());
+        assert_eq!(collapsed.primary.index.0,collapsed.secondary.index.0);
+        assert_eq!(collapsed.primary.index.0,source[..pos(5)].chars().count());
         assert!(rtl_preview_click_range(source,1,Some(collapsed),true).is_none(),
             "Shift-click must reject partial Unicode grapheme endpoints");
         assert!(rtl_preview_click_range(source,source.len()+1,None,false).is_none());
@@ -3414,8 +3477,8 @@ mod palette_tests {
             for &anchor in &boundaries {
                 let range=rtl_preview_editor_range(source,active,anchor)
                     .expect("whole-grapheme visual cursor must map to TextEdit");
-                assert_eq!(range.primary.index,source[..active].chars().count());
-                assert_eq!(range.secondary.index,source[..anchor].chars().count());
+                assert_eq!(range.primary.index.0,source[..active].chars().count());
+                assert_eq!(range.secondary.index.0,source[..anchor].chars().count());
             }
         }
         for byte in 0..source.len() {
@@ -3431,7 +3494,7 @@ mod palette_tests {
         let mut active=false;
         active=next_rtl_editor_preedit_state(active,&[
             Event::Ime(ImeEvent::Enabled),
-            Event::Ime(ImeEvent::Preedit("שָׁ".into())),
+            Event::Ime(synthetic_preedit("שָׁ".into())),
         ]);
         assert!(active,"active Hebrew niqqud candidate must own the source caret");
         active=next_rtl_editor_preedit_state(active,&[
@@ -3445,11 +3508,11 @@ mod palette_tests {
         ]);
         assert!(!active,"committing the candidate releases pointer positioning");
         active=next_rtl_editor_preedit_state(active,&[
-            Event::Ime(ImeEvent::Preedit("مَرْ".into())),
+            Event::Ime(synthetic_preedit("مَرْ".into())),
         ]);
         assert!(active);
         assert!(!next_rtl_editor_preedit_state(active,&[
-            Event::Ime(ImeEvent::Preedit(String::new())),
+            Event::Ime(synthetic_preedit(String::new())),
         ]),"explicitly empty composition releases the cursor guard");
         assert!(!next_rtl_editor_preedit_state(true,&[
             Event::Ime(ImeEvent::Disabled),
@@ -3461,12 +3524,12 @@ mod palette_tests {
         let mut preview=String::new();
         let huge="你".repeat(8000);
         assert!(!score_system_committed_event(&mut session,&mut preview,
-            &egui::Event::Ime(egui::ImeEvent::Preedit(huge))));
+            &egui::Event::Ime(synthetic_preedit(huge))));
         assert_eq!(preview.graphemes(true).count(),MAX_IME_PREEDIT_GRAPHEMES);
         assert!(preview.len()<=MAX_IME_PREEDIT_BYTES);
         let huge_combining=format!("e{}", "\u{301}".repeat(10_000));
         assert!(!score_system_committed_event(&mut session,&mut preview,
-            &egui::Event::Ime(egui::ImeEvent::Preedit(huge_combining))));
+            &egui::Event::Ime(synthetic_preedit(huge_combining))));
         assert!(preview.len()<=MAX_IME_PREEDIT_BYTES,
             "one giant combining grapheme must not bypass the preview byte cap");
         assert!(session.typed.is_empty());
@@ -3496,6 +3559,35 @@ mod palette_tests {
         assert!(!ime_owns_navigation(Mode::System,&mut candidate,egui::Key::Enter),
             "Enter is handled independently to avoid confirming IME candidates");
     }
+    #[test] fn explicit_right_alt_gates_emulated_level_three_without_left_alt_leak() {
+        let plain=egui::Modifiers::default();
+        let alt=egui::Modifiers{alt:true,..plain};
+        assert!(!emulated_level3_key_accepted(false,alt,false,false));
+        assert!(!emulated_level3_key_accepted(false,alt,true,true));
+        assert!(emulated_level3_key_accepted(false,alt,true,false));
+        assert!(emulated_level3_key_accepted(false,plain,true,false),
+            "right Alt event itself, not a possibly collapsed modifier flag, authorizes Level 3");
+        assert!(!emulated_level3_key_accepted(true,alt,true,false));
+        assert!(!emulated_level3_key_accepted(false,
+            egui::Modifiers{ctrl:true,..alt},true,false));
+        assert!(!emulated_level3_key_accepted(false,
+            egui::Modifiers{command:true,..alt},true,false));
+        let de=Emulator::compile("de").unwrap();
+        let mut state=de.compose_state().unwrap();
+        let mut session=Session::new_with_custom(30,TestMode::Custom,"e€@e");
+        session.begin();
+        for (key,right_alt) in [
+            (egui::Key::E,false),(egui::Key::E,true),
+            (egui::Key::Q,true),(egui::Key::E,false),
+        ] {
+            if let Some(text)=de.translate_composed_layer(key,false,right_alt,&mut state){
+                session.type_text(&text);
+            }
+        }
+        assert_eq!(session.typed,"e€@e");
+        assert_eq!(session.attempts,4);
+        assert_eq!(session.score().accuracy,100.0);
+    }
     #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {
         let plain=egui::Modifiers::default();
         assert!(emulated_key_accepted(false,plain));
@@ -3507,6 +3599,22 @@ mod palette_tests {
         assert!(!emulated_key_accepted(false,egui::Modifiers{alt:true,..plain}));
         assert!(!emulated_key_accepted(false,egui::Modifiers{command:true,..plain}));
         assert!(!emulated_key_accepted(true,egui::Modifiers{shift:true,..plain}));
+    }
+    #[test] fn egui_035_rtl_galley_cursor_count_matches_unicode_scalars() {
+        let ctx=egui::Context::default();
+        ctx.begin_pass(egui::RawInput::default());
+        ctx.fonts_mut(|fonts| {
+            for source in ["سَلَام بالعربية 123","שָׁלוֹם בעברית 123","Hello 123"] {
+                let galley=fonts.layout_no_wrap(source.to_owned(),
+                    egui::FontId::proportional(18.0),egui::Color32::WHITE);
+                assert_eq!(galley.end().index.0,source.chars().count(),
+                    "egui 0.35 shaped galley must preserve Unicode cursor extent");
+                let glyphs:usize=galley.rows.iter().map(|row|row.row.glyphs.len()).sum();
+                assert_eq!(glyphs,source.chars().count(),
+                    "native editor may not treat multiple RTL glyphs as characters");
+            }
+        });
+        let _=ctx.end_pass();
     }
     #[test] fn keyboard_theme_cycle_keeps_explicit_system_light_dark_order() {
         let mut theme=Theme::System;

@@ -135,12 +135,20 @@ fn evdev_code(key: Key) -> Option<u32> {
         Key::Num6=>7,Key::Num7=>8,Key::Num8=>9,Key::Num9=>10,Key::Num0=>11,
         Key::Minus=>12,Key::Equals=>13,Key::OpenBracket=>26,Key::CloseBracket=>27,
         Key::Quote=>40,Key::Backtick=>41,Key::Backslash=>43,
+        Key::IntlBackslash=>86,
         _ => return None
     })
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn physical_iso_102nd_key_has_its_own_xkb_position() {
+        let de=Emulator::compile("de").expect("installed German ISO layout");
+        assert_eq!(evdev_code(Key::IntlBackslash),Some(86));
+        assert_eq!(de.translate_layer(Key::IntlBackslash,false,false).as_deref(),Some("<"));
+        assert_eq!(de.translate_layer(Key::IntlBackslash,true,false).as_deref(),Some(">"));
+        assert_ne!(evdev_code(Key::IntlBackslash),evdev_code(Key::Backslash));
+    }
     #[test] fn common_system_xkb_layouts_compile() {
         for id in ["us", "de", "fr", "es", "latam", "ru", "gr", "ara", "il", "jp"] {
             assert!(Emulator::compile(id).is_ok(), "{id} did not compile");

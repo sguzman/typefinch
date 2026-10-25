@@ -1922,6 +1922,13 @@ impl Typefinch {
                         ui.label(format!("Raw accuracy: {:.1}% → {:.1}% ({:+.1} pp). Corrected WPM: {:.1} → {:.1} ({:+.1}).",
                             c.baseline_accuracy,c.retest_accuracy,c.accuracy_change_pp(),
                             c.baseline_wpm,c.retest_wpm,c.speed_change_wpm()));
+                        if let Some(delta)=c.missed_opportunity_change_pp() {
+                            ui.small(format!(
+                                "Distinct missed reference opportunities: {} / {} before → {} / {} after ({delta:+.1} pp).",
+                                c.baseline_opportunities.missed,c.baseline_opportunities.observed,
+                                c.retest_opportunities.missed,c.retest_opportunities.observed))
+                                .on_hover_text("Each reference position is counted once even after Backspace or repeated mistakes. This is descriptive, private and not causal evidence.");
+                        }
                         if !c.same_attempt_count() {
                             ui.small(format!("Input attempts differed ({} before, {} after); rates are not equal-sized samples.",
                                 c.baseline_attempts,c.retest_attempts));

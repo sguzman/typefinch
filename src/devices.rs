@@ -30,6 +30,8 @@ pub struct Keyboard {
     pub active_keymap: String,
     pub layout: String,
     pub variant: String,
+    /// Unattributed Wayland keymap group names; the active group is unknown.
+    pub seat_xkb_groups:Vec<String>,
 }
 /// Preserve selection by opaque inspection identity through enumeration
 /// changes. Neither a Hyprland address nor Wayland registry ID attributes events.
@@ -144,7 +146,7 @@ fn inspect_wayland_seats()->Result<Vec<Keyboard>,String> {
 // The same parent-side bounded subprocess and parser can be exercised in
 // native Weston CI using the built production binary (not the Rust test harness).
 fn inspect_wayland_seats_from_executable(exe:&str)->Result<Vec<Keyboard>,String> {
-    let raw=bounded_query(exe,&["--_probe_wayland_seats"],
+    let raw=bounded_query(exe,&["--_probe_wayland_xkb_seats"],
         X11_QUERY_MAX_BYTES,INSPECT_TIMEOUT)?;
     parse_wayland_seats(&raw)
 }
@@ -152,7 +154,7 @@ fn parse_wayland_seats(raw:&[u8])->Result<Vec<Keyboard>,String>{
     if raw.len()>X11_QUERY_MAX_BYTES {
         return Err("Wayland seat response exceeds inspection size limit.".into());
     }
-    let seats:Vec<crate::wayland_seat::Seat>=serde_json::from_slice(raw)
+    let seats:Vec<crate::wayland_seat::XkbSeat>=serde_json::from_slice(raw)
         .map_err(|e|format!("Invalid Wayland seat metadata: {e}"))?;
     if seats.len()>MAX_INSPECTED_KEYBOARDS {
         return Err("Wayland returned too many seat entries.".into());
@@ -166,7 +168,16 @@ fn parse_wayland_seats(raw:&[u8])->Result<Vec<Keyboard>,String>{
         if !usable_metadata(&seat.name,128) || !identities.insert(seat.id) {
             return Err("Wayland returned an invalid name or duplicate registry seat ID.".into());
         }
-        if !seat.keyboard {continue;}
+        if seat.xkb_groups.len()>16 || seat.xkb_groups.iter().any(|name|
+            !usable_metadata(name,128)) {
+            return Err("Wayland returned invalid XKB group metadata.".into());
+        }
+        if !seat.keyboard {
+            if !seat.xkb_groups.is_empty() {
+                return Err("Wayland offered an XKB map for a non-keyboard seat.".into());
+            }
+            continue;
+        }
         // wl_seat groups input devices, never physical keyboards. Neither
         // wl_seat names nor capabilities reveal the active XKB keymap.
         found.push(Keyboard {
@@ -175,6 +186,7 @@ fn parse_wayland_seats(raw:&[u8])->Result<Vec<Keyboard>,String>{
             active_keymap:String::new(),
             layout:String::new(),
             variant:String::new(),
+            seat_xkb_groups:seat.xkb_groups,
         });
     }
     Ok(found)
@@ -221,6 +233,7 @@ fn parse_x11_query(data:&[u8])->Result<Vec<Keyboard>,String>{
         active_keymap:String::new(),
         layout,
         variant,
+        seat_xkb_groups:Vec::new(),
     }])
 }
 
@@ -264,6 +277,7 @@ fn parse_json(data: &[u8]) -> Result<Vec<Keyboard>, String> {
             active_keymap:field("active_keymap",128),
             layout:field("layout",128),
             variant:field("variant",128),
+            seat_xkb_groups:Vec::new(),
         });
     }
     Ok(found)
@@ -407,6 +421,21 @@ mod tests {
         }
         assert!(started.elapsed()<Duration::from_secs(5),
             "an inspection child must not monopolize the only GUI worker");
+    }
+    #[test] fn generic_xkb_seat_names_are_not_active_group_or_device_attribution(){
+        let raw=br#"[{"id":8,"name":"seat0","keyboard":true,
+          "xkb_groups":["English (US)","German"]}]"#;
+        let found=parse_wayland_seats(raw).unwrap();
+        assert_eq!(found.len(),1);
+        assert_eq!(found[0].seat_xkb_groups,["English (US)","German"]);
+        assert!(found[0].active_keymap.is_empty());
+        assert!(found[0].layout.is_empty());
+        assert!(parse_wayland_seats(
+            br#"[{"id":1,"name":"seat0","keyboard":false,"xkb_groups":["English (US)"]}]"#
+        ).is_err());
+        assert!(parse_wayland_seats(
+            br#"[{"id":1,"name":"seat0","keyboard":true,"xkb_groups":["bad\\nname"]}]"#
+        ).is_err());
     }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {
         let raw=b"rules: evdev\nmodel: pc105\nlayout: us,ru\nvariant: ,phonetic\noptions: grp:alt_shift_toggle\n";

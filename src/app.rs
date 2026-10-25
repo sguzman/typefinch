@@ -1881,7 +1881,7 @@ impl Typefinch {
                     if let Some(position)=current_pos {
                         let local=position-response.rect.min;
                         if let Some(active)=rtl_preview_clamp_drag_endpoint(
-                                local,width,height)
+                                egui::pos2(local.x,local.y),width,height)
                             .and_then(|local|self.rtl_renderer.get_or_insert_with(
                                 rtl_shaping::Renderer::new)
                                 .hit_test_byte(&preview,width,height,local.x,local.y))

@@ -80,7 +80,7 @@
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 81%`
+## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 84%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
@@ -112,7 +112,7 @@
   - [x] Function/navigation and numeric keypad reference views — src/geometry.rs, src/app.rs and tests/gui_smoke.sh: 26 function/navigation and 17 keypad Linux evdev reference keys, non-overlap/uniqueness/non-attribution tests and F10 native selection; Actions 40006834967 passed 118 Rust tests and X11 GUI assertions, both archived screenshots visually inspected
   - [x] Complete control/modifier and edge-key geometry — src/geometry.rs exhaustive 104 ANSI/105 ISO/109 JIS/104 split unique Linux evdev reference inventories across Typing, Function/navigation and Keypad sections, non-attributed controls, modifier and national-edge keys with visible fallback captions. GitHub Actions 40134673256 green: 224 Rust tests and complete native X11 GUI, ISO/JIS/split 1100×850 screenshots manually inspected for labels and clipping. Earlier F10 function and keypad native screenshot inspections CI 40006834967. This accepts the standard illustrative reference inventory, not device hardware topology, extra-key routing or physical Hyprland.
 
-### 🔌 P4 — Keyboard detection and selection — `███████░░░ 69%`
+### 🔌 P4 — Keyboard detection and selection — `████████░░ 75%`
 
 - 🔍 **T401** Hyprland device inspection — `███████░░░ 67%`
   - [x] Read-only hyprctl query coded — src/devices.rs
@@ -122,10 +122,10 @@
   - [x] Read-only device chooser coded — src/app.rs
   - [x] Hotplug support — src/app.rs focused single-flight 20-second Hyprland/Wayland inventory poll, identity-preserving chooser and trust invalidation; src/devices.rs bounded read-only inspector, fail-closed parse and selection. tests/hotplug_gui_smoke.sh exercised unchanged native egui Typefinch under disposable Weston wl_display with independent synthetic hyprctl metadata: initial 1 keyboard with known map; attached 2 conflicting maps -> unknown; detached to 1 -> known; empty 0 -> unknown; malformed response -> unverified empty; recovery to 1 -> known. Six production-GUI QA reports had only device count, selected index, freshness and layout-detected boolean, no names/IDs/keys. Six native X11 parent screenshots archived; reviewed 1024x768 attached frame. CI 40146202012: 230 Rust tests and entire native Wayland/X11 graphical suite passed. This accepts software inventory hotplug and fail-safe recovery only, not real physical Hyprland hotplug, actual per-device event capture or attribution (T401/T404 still open).
   - [x] Reliable per-device event attribution or explicit unsupported mode — src/devices.rs CapturePolicy::InspectionOnly and src/app.rs: visible no-per-device typing mode, no physical event stream; unit test with two separate keyboard inspection identities, CI 40014109451: complete Rust and native X11 suites passed
-- 🪟 **T403** Generic compositor fallback — `████████░░ 75%`
+- 🪟 **T403** Generic compositor fallback — `██████████ 100%`
   - [x] Safe Hyprland-unavailable state coded — src/devices.rs
   - [x] Read-only standard Wayland seat capability query — src/wayland_seat.rs, src/devices.rs, src/main.rs and tests/wayland_virtual_seat_smoke.sh: read-only wl_registry/wl_seat capability and optional terminal JSON snapshot, with no wl_keyboard, physical event stream, or device attribution. CI 40037472601 passed 151 Rust tests, six synthetic Hyprland and eight synthetic Wayland scenarios, native headless Weston (0 seats), nested Weston/Xvfb (one keyboard-capable virtual seat and one disabled seat correctly excluded), disconnected/X11/Wayland CLI checks, and full native X11 graphical QA. Active generic XKB identification, real Hyprland hotplug and physical input attribution remain unverified.
-  - [ ] Generic XKB seat detection
+  - [x] Generic XKB seat detection — src/wayland_seat.rs native Wayland protocol XKB text-v1 keymap descriptor inspection using separate unfocused short-lived connection: bounded 4 MiB keymap compile, <=16 validated offered group labels, no event logging or physical-device inference; legacy capability-only probe remains unaffected. src/devices.rs parses strict aggregate seat group metadata and refuses malformed/double/oversized rows; src/app.rs displays offered groups while keeping active group unattributed; src/main.rs read-only inspect JSON exposes seat_xkb_groups, reported_active_keymap remains null. tests/wayland_virtual_seat_smoke.sh real nested Weston X11 virtual keyboard seat supplied actual XKB group labels through internal probe and public inspector; input-disabled and headless Weston, eight synthetic bad metadata/timeouts and no-attribution assertions retained. GitHub Actions 40148518400: 231 Rust tests and full native graphical suite passed. Accepted scope is generic XKB *keymap group detection* only; active group, physical keyboard identity and all generic Wayland OS-input attribution remain unknown.
   - [x] X11 fallback — src/devices.rs: gated read-only setxkbmap -query on genuine X11 sessions, one clearly labeled aggregate seat rather than invented devices; CI 40008974131: 122 Rust tests and dedicated live Xvfb seat probe, plus graphical suite passed
 - 🔐 **T404** Optional authorized per-device capture — `███░░░░░░░ 33%`
   - [x] Permission and threat model — docs/DEVICE_INPUT_SECURITY.md: threat boundary, explicit permission requirements, revocation, focus scoping, no global evdev/root capture, no double-scoring and negative acceptance tests; design-only, no capture implementation
@@ -134,7 +134,7 @@
 
 **Feature inventory** (computed from associated task progress):
 
-- 🗺️ Layout recognition — `████████░░ 81%`
+- 🗺️ Layout recognition — `█████████░ 89%`
 - 🔀 Software layout emulation — `█████████░ 90%`
 - 🔌 Multi-keyboard selection — `███████░░░ 67%`
 

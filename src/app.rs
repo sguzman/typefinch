@@ -791,6 +791,7 @@ impl Typefinch {
             self.emulator.as_ref().and_then(Emulator::compose_state)
         } else { None };
         self.session.begin();
+        let _=crate::qa::write_test_started_audit(&self.session);
         ctx.memory_mut(|m| m.request_focus(egui::Id::new("typing_surface")));
     }
     fn apply_events(&mut self, ctx: &egui::Context) {

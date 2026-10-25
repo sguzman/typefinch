@@ -131,3 +131,22 @@ pub fn write_hotplug_audit(count:usize,selected:usize,fresh:bool,
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
         .map_err(|e|e.to_string())
 }
+
+
+/// Opt-in synthetic GUI evidence for a real in-app drill and same-source
+/// retest. Numeric aggregates only; never record a passage or identity.
+pub fn write_training_followup_audit(c:crate::training::Comparison)->Result<(),String>{
+    if env::var_os("TYPEFINCH_QA_REPORT").is_none(){return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_TRAINING_REPORT") else{return Ok(());};
+    let data=serde_json::json!({
+        "state":"same-source-followup","synthetic":true,
+        "before_accuracy":c.baseline_accuracy,
+        "after_accuracy":c.retest_accuracy,
+        "before_wpm":c.baseline_wpm,"after_wpm":c.retest_wpm,
+        "before_attempts":c.baseline_attempts,
+        "after_attempts":c.retest_attempts,
+        "causal_claim":false
+    });
+    fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}

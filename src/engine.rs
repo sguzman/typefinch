@@ -1,5 +1,5 @@
 //! Deterministic, local typing-session scoring. No browser/network dependency.
-use std::{collections::BTreeMap, time::{Duration, Instant}};
+use std::{collections::{BTreeMap,BTreeSet}, time::{Duration, Instant}};
 use serde::{Serialize, Deserialize};
 use unicode_normalization::{UnicodeNormalization,char::canonical_combining_class};
 use unicode_segmentation::UnicodeSegmentation;
@@ -233,6 +233,12 @@ pub struct Session {
     pub corrections: u32,
     pub attempts: u32,
     pub mistakes: u32,
+    // Ephemeral *distinct reference offsets* touched/missed within one run.
+    // Multiple wrong scalar attempts or corrections at the same position
+    // count as one missed opportunity, never repeated error evidence.
+    // Offsets and source text are not persisted to profile history.
+    touched_reference_positions:BTreeSet<usize>,
+    missed_reference_positions:BTreeSet<usize>,
     weak_keys: BTreeMap<char,u32>,
     // Exact Unicode grapheme practice targets; original miss counts remain
     // available by first scalar for the illustrative ANSI heatmap.
@@ -244,6 +250,17 @@ pub struct Session {
     pending_completion: Option<Instant>,
 }
 #[derive(Clone, Copy, Debug, Default)]
+/// Counts *distinct* eligible reference positions, not wrong raw-key events.
+#[derive(Clone,Copy,Debug,Default,PartialEq,Eq)]
+pub struct OpportunityCounts {
+    pub observed:usize,
+    pub missed:usize,
+}
+impl OpportunityCounts {
+    pub fn missed_percent(self)->Option<f64> {
+        (self.observed>0).then(||100.0*self.missed as f64/self.observed as f64)
+    }
+}
 pub struct Score {
     pub wpm: f64,
     /// Correct final reference grapheme clusters per minute. This measures
@@ -292,7 +309,9 @@ impl Session {
         };
         Self { mode, language, difficulty, target, typed:String::new(), duration:Duration::from_secs(seconds),
             state:State::Ready, started:None, elapsed:Duration::ZERO,
-            corrections:0, attempts:0, mistakes:0, weak_keys:BTreeMap::new(),weak_graphemes:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
+            corrections:0, attempts:0, mistakes:0,
+            touched_reference_positions:BTreeSet::new(),
+            missed_reference_positions:BTreeSet::new(), weak_keys:BTreeMap::new(),weak_graphemes:BTreeMap::new(),weak_pairs:BTreeMap::new(),key_timings:BTreeMap::new(),last_key_at:None,pending_completion:None }
     }
     pub fn history_mode(&self)->String {
         if !self.mode.counts_for_benchmark() {return self.mode.key().to_owned();}
@@ -313,6 +332,8 @@ impl Session {
         self.corrections = 0;
         self.attempts = 0;
         self.mistakes = 0;
+        self.touched_reference_positions.clear();
+        self.missed_reference_positions.clear();
         self.weak_keys.clear();
         self.weak_graphemes.clear();
         self.weak_pairs.clear();
@@ -384,7 +405,9 @@ impl Session {
                 break;
             }
             self.attempts=self.attempts.saturating_add(1);
+            self.touched_reference_positions.insert(position);
             if !canonical_prefix(expected,actual) {
+                self.missed_reference_positions.insert(position);
                 self.mistakes=self.mistakes.saturating_add(1);
                 if let Some(key)=expected.chars().next().filter(|c|!c.is_control() && !c.is_whitespace()) {
                     let errors=self.weak_keys.entry(key).or_default();
@@ -488,6 +511,17 @@ impl Session {
             |start|now.saturating_duration_since(start));
         self.elapsed=if self.duration.is_zero(){elapsed}else{elapsed.min(self.duration)};
         self.state=State::Finished;
+    }
+    /// Bounded in-memory opportunity counts for descriptive observations.
+    /// Denominator: reference positions reached by any accepted input;
+    /// numerator: those positions where at least one noncanonical prefix
+    /// occurred. This is NOT session.mistakes/session.attempts, and neither
+    /// set is saved with the user profile or shared with any service.
+    pub fn opportunity_counts(&self)->OpportunityCounts {
+        OpportunityCounts {
+            observed:self.touched_reference_positions.len(),
+            missed:self.missed_reference_positions.len(),
+        }
     }
     pub fn score(&self) -> Score {
         let mut result=score(&self.target, &self.typed, self.elapsed);
@@ -614,6 +648,43 @@ mod tests {
             let s=Session::new_with_custom(0,TestMode::Custom,text);
             assert!(!s.has_cjk_reference(),"not a Han/kana/Hangul passage: {text}");
         }
+    }
+    #[test] fn distinct_reference_opportunities_do_not_double_count_repeated_errors(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"aba");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts::default());
+        assert_eq!(s.opportunity_counts().missed_percent(),None);
+        s.begin();
+        s.type_text("x");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:1,missed:1});
+        s.backspace();
+        s.type_text("x");
+        s.backspace();
+        s.type_text("aba");
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:3,missed:1});
+        assert_eq!(s.opportunity_counts().missed_percent(),Some(100.0/3.0));
+        assert_eq!(s.mistakes,2,"raw mistakes include both repeated wrong attempts");
+        s.begin();
+        assert_eq!(s.opportunity_counts(),OpportunityCounts::default(),
+            "restarting cannot retain private positions from a previous test");
+        s.type_text("aba");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:3,missed:0});
+    }
+    #[test] fn canonical_combining_marks_are_one_reference_opportunity(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"é xz");
+        s.begin();
+        s.type_text("e");
+        s.type_text("\u{301}");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:1,missed:0});
+        s.type_text(" ");
+        s.type_text("q");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:3,missed:1});
+        s.backspace();
+        s.type_text("xz");
+        assert_eq!(s.opportunity_counts(),OpportunityCounts{observed:4,missed:1});
+        assert_eq!(s.state,State::Finished);
+        assert_eq!(s.score().correct,4);
+        assert!(s.opportunity_counts().missed<=s.opportunity_counts().observed);
     }
     #[test] fn committed_cjk_cpm_counts_display_graphemes_not_ime_keypresses() {
         let perfect=score("你好世界","你好世界",Duration::from_secs(30));

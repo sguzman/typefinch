@@ -11,6 +11,7 @@ on:
       - tools/egui035_rtl_upstream_backport.lua
       - tools/egui035_physical_probe.lua
       - tests/egui035_physical_emulation_smoke.sh
+      - tests/hotplug_gui_guarded.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,31 +79,8 @@ jobs:
           xvfb-run -a -s "-screen 0 1280x900x24" bash tests/training_gui_smoke.sh
       - name: Native input, import, profile and timing regression under egui 0.35
         run: |
-          # Weston 13 X11 backend can SIGSEGV before the first fixture audit.
-          # Rerun ONLY that proven external pre-assertion transport failure,
-          # at most twice, with a completely fresh synthetic test process.
-          hotplug_log="$(mktemp)"
-          trap 'rm -f "$hotplug_log"' EXIT
-          hotplug_passed=0
-          for attempt in 1 2 3; do
-            if xvfb-run -a -s "-screen 0 1280x900x24" bash tests/hotplug_gui_smoke.sh >"$hotplug_log" 2>&1; then
-              cat "$hotplug_log"
-              hotplug_passed=1
-              break
-            fi
-            if ((attempt<3)) \
-              && grep -F 'Segmentation fault' "$hotplug_log" >/dev/null \
-              && grep -F 'weston --backend=x11-backend.so' "$hotplug_log" >/dev/null \
-              && grep -F 'Connection reset by peer' "$hotplug_log" >/dev/null \
-              && grep -F 'Native Typefinch quit' "$hotplug_log" >/dev/null \
-              && ! grep -F 'Native Wayland synthetic inventory initial PASS' "$hotplug_log" >/dev/null; then
-              echo "External pre-fixture Weston crash; retrying full native hotplug audit ($attempt/2)" >&2
-              continue
-            fi
-            cat "$hotplug_log" >&2
-            exit 1
-          done
-          ((hotplug_passed==1))
+          bash tests/hotplug_gui_guarded.sh --self-test
+          bash tests/hotplug_gui_guarded.sh
           for script in timing_deadline_smoke gui_import_smoke goals_gui_smoke multiline_gui_smoke keyboard_navigation_smoke rtl_input_gui_smoke gui_smoke; do
             echo "::group::Native $script"
             xvfb-run -a -s "-screen 0 1280x900x24" bash "tests/$script.sh"

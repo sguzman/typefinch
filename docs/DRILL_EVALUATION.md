@@ -102,6 +102,34 @@ recruited or that outcomes have been measured.
    efficacy from synthetic-learner tests, screenshots or faster completion of
    the practiced text.
 
+## Implemented in-memory distinct reference opportunity metric
+
+The scored `Session` now counts **unique reference-grapheme positions
+actually reached** by at least one accepted input scalar and the subset of
+those positions on which a noncanonical input prefix was ever recorded.
+Correcting and retrying a miss counts the original position **once**, unlike
+the raw `mistakes` counter; one decomposed Unicode grapheme containing
+several valid combining scalars also counts as **one** opportunity.
+The counters are reset on session start, held only as bounded sets of numeric
+positions, and never saved to the SQLite history, exported profile cards or
+uploaded. The GUI shows the two aggregate counts and a descriptive fraction
+for a finished session.
+
+The in-memory adaptive-drill baseline and identical-reference retest display
+those distinct missed-position rates alongside raw accuracy and corrected WPM.
+An opt-in synthetic QA report contains only four aggregate count fields; the
+native GUI test requires 1/3 missed baseline opportunities and 0/3 retest
+opportunities, with no private text or reference offsets recorded. A unit test
+makes the same position repeatedly mistyped, corrected, and mistyped again
+and requires **1** distinct miss despite **2** incorrect scalar attempts.
+
+**Interpretation:** This is a distinct *ever-missed reference position per
+reached position* fraction, not an independent-trial probability and not a
+human efficacy outcome. Timed runs may reach different numbers of reference
+positions, and correction opportunities can still differ. True randomized
+held-out transfer and delayed-retention experiments remain unimplemented,
+and T502 is not accepted from this engineering test.
+
 ## Interpretation safeguards
 
 `Session::mistakes` counts accepted incorrect scalar attempts, including

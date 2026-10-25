@@ -109,7 +109,7 @@ fn main() -> eframe::Result {
             println!("       typefinch --restore-backup-to-new-dir SETTINGS.json SESSIONS.sqlite3 NEW_DIRECTORY");
             println!("Keyboard inspection prints read-only JSON: seats/layout metadata, never key events or physical input attribution.");
             println!("Backup verification is read-only and never restores or replaces user data.");
-            println!("GUI shortcuts: F1 guide · F2 focus · F3 layout layer · F4 geometry · F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG · F10 reference keys · F11 / Ctrl+O custom file import · Ctrl+E custom source editor · F12 goals import · Shift+F12 goals export · Ctrl+N focus new profile · Ctrl+Shift+T cycle theme");
+            println!("GUI shortcuts: F1 guide · F2 focus · F3 layout layer · F4 geometry · F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG · F10 reference keys · F11 / Ctrl+O custom file import · Ctrl+E custom source editor · F12 goals import · Shift+F12 goals export · Ctrl+N focus new profile · Ctrl+Shift+T cycle theme · Ctrl+Shift+K practice missed keys · Ctrl+Shift+R retest original");
             return Ok(());
         },
         LaunchIntent::VerifyBackup(settings,database)=>{

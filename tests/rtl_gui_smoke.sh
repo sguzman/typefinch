@@ -426,13 +426,15 @@ LUA
     sleep 0.2
     xdotool keydown Shift_L
     xdotool mousemove --window "$window" "$shift_click_x" 521 click 1
-    sleep 0.25
+    sleep 0.3
     xdotool keyup Shift_L
-    sleep 0.25
+    sleep 0.4
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-shift-before-edit.json"
+    import -window "$window" "$tmp/rtl-$name-preview-shift-before-edit.png"
     xdotool type --clearmodifiers --delay 35 z
     sleep 0.4
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-shift-after-edit.json"
+    import -window "$window" "$tmp/rtl-$name-preview-shift-after-edit.png"
     xdotool key --clearmodifiers ctrl+z
     sleep 0.4
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-shift-after-undo.json"
@@ -447,6 +449,9 @@ local function read(path)
   return d
 end
 local first,edited,restored=read(arg[1]),read(arg[2]),read(arg[3])
+print(string.format("Native Shift-click edit audit: original=%d selected=%d after=%d selected=%d undo=%d selected=%d",
+  first.total,first.selected_graphemes,edited.total,
+  edited.selected_graphemes,restored.total,restored.selected_graphemes))
 assert(first.selected_graphemes>=2
   and edited.total==first.total-first.selected_graphemes+1
   and edited.selected_graphemes==0,

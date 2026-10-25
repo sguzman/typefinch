@@ -434,7 +434,7 @@ mod tests {
             br#"[{"id":1,"name":"seat0","keyboard":false,"xkb_groups":["English (US)"]}]"#
         ).is_err());
         assert!(parse_wayland_seats(
-            br#"[{"id":1,"name":"seat0","keyboard":true,"xkb_groups":["bad\\nname"]}]"#
+            br#"[{"id":1,"name":"seat0","keyboard":true,"xkb_groups":["bad\nname"]}]"#
         ).is_err());
     }
     #[test] fn x11_seat_parser_does_not_invent_per_device_identity() {

@@ -47,9 +47,14 @@ fn rtl_preview_editor_range(text:&str,active_byte:usize,anchor_byte:usize)
     let valid=|byte:usize| byte<=text.len() && text.is_char_boundary(byte)
         && (byte==text.len() || text.grapheme_indices(true).any(|(at,_)|at==byte));
     if !valid(active_byte) || !valid(anchor_byte){return None;}
-    Some(egui::text::CCursorRange::two(
-        egui::text::CCursor::new(text[..active_byte].chars().count()),
-        egui::text::CCursor::new(text[..anchor_byte].chars().count())))
+    // CCursorRange::two(min,max) deliberately makes the SECOND
+    // argument primary. Pointer drags need an arbitrary active endpoint,
+    // including reverse RTL/LTR selections, so retain the orientation.
+    Some(egui::text::CCursorRange {
+        primary:egui::text::CCursor::new(text[..active_byte].chars().count()),
+        secondary:egui::text::CCursor::new(text[..anchor_byte].chars().count()),
+        h_pos:None,
+    })
 }
 fn keyboard_poll_interval()->Duration {
     // Only an expressly isolated synthetic GUI QA process can accelerate

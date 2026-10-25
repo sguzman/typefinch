@@ -8,6 +8,7 @@ mod app;
 mod devices;
 mod wayland_seat;
 mod engine;
+mod training;
 mod history;
 mod export;
 mod fonts;

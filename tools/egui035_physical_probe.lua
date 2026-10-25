@@ -125,4 +125,28 @@ fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::
     }
     #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {]]}
 })
+-- Diagnostic output contains only physical key names, modifier booleans and
+-- result lengths, never passages, translated symbols or private IME text.
+edit("src/app.rs",{
+    {[[self.emulated_right_alt_held=pressed;]],
+     [[self.emulated_right_alt_held=pressed;
+                    if std::env::var_os("TYPEFINCH_QA_XKB_COMPOSE").is_some()
+                        && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+                        eprintln!("egui035-key-qa right_alt pressed={pressed}");
+                    }]]},
+    {[[self.emulated_left_alt_held=pressed;]],
+     [[self.emulated_left_alt_held=pressed;
+                    if std::env::var_os("TYPEFINCH_QA_XKB_COMPOSE").is_some()
+                        && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+                        eprintln!("egui035-key-qa left_alt pressed={pressed}");
+                    }]]},
+    {[[if let Some(text) = mapped { self.session.type_text(&text); }]],
+     [[if std::env::var_os("TYPEFINCH_QA_XKB_COMPOSE").is_some()
+                            && std::env::var_os("TYPEFINCH_QA_REPORT").is_some() {
+                            eprintln!("egui035-key-qa physical={physical:?} level3={alt_gr} shift={} mapped_chars={} attempts_before={}",
+                                modifiers.shift,mapped.as_ref().map(|s|s.chars().count()).unwrap_or(0),self.session.attempts);
+                        }
+                        if let Some(text) = mapped { self.session.type_text(&text); }]]}
+})
+
 print("Isolated egui 0.35 physical AltGr + ISO input probe patched");

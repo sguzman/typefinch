@@ -103,6 +103,9 @@ assert(r.state=="same-source-followup" and r.synthetic
 assert(math.abs(r.before_accuracy-66.6666666667)<0.01
   and r.after_accuracy==100 and r.before_attempts==3
   and r.after_attempts==3,"Paired raw accuracy or samples mismatched")
+assert(r.before_reference_observed==3 and r.before_reference_missed==1
+  and r.after_reference_observed==3 and r.after_reference_missed==0,
+  "Distinct scored reference opportunities must not be raw key attempts")
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local command=string.format("sqlite3 -cmd '.timeout 5000' -json %q 'SELECT test_mode,input_mode,entered,correct,attempts,mistakes FROM sessions ORDER BY id'",db)
 local pipe=assert(io.popen(command,"r"))

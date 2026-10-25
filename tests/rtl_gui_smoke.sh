@@ -422,10 +422,14 @@ print("Native shaped-preview plain click collapses Shift-selection PASS")
 LUA
     # The extended selection belongs to native TextEdit, not the preview
     # alone. Replace then Undo and compare all original marked Unicode.
+    # The outer x=175 Arabic hit selects 16/17 graphemes, which would
+    # remove *every RTL glyph* during replacement and legitimately disable
+    # the RTL-only QA report. Both scripts' verified x=220 midpoint hits
+    # leave marked RTL text in the source during the edit assertion.
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
     xdotool keydown Shift_L
-    xdotool mousemove --window "$window" "$shift_click_x" 521 click 1
+    xdotool mousemove --window "$window" 220 521 click 1
     sleep 0.3
     xdotool keyup Shift_L
     sleep 0.4

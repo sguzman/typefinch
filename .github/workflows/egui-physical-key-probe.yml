@@ -47,6 +47,14 @@ jobs:
         run: cargo build
       - name: Verify physical RightAlt and ISO extra-key routing in native X11 emulation
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/egui035_physical_emulation_smoke.sh
+      - name: Native Wayland inventory and virtual compositor regression under egui 0.35
+        run: |
+          bash tests/hyprland_fixture_smoke.sh
+          bash tests/wayland_fixture_smoke.sh
+          bash tests/wayland_seat_smoke.sh
+          xvfb-run -a -s "-screen 0 1280x900x24" bash tests/wayland_virtual_seat_smoke.sh
+          bash tests/wayland_gui_guarded.sh --self-test
+          bash tests/wayland_gui_guarded.sh
       - name: Verify existing RTL editor and Unicode Undo through native X11
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/rtl_gui_smoke.sh
       - name: Verify existing AltGr and Spanish OS Compose through native X11
@@ -62,14 +70,6 @@ jobs:
             xvfb-run -a -s "-screen 0 1280x900x24" bash "tests/$script.sh"
             echo "::endgroup::"
           done
-      - name: Native Wayland inventory and virtual compositor regression under egui 0.35
-        run: |
-          bash tests/hyprland_fixture_smoke.sh
-          bash tests/wayland_fixture_smoke.sh
-          bash tests/wayland_seat_smoke.sh
-          xvfb-run -a -s "-screen 0 1280x900x24" bash tests/wayland_virtual_seat_smoke.sh
-          bash tests/wayland_gui_guarded.sh --self-test
-          bash tests/wayland_gui_guarded.sh
       - name: Save an isolated dependency graph for review
         if: always()
         uses: actions/upload-artifact@v4

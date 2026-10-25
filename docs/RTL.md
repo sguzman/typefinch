@@ -413,3 +413,31 @@ correctness of arbitrary mixed-direction selection, native Fcitx/IBus
 candidate overlays, physical Hyprland keyboard input, or full assistive
 technology integration. T804's broader RTL-tests gate remains **open**
 and its tracked completion remains unchanged.
+
+
+## Native X11 exact-source recovery after mixed-direction editing
+
+[CI 40202172590](https://github.com/sguzman/typefinch/actions/runs/40202172590)
+passed **243 Rust tests** and the complete native GUI suite. Its real
+Xvfb/egui editor test dragged a selection between Latin and mixed Hebrew/Arabic
+paragraphs, replaced the selected range with one ASCII grapheme, then undid
+the replacement. It independently asserted the changed selection length
+and compared the **entire recovered UTF-8 source byte for byte** against the
+original disposable synthetic fixture using the native TextEdit's Ctrl+A/C
+and X11 clipboard. This closes a real testing blind spot: equal-length
+substitutions or damaged combining marks could previously pass a check
+that looked only at grapheme counts.
+
+[CI 40202618058](https://github.com/sguzman/typefinch/actions/runs/40202618058)
+extended that byte-exact native editor verification to the individual
+Arabic-with-harakat and Hebrew-with-niqqud fixtures after selecting,
+Backspacing and undoing one marked grapheme. The native RTL GUI stage
+passed; any additional workflow-stage verdict is tracked in GitHub Actions.
+The clipboard is read only in isolated synthetic X11 CI; test output
+contains no copied passage bytes or private file paths.
+
+**Scope:** This demonstrates specific native X11 editor operations, not
+arbitrary bidirectional editing in production, native Wayland Fcitx/IBus
+candidate handling, physical Hyprland keyboards or per-device input routing.
+T804's broad RTL-tests acceptance check remains open, with no added
+percentage credited for these narrower regressions.

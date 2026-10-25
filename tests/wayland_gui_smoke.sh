@@ -75,6 +75,14 @@ if [[ -z "$parent" ]];then
 fi
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app_pid=$!
+# A Weston 13 X11-backend race has repeatedly segfaulted while its first
+# Wayland surface and F11 synthetic input were established <1 second after
+# compositor startup. Let the disposable compositor settle before sending
+# any input. Real typing and all score assertions remain mandatory.
+sleep 0.75
+kill -0 "$weston_pid" 2>/dev/null || {
+  echo "Nested Weston died before native input stabilization" >&2;exit 1;
+}
 cfg="$XDG_CONFIG_HOME/typefinch/settings.json"
 # The Wayland client can become live after Weston's X11 bridge is already
 # focusable. A fixed sleep makes F11 a timing lottery on fast CI runners.

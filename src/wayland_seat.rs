@@ -146,7 +146,7 @@ impl Dispatch<wl_keyboard::WlKeyboard,u32> for State {
     fn event(state:&mut Self,_:&wl_keyboard::WlKeyboard,
         event:wl_keyboard::Event,id:&u32,_:&Connection,_:&QueueHandle<Self>) {
         if let wl_keyboard::Event::Keymap{format,fd,size}=event {
-            if format!=wl_keyboard::KeymapFormat::XkbV1.into(){
+            if !matches!(format,WEnum::Value(wl_keyboard::KeymapFormat::XkbV1)){
                 state.invalid_keymap=true;
                 return;
             }

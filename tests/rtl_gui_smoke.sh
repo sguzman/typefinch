@@ -257,6 +257,47 @@ LUA
       exit 1
     }
     echo "Native $name plain Arrow grapheme navigation PASS: 0 -> 1 -> 0"
+    # Drag through the *shaped read-only preview*, not the native source
+    # field. Its visual hit-tests must transfer a grapheme-safe selection
+    # into the actual editable egui TextEdit and visibly color the preview.
+    # Coordinates are from independently inspected 1060x760 CI screenshots:
+    # connected script glyphs occupy x=140..300, y=506..536.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    import -window "$window" "$tmp/rtl-$name-preview-drag-before.png"
+    xdotool mousemove --window "$window" 175 521 mousedown 1
+    sleep 0.15
+    xdotool mousemove --window "$window" 265 521
+    sleep 0.25
+    xdotool mouseup 1
+    sleep 0.45
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-drag.json"
+    import -window "$window" "$tmp/rtl-$name-preview-drag-after.png"
+    lua5.4 - "$tmp/$name/preview-drag.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing native shaped-preview drag report")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+assert(d.total>=10 and d.selected_graphemes>=2
+  and d.selected_graphemes<d.total,
+  "Shaped-preview pointer drag failed to select a partial Unicode range")
+assert(d.index>=0 and d.index<=d.total,
+  "Shaped-preview selection caret outside logical source bounds")
+print("Native shaped RTL preview drag PASS: "..d.selected_graphemes.." graphemes")
+LUA
+    for state in before after;do
+      convert "$tmp/rtl-$name-preview-drag-$state.png" \
+        -crop 280x48+18+500 +repage \
+        "$tmp/$name/preview-drag-$state-crop.png"
+    done
+    preview_pixels="$(compare -metric AE "$tmp/$name/preview-drag-before-crop.png" \
+      "$tmp/$name/preview-drag-after-crop.png" null: 2>&1 || true)"
+    [[ "$preview_pixels" =~ ^[0-9]+$ && "$preview_pixels" -gt 80 ]] || {
+      echo "Shaped $name preview selection not visibly painted: $preview_pixels" >&2
+      exit 1
+    }
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.25
     # Real source mutation, not only caret painting. Select the first marked
     # script grapheme, Backspace it, then undo. Both the original and the
     # restored passage must have exactly the same grapheme counts; no fixture

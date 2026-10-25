@@ -342,3 +342,38 @@ shortcut-modified letters. It is **not** physical Right Alt/AltGr
 attribution, Caps Lock behavior on real keyboards, arbitrary ISO/JIS
 national-edge routing or a real Hyprland device/IME test. Those independent
 T303/T305/hardware criteria remain open. There is no global key interception.
+
+## Native Wayland compositor-inventory hotplug lifecycle — accepted (synthetic metadata)
+
+[CI 40146202012](https://github.com/sguzman/typefinch/actions/runs/40146202012)
+passed **230 Rust tests and the entire native GUI suite** at
+[`4fdfc36`](https://github.com/sguzman/typefinch/commit/4fdfc36f291a072f70b75f9f67cf129422a82c88).
+The production Typefinch egui UI remained open as a **real Wayland client**
+under a disposable Weston/Xvfb compositor. Only its `hyprctl -j devices`
+metadata provider was replaced by a synthetic, fixed-argument test fixture.
+The same background-inspector poll and recovery path as production (normally
+20 seconds; 300 ms strictly within the explicit synthetic QA process)
+observed six successive states without manual interaction:
+
+- One reported keyboard with a unique recognized XKB map: fresh, known.
+- A second keyboard with a conflicting map: two fresh entries, no trustworthy
+  single active layout attribution.
+- Removal of the first keyboard: one fresh recognized map.
+- All keyboards removed: empty inventory, unknown layout.
+- Malformed compositor JSON: cleared/unverified inventory, no stale trust.
+- Healthy keyboard reappears: fresh inventory, known unique map.
+
+The real UI reported only counts, selected index, freshness and a boolean
+indicating whether a unique installed layout matched; it did **not** log
+addresses, keycodes, raw events or typed text. Six screenshots of the live
+1024x768 disposable GUI are archived as `typefinch-hotplug-*.png`.
+The attached-state image was manually inspected to confirm the real app
+remained rendered; inventory transitions are proven by QA metadata from its
+actual asynchronous GUI state, not by screenshot text or simulated editor
+logic. Unit tests independently verify selected inspection identity remains
+stable through reordering and resets safely after removal.
+
+**Scope:** T402's software **hotplug support** is accepted; this is *not*
+evidence of a real physical keyboard being attached or removed under Hyprland,
+per-device keyboard attribution, an opt-in key-event capture backend or real
+Hyprland visual QA. T401, T404 and T902 remain explicitly unaccepted.

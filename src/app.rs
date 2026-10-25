@@ -3152,6 +3152,35 @@ mod palette_tests {
         assert_eq!(session.state,State::Finished);
         assert_eq!(session.score().correct,4);
     }
+    #[test] fn rtl_editor_preedit_blocks_click_seek_until_composition_is_resolved() {
+        use egui::{Event,ImeEvent};
+        let mut active=false;
+        active=next_rtl_editor_preedit_state(active,&[
+            Event::Ime(ImeEvent::Enabled),
+            Event::Ime(ImeEvent::Preedit("שָׁ".into())),
+        ]);
+        assert!(active,"active Hebrew niqqud candidate must own the source caret");
+        active=next_rtl_editor_preedit_state(active,&[
+            Event::PointerMoved(egui::pos2(52.0,83.0)),
+            Event::Ime(ImeEvent::Enabled),
+            Event::Text("x".into()),
+        ]);
+        assert!(active,"pointer motion, text events and repeated IME enable do not release preedit");
+        active=next_rtl_editor_preedit_state(active,&[
+            Event::Ime(ImeEvent::Commit("שָׁ".into())),
+        ]);
+        assert!(!active,"committing the candidate releases pointer positioning");
+        active=next_rtl_editor_preedit_state(active,&[
+            Event::Ime(ImeEvent::Preedit("مَرْ".into())),
+        ]);
+        assert!(active);
+        assert!(!next_rtl_editor_preedit_state(active,&[
+            Event::Ime(ImeEvent::Preedit(String::new())),
+        ]),"explicitly empty composition releases the cursor guard");
+        assert!(!next_rtl_editor_preedit_state(true,&[
+            Event::Ime(ImeEvent::Disabled),
+        ]),"losing the IME ends stale preedit ownership");
+    }
     #[test] fn ime_preedit_is_bounded_and_never_scores_candidates() {
         let mut session=Session::new_with_custom(0,TestMode::Custom,"你好");
         session.begin();

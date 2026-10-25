@@ -251,6 +251,50 @@ LUA
   done
   ((restored==1)) || { echo "Native Wayland $script preview-click Undo failed" >&2;exit 1; }
   echo "Native Weston $script shaped-preview seek, actual edit and Undo PASS"
+  # Real wl_pointer press/motion/release across COSMIC's visual glyphs:
+  # egui's source TextEdit must receive a whole-grapheme selection without
+  # losing text or converting the preview into a separate input field.
+  # Coordinates are grounded in the reviewed nested 1024x768 Weston frame.
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.25
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-preview-drag-before.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-preview-drag-before.png"
+  xdotool mousemove --window "$parent" 228 539 mousedown 1
+  sleep 0.15
+  xdotool mousemove --window "$parent" 325 539
+  sleep 0.25
+  xdotool mouseup 1
+  sleep 0.55
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-preview-drag-after.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-preview-drag-after.png"
+  lua5.4 - "$tmp/$script-preview-drag-before.json" \
+    "$tmp/$script-preview-drag-after.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native Wayland preview drag report")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local before,after=read(arg[1]),read(arg[2])
+assert(before.selected_graphemes==0 and before.total>8,
+  "Wayland shaped-preview drag started from an invalid source state")
+assert(after.total==before.total and after.selected_graphemes>=2
+  and after.selected_graphemes<before.total
+  and after.index>=0 and after.index<=before.total,
+  "Wayland shaped-preview drag must create a partial selection without changing text")
+print("Native Weston shaped RTL preview drag PASS: "..after.selected_graphemes.." selected graphemes")
+LUA
+  for state in before after;do
+    convert "typefinch-wayland-rtl-$script-preview-drag-$state.png" \
+      -crop 345x52+18+513 +repage "$tmp/$script-preview-drag-$state-crop.png"
+  done
+  preview_pixels="$(compare -metric AE "$tmp/$script-preview-drag-before-crop.png" \
+    "$tmp/$script-preview-drag-after-crop.png" null: 2>&1 || true)"
+  [[ "$preview_pixels" =~ ^[0-9]+$ && "$preview_pixels" -gt 80 ]] || {
+    echo "Weston $script shaped-preview drag selection not visibly painted: $preview_pixels" >&2
+    exit 1
+  }
   xdotool key --clearmodifiers ctrl+Home
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"

@@ -1,0 +1,30 @@
+name: Typefinch one-time egui 0.35 lock export
+# Temporary reproducibility bridge: emits only public Cargo.lock contents.
+# Remove this workflow in the same commit that installs the verified lock.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/egui035-lock-export.yml
+permissions:
+  contents: read
+jobs:
+  export-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve precisely the tested egui 0.35 dependency graph
+        run: |
+          sed -i 's/eframe = { version = "=0.33.3"/eframe = { version = "=0.35.0"/' Cargo.toml
+          grep -F 'eframe = { version = "=0.35.0"' Cargo.toml
+          printf '\n[patch.crates-io]\nepaint = { path = "third_party/epaint-0.35.0" }\n' >> Cargo.toml
+          cargo update -p eframe
+          cargo metadata --locked --format-version 1 --no-deps >/dev/null
+          sha256sum Cargo.lock
+      - name: Export the public lockfile as chunked base64 for a Git blob
+        run: |
+          printf '%s\n' TYPEFINCH_LOCK_B64_BEGIN
+          base64 -w0 Cargo.lock | fold -w 2048 | sed 's/^/TYPEFINCH_LOCK_PART /'
+          printf '%s\n' TYPEFINCH_LOCK_B64_END

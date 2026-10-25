@@ -31,20 +31,10 @@ jobs:
         run: |
           sed -i 's/eframe = { version = "=0.33.3"/eframe = { version = "=0.35.0"/' Cargo.toml
           grep -F 'eframe = { version = "=0.35.0"' Cargo.toml
+          printf '\n[patch.crates-io]\nepaint = { path = "third_party/epaint-0.35.0" }\n' >> Cargo.toml
           cargo update -p eframe
           cargo tree -i egui | head -30
-      - name: Backport upstream RTL glyph-count fix in disposable Cargo cache
-        run: |
-          cargo fetch
-          ROOT="${CARGO_HOME:-$HOME/.cargo}/registry/src"
-          EP="$(find "$ROOT" -path '*/epaint-0.35.0/src/text/text_layout.rs' -print -quit)"
-          EG="$(find "$ROOT" -path '*/egui-0.35.0/src/text_selection/text_cursor_state.rs' -print -quit)"
-          test -n "$EP" && test -n "$EG"
-          lua5.4 tools/egui035_rtl_upstream_backport.lua "$EP" "$EG"
-          # Registry sources are normally immutable; cached Rust fingerprints
-          # must not silently reuse pre-backport epaint/egui artifacts.
-          cargo clean -p epaint
-          cargo clean -p egui
+          cargo tree -i epaint | head -30
       - name: Apply egui 0.35 compatibility edits in temporary checkout
         run: |
           lua5.4 tools/egui035_migration_probe.lua

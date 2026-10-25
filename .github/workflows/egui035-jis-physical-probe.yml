@@ -1,0 +1,37 @@
+name: Typefinch JIS physical-key research probe
+# Isolated T305 experiment. Production eframe/egui dependencies remain untouched.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/egui035-jis-physical-probe.yml
+      - tools/egui035_jis_physical_probe.lua
+      - tests/jis_physical_emulation_smoke.sh
+permissions:
+  contents: read
+jobs:
+  jis-physical:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Native dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config lua5.4 xvfb openbox xdotool x11-xkb-utils libxkbcommon-x11-0 sqlite3 lua-dkjson fonts-noto-core fonts-noto-cjk
+      - name: Extend only temporary egui and egui-winit sources
+        run: |
+          cargo fetch --locked
+          ROOT="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+          KEY="$(find "$ROOT" -path '*/egui-0.35.0/src/data/key.rs' -print -quit)"
+          BRIDGE="$(find "$ROOT" -path '*/egui-winit-0.35.0/src/lib.rs' -print -quit)"
+          test -n "$KEY" && test -n "$BRIDGE"
+          lua5.4 tools/egui035_jis_physical_probe.lua "$KEY" "$BRIDGE" src/xkb.rs
+          cargo clean -p egui -p egui-winit
+      - name: Check physical JIS key maps against pinned XKB
+        run: cargo test --locked --all-targets
+      - name: Assert production source and dependency lock remain unchanged
+        if: always()
+        run: git diff --exit-code -- Cargo.toml Cargo.lock

@@ -2,7 +2,7 @@
 
 **Source of truth:** [progress.json](progress.json). Percentages are evidence-backed fractions of atomic acceptance checks, averaged into phase/milestone totals. No unverified task reaches 100%.
 
-**Overall:** `█████████░ 89%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
+**Overall:** `█████████░ 90%` across 41 tasks. This is tracked progress, not a claim of runtime readiness.
 
 ## 🐣 M0 — Native typing MVP — `██████████ 95%`
 
@@ -80,7 +80,7 @@
 - 🐦 Local identity — `██████████ 100%`
 - 🌗 Appearance — `█████████░ 92%`
 
-## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 78%`
+## 🗺️ M1 — Keyboard layout laboratory — `████████░░ 81%`
 
 **Acceptance gate:** Broad XKB-backed layout emulation and honest multi-device handling.
 
@@ -112,15 +112,15 @@
   - [x] Function/navigation and numeric keypad reference views — src/geometry.rs, src/app.rs and tests/gui_smoke.sh: 26 function/navigation and 17 keypad Linux evdev reference keys, non-overlap/uniqueness/non-attribution tests and F10 native selection; Actions 40006834967 passed 118 Rust tests and X11 GUI assertions, both archived screenshots visually inspected
   - [x] Complete control/modifier and edge-key geometry — src/geometry.rs exhaustive 104 ANSI/105 ISO/109 JIS/104 split unique Linux evdev reference inventories across Typing, Function/navigation and Keypad sections, non-attributed controls, modifier and national-edge keys with visible fallback captions. GitHub Actions 40134673256 green: 224 Rust tests and complete native X11 GUI, ISO/JIS/split 1100×850 screenshots manually inspected for labels and clipping. Earlier F10 function and keypad native screenshot inspections CI 40006834967. This accepts the standard illustrative reference inventory, not device hardware topology, extra-key routing or physical Hyprland.
 
-### 🔌 P4 — Keyboard detection and selection — `██████░░░░ 61%`
+### 🔌 P4 — Keyboard detection and selection — `███████░░░ 69%`
 
 - 🔍 **T401** Hyprland device inspection — `███████░░░ 67%`
   - [x] Read-only hyprctl query coded — src/devices.rs
   - [x] Device and active map display coded — src/app.rs
   - [ ] Live connected-keyboard test
-- 🎛️ **T402** Multiple connected keyboards — `███████░░░ 67%`
+- 🎛️ **T402** Multiple connected keyboards — `██████████ 100%`
   - [x] Read-only device chooser coded — src/app.rs
-  - [ ] Hotplug support
+  - [x] Hotplug support — src/app.rs focused single-flight 20-second Hyprland/Wayland inventory poll, identity-preserving chooser and trust invalidation; src/devices.rs bounded read-only inspector, fail-closed parse and selection. tests/hotplug_gui_smoke.sh exercised unchanged native egui Typefinch under disposable Weston wl_display with independent synthetic hyprctl metadata: initial 1 keyboard with known map; attached 2 conflicting maps -> unknown; detached to 1 -> known; empty 0 -> unknown; malformed response -> unverified empty; recovery to 1 -> known. Six production-GUI QA reports had only device count, selected index, freshness and layout-detected boolean, no names/IDs/keys. Six native X11 parent screenshots archived; reviewed 1024x768 attached frame. CI 40146202012: 230 Rust tests and entire native Wayland/X11 graphical suite passed. This accepts software inventory hotplug and fail-safe recovery only, not real physical Hyprland hotplug, actual per-device event capture or attribution (T401/T404 still open).
   - [x] Reliable per-device event attribution or explicit unsupported mode — src/devices.rs CapturePolicy::InspectionOnly and src/app.rs: visible no-per-device typing mode, no physical event stream; unit test with two separate keyboard inspection identities, CI 40014109451: complete Rust and native X11 suites passed
 - 🪟 **T403** Generic compositor fallback — `████████░░ 75%`
   - [x] Safe Hyprland-unavailable state coded — src/devices.rs
@@ -136,7 +136,7 @@
 
 - 🗺️ Layout recognition — `████████░░ 81%`
 - 🔀 Software layout emulation — `█████████░ 90%`
-- 🔌 Multi-keyboard selection — `█████░░░░░ 50%`
+- 🔌 Multi-keyboard selection — `███████░░░ 67%`
 
 ## 🎓 M2 — Typing academy — `█████████░ 92%`
 

@@ -222,6 +222,7 @@ impl Renderer {
                     return None;
                 }
                 let byte=start.checked_add(cursor.index)?;
+                if byte==text.len(){return Some(byte);}
                 return text.grapheme_indices(true)
                     .take_while(|(at,_)|*at<=byte)
                     .last().map(|(at,_)|at)
@@ -327,6 +328,41 @@ mod tests {
             }
             assert_eq!(snap_drag_selection(text,total+1,0),None);
             assert_eq!(snap_drag_selection(text,0,total+1),None);
+        }
+    }
+    #[test] fn cosmic_visual_hit_testing_returns_only_logical_cluster_boundaries(){
+        let mut shaper=Renderer::new();
+        for text in [
+            "שָׁלוֹם abc مرحبا 123",
+            "سَلَام\nHebrew שָׁלוֹם\n👩‍💻 e\u{301}",
+        ] {
+            let boundaries=text.grapheme_indices(true).map(|(idx,_)|idx)
+                .chain(std::iter::once(text.len()))
+                .collect::<std::collections::HashSet<_>>();
+            let mut hits=0;
+            for y in [2.0,15.0,34.0,62.0,91.0] {
+                for x in [2.0,34.0,84.0,180.0,290.0] {
+                    if let Some(byte)=shaper.hit_test_byte(text,320,140,x,y){
+                        hits+=1;
+                        assert!(byte<=text.len() && boundaries.contains(&byte),
+                            "COSMIC pointer hit bisected an actual grapheme: {text:?} x={x} y={y} at={byte}");
+                        assert!(text.is_char_boundary(byte));
+                    }
+                }
+            }
+            assert!(hits>4,"visual BiDi hit tester never returned valid cursor boundaries");
+            for (x,y) in [
+                (-1.0,1.0),(1.0,-1.0),
+                (f32::NAN,1.0),(1.0,f32::NAN),
+                (f32::INFINITY,1.0),(1.0,f32::NEG_INFINITY),
+                (321.0,1.0),(1.0,141.0),
+            ] {
+                assert_eq!(shaper.hit_test_byte(text,320,140,x,y),None);
+            }
+            assert_eq!(shaper.hit_test_byte(text,0,140,1.0,1.0),None);
+            assert_eq!(shaper.hit_test_byte(text,320,0,1.0,1.0),None);
+            assert_eq!(shaper.hit_test_byte(text,2049,140,1.0,1.0),None);
+            assert_eq!(shaper.hit_test_byte(text,320,257,1.0,1.0),None);
         }
     }
     #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){

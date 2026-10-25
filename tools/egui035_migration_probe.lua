@@ -167,6 +167,30 @@ replace([[if shift_arrow || plain_arrow || pointer_selection {
 [[if shift_arrow || plain_arrow || pointer_selection || plain_undo {
                                 stored.or(native_cursor_range)]],1)
 
+
+-- Temporary synthetic metadata-only Wayland diagnostic. The migrated source
+-- sometimes reports the full 17-grapheme range for a visibly partial RTL
+-- pointer drag. Compare original scalar counts with native galley coordinates.
+replace([[let range=range.map(|mut range|{
+                            let scalars=self.custom_text.chars().count();]],
+[[if std::env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT").is_some()
+                            && ui.input(|i|i.events.iter().any(|event|
+                                matches!(event,egui::Event::PointerButton{
+                                    button:egui::PointerButton::Primary,pressed:false,..}))) {
+                            let ix=|r:egui::text::CCursorRange|
+                                (r.primary.index.0,r.secondary.index.0);
+                            let saved=egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|st|st.cursor.char_range());
+                            eprintln!("egui035-wayland-rtl-qa pointer focus={} source_chars={} source_bytes={} galley_chars={} galley_bytes={} same_text={} output={:?} stored={:?} used={:?}",
+                                edit.has_focus(),self.custom_text.chars().count(),
+                                self.custom_text.len(),edit_output.galley.text.chars().count(),
+                                edit_output.galley.text.len(),
+                                edit_output.galley.text==self.custom_text,
+                                native_cursor_range.map(ix),saved.map(ix),range.map(ix));
+                        }
+                        let range=range.map(|mut range|{
+                            let scalars=self.custom_text.chars().count();]],1)
+
 local out=assert(io.open(path, "wb"))
 assert(out:write(src))
 assert(out:close())

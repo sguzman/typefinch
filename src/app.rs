@@ -1716,7 +1716,7 @@ impl Typefinch {
         self.training_followup=Some(trial);
         self.save();
         self.start_test(ctx);
-        self.message="Original passage retest started. Before/after scores are observational, not proof that the drill caused improvement.".into();
+        self.message="Original passage retest started as Custom: this is not a new benchmark result. Before/after scores are observational, not proof of drill efficacy.".into();
     }
     /// Recompute only when reference window, score colors or input changes.
     /// No screenshot or entered text leaves the in-memory native widget.
@@ -1894,8 +1894,14 @@ impl Typefinch {
                     && trial.same_context(
                         &self.prefs.profiles[self.prefs.active_profile].id,
                         &self.prefs.layout,self.mode));
-                if can_retest && ui.button("Retest original passage").clicked() {
-                    self.start_training_retest(ctx);
+                if can_retest {
+                    let label=if self.training_followup.as_ref().is_some_and(|trial|
+                        trial.mode!=TestMode::Custom) {
+                        "Retest original passage (Custom; not benchmark)"
+                    } else {
+                        "Retest original passage"
+                    };
+                    if ui.button(label).clicked() {self.start_training_retest(ctx);}
                 }
             }
             ui.label(match self.session.state {

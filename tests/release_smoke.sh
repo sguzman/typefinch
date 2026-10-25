@@ -7,23 +7,27 @@ archive="dist/typefinch-${version}-linux-x86_64.tar.gz"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 tar -tzf "$archive" >"$tmp/members"
-[[ "$(grep -cv '/$' "$tmp/members")" -eq 8 ]]
+[[ "$(grep -cv '/$' "$tmp/members")" -eq 14 ]]
 ! grep -E '^/|(^|/)\.\.(/|$)' "$tmp/members"
 tar -xzf "$archive" -C "$tmp"
 root="$tmp/typefinch-${version}-linux-x86_64"
-# Original epaint notices are required byte-for-byte in every preview archive.
-for item in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
-  notice="$root/share/doc/typefinch/third-party/epaint-0.35.0/$item"
-  [[ -s "$notice" ]] || { echo "Missing pinned epaint notice: $item" >&2;exit 1; }
-  cmp "third_party/epaint-0.35.0/$item" "$notice"
+# Each pinned source ships its exact original MIT/Apache texts and provenance.
+for vendor in epaint-0.35.0 egui-0.35.0 egui-winit-0.35.0;do
+  for item in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
+    notice="$root/share/doc/typefinch/third-party/$vendor/$item"
+    [[ -s "$notice" ]] || { echo "Missing vendor notice: $vendor/$item" >&2;exit 1; }
+    cmp "third_party/$vendor/$item" "$notice"
+  done
 done
 prefix="$tmp/prefix"
 sh "$root/install.sh" --prefix "$prefix"
 test -x "$prefix/bin/typefinch"
 cmp "$root/bin/typefinch" "$prefix/bin/typefinch"
-for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
-  cmp "$root/share/doc/typefinch/third-party/epaint-0.35.0/$notice" \
-      "$prefix/share/doc/typefinch/third-party/epaint-0.35.0/$notice"
+for vendor in epaint-0.35.0 egui-0.35.0 egui-winit-0.35.0;do
+  for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
+    cmp "$root/share/doc/typefinch/third-party/$vendor/$notice" \
+        "$prefix/share/doc/typefinch/third-party/$vendor/$notice"
+  done
 done
 "$prefix/bin/typefinch" --version | grep -Fx "typefinch $version"
 original="$(sha256sum "$prefix/bin/typefinch" | cut -d' ' -f1)"
@@ -63,4 +67,23 @@ for form in directory file ancestor readme bin;do
   fi
   [ ! -e "$blocked/bin/typefinch" ] || { echo "Partially installed executable" >&2;exit 1; }
 done
-echo "Versioned Linux packaging, vendor notices, install/upgrade/rollback and collision tests PASS"
+# Independently exercise the extra vendor destinations against symlinks.
+for vendor in egui-0.35.0 egui-winit-0.35.0;do
+  for form in directory file;do
+    blocked="$tmp/symlink-$vendor-$form"
+    target="$blocked/share/doc/typefinch/third-party/$vendor"
+    mkdir -p "$(dirname "$target")" "$tmp/outside"
+    if [[ "$form" == directory ]];then
+      ln -s "$tmp/outside" "$target"
+    else
+      mkdir -p "$target"
+      ln -s "$tmp/outside/notices" "$target/LICENSE-MIT"
+    fi
+    if sh "$root/install.sh" --prefix "$blocked";then
+      echo "Installed through symlinked pinned vendor" >&2;exit 1
+    fi
+    [[ ! -e "$blocked/bin/typefinch" ]] ||
+      { echo "Partially installed executable" >&2;exit 1; }
+  done
+done
+echo "Versioned Linux packaging, three vendor notices, install/upgrade/rollback and collision tests PASS"

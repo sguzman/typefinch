@@ -743,6 +743,7 @@ impl Typefinch {
                 if let Some(comparison)=result {
                     trial.stage=Stage::Compared;
                     trial.comparison=Some(comparison);
+                    let _=crate::qa::write_training_followup_audit(comparison);
                 } else {
                     self.training_followup=None;
                     self.message="Practice comparison not available: retest context or passage changed.".into();

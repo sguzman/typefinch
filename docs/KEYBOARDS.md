@@ -444,7 +444,14 @@ rather than accepting synthetic `hyprctl` fixtures as evidence.
 
 Both are **external runner/compositor initialization failures**. Neither
 execution reached the Typefinch application, therefore neither proves a
-Typefinch defect nor passes its live Hyprland gates. The experimental
+Typefinch defect nor passes its live Hyprland gates.
+
+A distinct [labwc software-GLES experiment 40244600862](https://github.com/sguzman/typefinch/actions/runs/40244600862)
+likewise stopped before Hyprland or Typefinch opened: wlroots 0.19/labwc 0.9.3
+reported `drmGetDevices2 failed` and `Cannot create GLES2 renderer: no DRM FD
+available`. The alternate headless-parent attempt was reverted, and the
+workflow remains manually dispatchable only. No repeated GPU-less hosted
+attempt is warranted by this evidence. The experimental
 workflow remains manually dispatchable but is not a required on-push gate
 on hosted runners known to lack the necessary allocator/device/protocol
 support. Further virtual validation needs a compatible render-capable host;

@@ -1,15 +1,11 @@
 name: Typefinch experimental headless Hyprland GUI
 # Isolated virtual compositor: never physical-device acceptance.
-# Alternate software Wayland host experiment for T001/T902. Weston failed
-# to supply the required protocol/allocator; try headless EGL labwc instead.
-# Never count this as real physical-device or hardware acceptance.
+# The hosted runner has no working Aquamarine GPU/allocator backend.
+# This hosted runner has no usable Aquamarine DRM/allocator backend and
+# its nested compositor lacks required protocol versions. Keep this experiment
+# opt-in until a render-capable runner is configured; no hardware acceptance.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/hyprland-headless.yml
-      - tests/hyprland_headless_smoke.sh
 jobs:
   native-hyprland:
     runs-on: ubuntu-24.04
@@ -27,7 +23,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/workspace" -w /workspace -e DEBIAN_FRONTEND=noninteractive ubuntu:26.04 bash -euc '
             apt-get -o Acquire::Retries=3 update
-            apt-get -o Acquire::Retries=3 install -y --no-install-recommends hyprland labwc grim jq procps util-linux file imagemagick libegl1 libgl1 libgl1-mesa-dri libwayland-client0 libxkbcommon0 libfontconfig1 fonts-noto-core
+            apt-get -o Acquire::Retries=3 install -y --no-install-recommends hyprland weston grim jq procps util-linux file imagemagick libegl1 libgl1 libgl1-mesa-dri libwayland-client0 libxkbcommon0 libfontconfig1 fonts-noto-core
             useradd --uid 1001 --create-home qa
             runuser -u qa -- bash tests/hyprland_headless_smoke.sh
           '

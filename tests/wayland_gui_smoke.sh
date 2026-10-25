@@ -341,6 +341,37 @@ assert(d.synthetic and d.state=="rtl-editor-caret"
   and d.caret_positioned and d.selected_graphemes==0,
   "Wayland ordinary visual click failed to collapse extended selection")
 LUA
+  # A real wl_pointer double-click on the shaped, read-only script
+  # preview selects one lexical word in the native source TextEdit.
+  # X11 double-click is tested separately; this proves the Wayland gesture.
+  xdotool key --clearmodifiers ctrl+Home
+  sleep 0.25
+  xdotool mousemove --window "$parent" 275 539
+  xdotool click --repeat 2 --delay 100 1
+  sleep 0.55
+  cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-preview-double-word.json"
+  import -window "$parent" "typefinch-wayland-rtl-$script-preview-double-word.png"
+  lua5.4 - "$tmp/$script-preview-double-word.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing native Wayland double-click audit")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned
+  and d.total>8 and d.selected_graphemes>=2
+  and d.selected_graphemes<d.total,
+  "Wayland double-click on shaped RTL word must select a bounded source word")
+print("Native Weston shaped RTL word double-click PASS: "..
+  d.selected_graphemes.." selected graphemes")
+LUA
+  xdotool mousemove --window "$parent" 275 539 click 1
+  sleep 0.4
+  lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret"
+  and d.caret_positioned and d.selected_graphemes==0,
+  "Wayland plain click must collapse double-click word selection")
+LUA
   xdotool key --clearmodifiers ctrl+Home
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"

@@ -39,6 +39,14 @@ impl PreviewLayer {
 }
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
+fn keyboard_poll_interval()->Duration {
+    // Only an expressly isolated synthetic GUI QA process can accelerate
+    // compositor metadata polling. Production remains a bounded 20 seconds.
+    if std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+        && std::env::var_os("TYPEFINCH_QA_HOTPLUG_REPORT").is_some() {
+        Duration::from_millis(300)
+    } else {KEYBOARD_POLL_INTERVAL}
+}
 // Read modifier state from the *key press event*, not the frame-final
 // keyboard state. Fast synthetic chords and real quick releases may have
 // released Shift/Ctrl before the next GUI frame begins.
@@ -209,7 +217,7 @@ fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::
     })
 }
 fn should_poll_devices(can_poll:bool,focused:bool,focus_gained:bool,elapsed:Duration)->bool {
-    can_poll && focused && (focus_gained || elapsed>=KEYBOARD_POLL_INTERVAL)
+    can_poll && focused && (focus_gained || elapsed>=keyboard_poll_interval())
 }
 // Manual requests and the focus/hotplug watcher share one bounded inspector.
 // A slow external compositor command must not block typing or allow repeated
@@ -592,6 +600,10 @@ impl Typefinch {
         self.device_index=devices::preserve_selection(selected.as_deref(),&updated);
         self.keyboards=updated;
         self.device_error=error;
+        let known=recorded_layout(Mode::System,"",&self.keyboards,&self.installed_layouts)
+            .starts_with("detected/");
+        let _=crate::qa::write_hotplug_audit(
+            self.keyboards.len(),self.device_index,self.device_inventory_fresh,known);
         if self.session.state==State::Running && self.mode==Mode::System {
             let validated=validated_session_layout(
                 &self.session_layout,self.mode,&self.keyboards,&self.installed_layouts);
@@ -620,7 +632,7 @@ impl Typefinch {
                 self.device_inventory_fresh=false;
                 // Let Hyprland's normal periodic logic immediately issue
                 // a fresh query (still only one query in flight).
-                self.device_poll_started=Instant::now()-KEYBOARD_POLL_INTERVAL;
+                self.device_poll_started=Instant::now()-keyboard_poll_interval();
             } else {
                 // A disconnected inspector invalidates the old inventory,
                 // as does a failed query; neither leaves a trusted row.
@@ -636,7 +648,7 @@ impl Typefinch {
             self.request_device_query(ctx);
         }
         if focused && can_poll {
-            ctx.request_repaint_after(KEYBOARD_POLL_INTERVAL);
+            ctx.request_repaint_after(keyboard_poll_interval());
         }
     }
     fn poll_publish_result(&mut self) {

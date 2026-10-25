@@ -3,6 +3,50 @@
 # the external Weston 13 X11-backend process segfaults before the first
 # verified scored native typing session, with demonstrated connection loss. Never retry product/assertion failures.
 set -Eeuo pipefail
+# Classify *only* the external compositor's SIGSEGV with lost Wayland
+# transport before any proven completed Typefinch typing session. Keep
+# this separately testable so CI cannot silently grow a broad retry policy.
+weston_pre_score_crash(){
+  local log="$1"
+  grep -F 'Segmentation fault' "$log" >/dev/null &&
+  grep -F 'weston --backend=x11-backend.so' "$log" >/dev/null &&
+  ! grep -F 'Nested Weston real Wayland wl_keyboard PASS:' "$log" >/dev/null &&
+  { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null ||
+    { grep -F 'Connection reset by peer' "$log" >/dev/null &&
+      grep -F 'No scored native Wayland typing result' "$log" >/dev/null; }; }
+}
+# Tiny standalone contract test: explicitly reject after-score crashes,
+# Typefinch application assertion failures and unrelated interruptions.
+if [[ "${1:-}" == --self-test ]];then
+  file="$(mktemp)"
+  trap 'rm -f "$file"' EXIT
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Typefinch exited before native Wayland keyboard input' >"$file"
+  weston_pre_score_crash "$file" || exit 1
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Connection reset by peer' \
+    'No scored native Wayland typing result' >"$file"
+  weston_pre_score_crash "$file" || exit 1
+  for counterexample in \
+    'Native Weston wl_keyboard did not deliver complete test' \
+    'Nested Weston real Wayland wl_keyboard PASS:' \
+    'Typefinch application panicked';do
+    printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+      'Connection reset by peer' 'No scored native Wayland typing result' \
+      "$counterexample" >"$file"
+    if [[ "$counterexample" == 'Nested Weston real Wayland wl_keyboard PASS:' ]];then
+      weston_pre_score_crash "$file" && exit 1
+    fi
+  done
+  printf '%s\n' 'Native application scoring mismatch' \
+    'No scored native Wayland typing result' >"$file"
+  weston_pre_score_crash "$file" && exit 1
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Native input wrong: 2/3' >"$file"
+  weston_pre_score_crash "$file" && exit 1
+  echo "External Weston pre-score retry guard positive/negative cases PASS"
+  exit 0
+fi
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 for attempt in 1 2;do
@@ -20,13 +64,7 @@ for attempt in 1 2;do
   # loss of the Wayland connection, and absence of *any* successful scored
   # session. Do NOT retry failed product assertions, incomplete scores,
   # or a crash after a successfully completed native typing session.
-  if ((attempt==1)) \
-    && grep -F 'Segmentation fault' "$log" >/dev/null \
-    && grep -F 'weston --backend=x11-backend.so' "$log" >/dev/null \
-    && ! grep -F 'Nested Weston real Wayland wl_keyboard PASS:' "$log" >/dev/null \
-    && { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null \
-       || { grep -F 'Connection reset by peer' "$log" >/dev/null \
-            && grep -F 'No scored native Wayland typing result' "$log" >/dev/null; }; };then
+  if ((attempt==1)) && weston_pre_score_crash "$log";then
     echo "Confirmed external Weston SIGSEGV before the first verified native typing result. Retrying the entire isolated GUI test once; all app assertions remain strict." >&2
   else
     echo "Native Wayland assertion failed or compositor crash outside bootstrap; not retried." >&2

@@ -18,7 +18,7 @@ cleanup(){
       [[ ! -f "$log" ]] || tail -n 180 "$log" >&2
     done
     [[ ! -f "$tmp/hyprland.log" ]] || tail -n 100 "$tmp/hyprland.log" >&2
-    [[ ! -f "$tmp/weston.log" ]] || tail -n 50 "$tmp/weston.log" >&2
+    [[ ! -f "$tmp/labwc.log" ]] || tail -n 90 "$tmp/labwc.log" >&2
     for log in "$XDG_RUNTIME_DIR"/hypr/*/hyprland.log;do
       [[ ! -f "$log" ]] || tail -n 110 "$log" >&2
     done
@@ -35,24 +35,27 @@ export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland
 export LIBGL_ALWAYS_SOFTWARE=1 MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
 export HYPRLAND_NO_SD_NOTIFY=1 HYPRLAND_TRACE=1 AQ_TRACE=1
 unset DISPLAY WAYLAND_SOCKET WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE
-# Current Aquamarine cannot create a GPU-less stand-alone backend. The
-# disposable software-rendered parent Weston supplies a legitimate Wayland
-# allocator/surface; Hyprland itself still owns the real child compositor.
-# Aquamarine's nested Wayland backend needs a dmabuf-capable EGL parent;
-# the Pixman-only Weston parent lacks the required allocation protocols.
-# Exercise Weston software GLES via llvmpipe instead of pretending a
-# Pixman-only Wayland socket is an acceptable Hyprland host.
-weston --backend=headless-backend.so --renderer=gl --socket=parent-wayland \
-  --no-config --idle-time=0 --width=1280 --height=900 \
-  --log="$tmp/weston.log" >"$tmp/weston-stdout.log" 2>&1 &
+# An earlier Weston parent advertised wl_compositor v5 while Aquamarine
+# required v6 and could not negotiate usable DMA buffers. Use an independent
+# wlroots labwc compositor with an EGL/GLES software headless renderer.
+# This is an isolated *experimental* virtual parent, not hardware evidence.
+mkdir -p "$tmp/labwc"
+export WLR_BACKENDS=headless WLR_RENDERER=gles2 WLR_HEADLESS_OUTPUTS=1
+export WLR_LIBINPUT_NO_DEVICES=1
+labwc --config-dir "$tmp/labwc" --debug >"$tmp/labwc.log" 2>&1 &
 parent=$!
+parent_socket=''
 for _ in $(seq 1 100);do
-  [[ -S "$XDG_RUNTIME_DIR/parent-wayland" ]] && break
-  kill -0 "$parent" 2>/dev/null || { echo "Parent Weston exited" >&2;exit 1; }
+  for sock in "$XDG_RUNTIME_DIR"/wayland-*;do
+    if [[ -S "$sock" ]];then parent_socket="$(basename "$sock")";break;fi
+  done
+  [[ -z "$parent_socket" ]] || break
+  kill -0 "$parent" 2>/dev/null || { echo "Parent labwc exited" >&2;exit 1; }
   sleep 0.2
 done
-[[ -S "$XDG_RUNTIME_DIR/parent-wayland" ]] || { echo "Parent Weston socket missing" >&2;exit 1; }
-export WAYLAND_DISPLAY=parent-wayland
+[[ -n "$parent_socket" ]] || { echo "labwc native Wayland socket missing" >&2;exit 1; }
+export WAYLAND_DISPLAY="$parent_socket"
+unset WLR_BACKENDS WLR_RENDERER WLR_HEADLESS_OUTPUTS WLR_LIBINPUT_NO_DEVICES
 cat >"$tmp/hyprland.conf" <<'CONF'
 monitor = ,1280x900@60,auto,1
 misc {
@@ -87,10 +90,15 @@ if [[ "$(jq 'length' "$tmp/monitors.json")" == 0 ]];then
   hyprctl -j monitors >"$tmp/monitors.json"
 fi
 jq -e 'type=="array" and length>0' "$tmp/monitors.json" >/dev/null
+child_socket=''
 for socket in "$XDG_RUNTIME_DIR"/wayland-*;do
-  if [[ -S "$socket" ]];then export WAYLAND_DISPLAY="$(basename "$socket")";break;fi
+  if [[ -S "$socket" && "$(basename "$socket")" != "$parent_socket" ]];then
+    child_socket="$(basename "$socket")"
+    break
+  fi
 done
-: "${WAYLAND_DISPLAY:?Hyprland native Wayland socket missing}"
+[[ -n "$child_socket" ]] || { echo "Hyprland Wayland socket missing" >&2;exit 1; }
+export WAYLAND_DISPLAY="$child_socket"
 test -x /workspace/target/debug/typefinch
 env -u DISPLAY ./target/debug/typefinch >"$tmp/typefinch.log" 2>&1 &
 app=$!

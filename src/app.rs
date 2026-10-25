@@ -1843,51 +1843,54 @@ impl Typefinch {
             let can_seek=self.rtl_raw_editor_open && self.session.state!=State::Running
                 && !self.rtl_editor_preedit_active
                 && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_))));
+            let (pressed,released,press_origin,current_pos)=ui.input(|i|(
+                i.pointer.primary_pressed(),i.pointer.primary_released(),
+                i.pointer.press_origin(),i.pointer.interact_pos()));
             if !can_seek {self.rtl_preview_drag_anchor=None;}
-            if can_seek && response.drag_started() {
-                let origin=ui.input(|i|i.pointer.press_origin())
-                    .or_else(||response.interact_pointer_pos());
-                self.rtl_preview_drag_anchor=origin.and_then(|position|{
-                    let local=position-response.rect.min;
-                    self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
-                        .hit_test_byte(&preview,width,height,local.x,local.y)
-                        .and_then(|at|skipped.checked_add(at))
-                        .filter(|at|rtl_preview_editor_range(&self.custom_text,*at,*at).is_some())
-                });
+            // The source TextEdit must NOT reclaim keyboard/pointer focus
+            // while the shaped preview owns an unfinished mouse drag.
+            // Capture the original press even if a parent ScrollArea later
+            // claims the drag gesture; use actual release, not hovered()
+            // or Response::dragged(), to finalize the logical selection.
+            if can_seek && pressed {
+                self.rtl_preview_drag_anchor=press_origin
+                    .filter(|position|response.rect.contains(*position))
+                    .and_then(|position|{
+                        let local=position-response.rect.min;
+                        self.rtl_renderer.get_or_insert_with(
+                                rtl_shaping::Renderer::new)
+                            .hit_test_byte(&preview,width,height,local.x,local.y)
+                            .and_then(|at|skipped.checked_add(at))
+                            .filter(|at|rtl_preview_editor_range(
+                                &self.custom_text,*at,*at).is_some())
+                    });
             }
-            let dragged=can_seek && response.dragged()
-                && self.rtl_preview_drag_anchor.is_some();
-            if (can_seek && response.clicked()) || dragged {
-                let position=response.interact_pointer_pos()
-                    .or_else(||ui.input(|i|i.pointer.interact_pos()));
-                if let Some(position)=position {
-                    let local=position-response.rect.min;
-                    if let Some(active)=self.rtl_renderer.get_or_insert_with(
-                            rtl_shaping::Renderer::new)
-                        .hit_test_byte(&preview,width,height,local.x,local.y)
-                        .and_then(|at|skipped.checked_add(at)) {
-                        let anchor=if dragged {
-                            self.rtl_preview_drag_anchor.unwrap_or(active)
-                        }else{active};
-                        if let Some(range)=rtl_preview_editor_range(
-                            &self.custom_text,active,anchor) {
-                            let id=egui::Id::new("custom_text_editor");
-                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id){
-                                state.cursor.set_char_range(Some(range));
-                                state.store(ui.ctx(),id);
-                                ui.ctx().memory_mut(|m|m.request_focus(id));
-                                self.rtl_editor_cursor_byte=Some(active);
-                                self.rtl_editor_selection_bytes=(active!=anchor).then_some(
-                                    (active.min(anchor),active.max(anchor)));
-                                self.rtl_editor_signature.clear();
-                                ui.ctx().request_repaint();
+            if can_seek && released {
+                if let Some(anchor)=self.rtl_preview_drag_anchor.take() {
+                    if let Some(position)=current_pos {
+                        let local=position-response.rect.min;
+                        if let Some(active)=self.rtl_renderer.get_or_insert_with(
+                                rtl_shaping::Renderer::new)
+                            .hit_test_byte(&preview,width,height,local.x,local.y)
+                            .and_then(|at|skipped.checked_add(at)) {
+                            if let Some(range)=rtl_preview_editor_range(
+                                    &self.custom_text,active,anchor) {
+                                let id=egui::Id::new("custom_text_editor");
+                                if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id) {
+                                    state.cursor.set_char_range(Some(range));
+                                    state.store(ui.ctx(),id);
+                                    ui.ctx().memory_mut(|m|m.request_focus(id));
+                                    self.rtl_editor_cursor_byte=Some(active);
+                                    self.rtl_editor_selection_bytes=
+                                        (active!=anchor).then_some((
+                                            active.min(anchor),active.max(anchor)));
+                                    self.rtl_editor_signature.clear();
+                                    ui.ctx().request_repaint();
+                                }
                             }
                         }
                     }
                 }
-            }
-            if response.drag_stopped() || !response.is_pointer_button_down_on() {
-                self.rtl_preview_drag_anchor=None;
             }
             if self.rtl_raw_editor_open
                 && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {

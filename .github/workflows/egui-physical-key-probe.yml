@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/egui-physical-key-probe.yml
       - tools/egui035_migration_probe.lua
+      - tools/egui035_physical_probe.lua
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +33,7 @@ jobs:
       - name: Apply egui 0.35 compatibility edits in temporary checkout
         run: |
           lua5.4 tools/egui035_migration_probe.lua
+          lua5.4 tools/egui035_physical_probe.lua
       - name: Check Typefinch compatibility against the new API
         run: |
           cargo check --all-targets 2>&1 | tee egui-physical-key-probe.log

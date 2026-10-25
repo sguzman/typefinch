@@ -503,9 +503,10 @@ Weston Wayland, not a physical Hyprland session or arbitrary complex
 bidirectional drag topology. Real Fcitx/IBus candidate overlays, every
 caret/selection path, physical keyboard attribution and assistive technology
 remain outside these tests. T804's overall RTL acceptance check therefore
-remains **open at its previous 67%**, and the overall 41-task percentage is
-**unchanged at 90.46%**. The narrower editor regressions do not justify
-claiming general-purpose production RTL editing is complete.
+remains **open at 67%**. The project-wide 90.46% shown in this earlier
+evidence snapshot preceded the separately accepted T303 modifier work; the
+current total is in [the roadmap](ROADMAP.md). These narrower regressions do
+not justify claiming general-purpose production RTL editing is complete.
 
 ## Focus loss, bounded drag release and mixed visual rows
 
@@ -533,8 +534,9 @@ These tests establish bounded and focus-safe drag interactions over the
 specified synthetic X11 and nested Weston scenarios. They do not certify
 hardware Hyprland behavior, arbitrary multiline BiDi interactions, native
 Fcitx/IBus candidate positioning, or every accessibility pathway. T804's
-broader RTL-test gate remains open; its 67% task completion and the overall
-90.46% acceptance ledger are intentionally unchanged.
+broader RTL-test gate remains open at 67%; the project-wide percentage
+reported at the time was unchanged, but the current total is tracked in
+[the evidence-backed roadmap](ROADMAP.md).
 
 ## Native source-anchored Shift-click
 

@@ -198,6 +198,10 @@ replace([[let range=range.map(|mut range|{
                             }
                             let coarse=|ch:char|->char {
                                 if ch.is_ascii_digit(){'D'} else if ch.is_whitespace(){'_'}
+                                else if matches!(ch as u32,0x0600..=0x06ff){'A'}
+                                else if matches!(ch as u32,0xfb50..=0xfdff){'p'}
+                                else if matches!(ch as u32,0xfe70..=0xfeff){'q'}
+                                else if matches!(ch as u32,0x0590..=0x05ff){'H'}
                                 else if ch.is_alphabetic(){'L'} else if ch.is_ascii_punctuation(){'P'}
                                 else {'x'}
                             };

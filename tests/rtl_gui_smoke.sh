@@ -372,7 +372,10 @@ LUA
     # selection, and never guess or mutate source text.
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
-    xdotool mousemove --window "$window" 175 521 mousedown 1
+    # Start inside the connected script glyphs, not the Latin digit edge.
+    # A drag from the digit edge to the far right legitimately selects the
+    # entire Hebrew source, which is not this partial-range acceptance case.
+    xdotool mousemove --window "$window" 220 521 mousedown 1
     sleep 0.15
     xdotool mousemove --window "$window" 355 521
     sleep 0.25

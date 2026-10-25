@@ -84,6 +84,16 @@ sleep 0.35
 xdotool key --clearmodifiers F2
 xdotool type --clearmodifiers --delay 55 aba
 wait_score 3 3 3
+# The regular score report is written immediately before the separate
+# in-memory trial audit in the same GUI frame. Observe both independently.
+for _ in $(seq 1 60);do
+  [[ -s "$TYPEFINCH_QA_TRAINING_REPORT" ]] && break
+  sleep 0.1
+done
+[[ -s "$TYPEFINCH_QA_TRAINING_REPORT" ]] || {
+  echo "No completed in-app paired comparison despite three saved sessions" >&2
+  exit 1
+}
 lua5.4 - "$TYPEFINCH_QA_TRAINING_REPORT" "$config" "$tmp/source.txt" <<'LUA'
 local json=require("dkjson")
 local file=assert(io.open(arg[1],"rb"),"No actual in-app paired retest report")

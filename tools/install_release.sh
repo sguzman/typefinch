@@ -31,6 +31,13 @@ if [ "$rollback" -eq 1 ]; then
 fi
 [ -f "$base/bin/typefinch" ] && [ -f "$base/METADATA.txt" ] ||
   { echo "Incomplete preview archive" >&2; exit 1; }
+vendor_source="$base/share/doc/typefinch/third-party/epaint-0.35.0"
+vendor_target="$prefix/share/doc/typefinch/third-party/epaint-0.35.0"
+for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
+  [ -s "$vendor_source/$notice" ] || { echo "Incomplete upstream epaint notices" >&2; exit 1; }
+  [ ! -L "$vendor_target" ] && [ ! -L "$vendor_target/$notice" ] ||
+    { echo "Refusing symlinked notice destination" >&2; exit 1; }
+done
 if [ -e "$exe" ] && [ ! -f "$marker" ]; then
   echo "Refusing to overwrite unmanaged executable: $exe" >&2; exit 1
 fi
@@ -45,4 +52,8 @@ install -m 644 "$base/METADATA.txt" "$marker"
 mkdir -p "$prefix/share/doc/typefinch"
 install -m 644 "$base/share/doc/typefinch/README.md" "$prefix/share/doc/typefinch/README.md"
 install -m 644 "$base/share/doc/typefinch/LICENSE" "$prefix/share/doc/typefinch/LICENSE"
+mkdir -p "$vendor_target"
+for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
+  install -m 644 "$vendor_source/$notice" "$vendor_target/$notice"
+done
 echo "Installed user-local Typefinch: $exe"

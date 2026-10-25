@@ -64,7 +64,9 @@ under `share/doc/typefinch/third-party/epaint-0.35.0/`, because Typefinch
 currently includes a narrowly patched egui RTL shaping dependency.
 `tests/release_smoke.sh` verifies these three files against the checked-in
 third-party originals, alongside the existing checksum, install, upgrade,
-rollback and unmanaged-file refusal tests. Tar metadata and gzip headers
+rollback and unmanaged-file refusal tests. Installation also places these
+notices under the user's `share/doc/typefinch/third-party/` prefix;
+preflight refuses symlinked notice destinations before writing a binary. Tar metadata and gzip headers
 are normalized for repeatable archives *given identical binary contents*;
 the Rust executable is not independently proven reproducible.
 

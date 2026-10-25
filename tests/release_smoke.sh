@@ -21,6 +21,10 @@ prefix="$tmp/prefix"
 sh "$root/install.sh" --prefix "$prefix"
 test -x "$prefix/bin/typefinch"
 cmp "$root/bin/typefinch" "$prefix/bin/typefinch"
+for notice in LICENSE-MIT LICENSE-APACHE UPSTREAM.md;do
+  cmp "$root/share/doc/typefinch/third-party/epaint-0.35.0/$notice" \
+      "$prefix/share/doc/typefinch/third-party/epaint-0.35.0/$notice"
+done
 "$prefix/bin/typefinch" --version | grep -Fx "typefinch $version"
 original="$(sha256sum "$prefix/bin/typefinch" | cut -d' ' -f1)"
 printf '#!/bin/sh\necho upgraded\n' >"$root/bin/typefinch"
@@ -37,4 +41,20 @@ mkdir -p "$foreign/bin"
 printf '#!/bin/sh\necho foreign\n' >"$foreign/bin/typefinch"
 chmod 755 "$foreign/bin/typefinch"
 if sh "$root/install.sh" --prefix "$foreign"; then echo "Overwrote foreign executable" >&2; exit 1; fi
-echo "Versioned Linux packaging, install/upgrade/rollback and collision tests PASS"
+# Refuse symlinked notice destinations before writing the binary.
+for form in directory file;do
+  blocked="$tmp/symlink-notice-$form"
+  target="$blocked/share/doc/typefinch/third-party/epaint-0.35.0"
+  mkdir -p "$(dirname "$target")" "$tmp/outside"
+  if [ "$form" = directory ];then
+    ln -s "$tmp/outside" "$target"
+  else
+    mkdir -p "$target"
+    ln -s "$tmp/outside/notices" "$target/LICENSE-MIT"
+  fi
+  if sh "$root/install.sh" --prefix "$blocked";then
+    echo "Installed through a symlinked notice destination" >&2;exit 1
+  fi
+  [ ! -e "$blocked/bin/typefinch" ] || { echo "Partially installed executable" >&2;exit 1; }
+done
+echo "Versioned Linux packaging, vendor notices, install/upgrade/rollback and collision tests PASS"

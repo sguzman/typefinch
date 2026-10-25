@@ -563,7 +563,7 @@
               "id": "T402",
               "emoji": "🎛️",
               "name": "Multiple connected keyboards",
-              "progress": 67,
+              "progress": 100,
               "checks": [
                 {
                   "text": "Read-only device chooser coded",
@@ -572,7 +572,8 @@
                 },
                 {
                   "text": "Hotplug support",
-                  "passed": false
+                  "passed": true,
+                  "evidence": "src/app.rs focused single-flight 20-second Hyprland/Wayland inventory poll, identity-preserving chooser and trust invalidation; src/devices.rs bounded read-only inspector, fail-closed parse and selection. tests/hotplug_gui_smoke.sh exercised unchanged native egui Typefinch under disposable Weston wl_display with independent synthetic hyprctl metadata: initial 1 keyboard with known map; attached 2 conflicting maps -> unknown; detached to 1 -> known; empty 0 -> unknown; malformed response -> unverified empty; recovery to 1 -> known. Six production-GUI QA reports had only device count, selected index, freshness and layout-detected boolean, no names/IDs/keys. Six native X11 parent screenshots archived; reviewed 1024x768 attached frame. CI 40146202012: 230 Rust tests and entire native Wayland/X11 graphical suite passed. This accepts software inventory hotplug and fail-safe recovery only, not real physical Hyprland hotplug, actual per-device event capture or attribution (T401/T404 still open)."
                 },
                 {
                   "text": "Reliable per-device event attribution or explicit unsupported mode",

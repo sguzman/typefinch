@@ -63,7 +63,7 @@ impl FollowUp {
             || !self.same_context(profile_id,chosen_layout,input)
             || self.recorded_layout!=recorded_layout
             || self.reference!=session.target
-            || self.mode!=session.mode || self.duration!=session.duration
+            || session.mode!=TestMode::Custom || self.duration!=session.duration
             || self.language!=session.language || self.difficulty!=session.difficulty {
             return None;
         }
@@ -144,6 +144,43 @@ mod tests {
         altered.type_text("سَلَام שָׁלוֹם e");
         assert!(follow.compare(&altered,"os:unknown","private","us",Mode::System).is_none(),
             "a changed private passage must never match the baseline");
+    }
+    #[test] fn benchmark_followup_uses_identical_custom_reference_not_benchmark_ranking(){
+        let mut baseline=Session::new_with_settings(
+            0,TestMode::Numbers,"",Language::MexicanSpanish,WordDifficulty::Standard);
+        let original=baseline.target.clone();
+        baseline.begin();
+        baseline.type_text(&original);
+        assert_eq!(baseline.state,State::Finished);
+        assert!(baseline.mode.counts_for_benchmark());
+        let mut trial=FollowUp::begin(&baseline,"7 7","profile","us",
+            "os:unknown",Mode::System).unwrap();
+        assert_eq!(trial.mode,TestMode::Numbers);
+        trial.stage=Stage::Retest;
+        // The exact original source is a CUSTOM session, not another sample
+        // that can silently inflate the Numbers benchmark history.
+        let mut replay=Session::new_with_settings(
+            0,TestMode::Custom,&trial.reference,
+            Language::MexicanSpanish,WordDifficulty::Standard);
+        assert_eq!(replay.target,trial.reference);
+        replay.begin();
+        let retest=replay.target.clone();
+        replay.type_text(&retest);
+        assert_eq!(replay.state,State::Finished);
+        assert_eq!(replay.history_mode(),"custom");
+        assert!(!replay.mode.counts_for_benchmark());
+        assert!(trial.compare(&replay,"os:unknown","profile","us",
+            Mode::System).is_some());
+        let mut wrong_mode=Session::new_with_settings(
+            0,TestMode::Numbers,"",Language::MexicanSpanish,
+            WordDifficulty::Standard);
+        wrong_mode.begin();
+        let repeated=wrong_mode.target.clone();
+        wrong_mode.type_text(&repeated);
+        assert_eq!(wrong_mode.target,trial.reference);
+        assert!(trial.compare(&wrong_mode,"os:unknown","profile","us",
+            Mode::System).is_none(),
+            "replaying an identical benchmark must not count as fresh benchmark evidence");
     }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,

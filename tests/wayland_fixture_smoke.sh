@@ -6,7 +6,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/seat-probe" <<'SH'
 #!/bin/sh
-[ "${1:-}" = "--_probe_wayland_seats" ] || exit 2
+[ "${1:-}" = "--_probe_wayland_xkb_seats" ] || exit 2
 case "${TYPEFINCH_QA_WAYLAND_CASE:-}" in
   two_seats)
     printf '%s\n' '[{"id":10,"name":"shared","keyboard":true},{"id":11,"name":"shared","keyboard":true}]'

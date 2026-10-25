@@ -7,7 +7,7 @@ archive="dist/typefinch-${version}-linux-x86_64.tar.gz"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 tar -tzf "$archive" >"$tmp/members"
-[[ "$(grep -cv '/
+[[ "$(grep -cv '/$' "$tmp/members")" -eq 8 ]]
 ! grep -E '^/|(^|/)\.\.(/|$)' "$tmp/members"
 tar -xzf "$archive" -C "$tmp"
 root="$tmp/typefinch-${version}-linux-x86_64"

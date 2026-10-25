@@ -1,0 +1,38 @@
+name: Typefinch one-time verified lock blob transfer
+# Transfer the exact already-tested Cargo.lock without editing refs.
+# Delete this helper after installing the Git blob on main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/egui035-lock-blob.yml
+permissions:
+  actions: read
+  contents: write
+jobs:
+  export-verified-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Retrieve previously green egui 0.35 artifact
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 40233425013
+          name: typefinch-egui-physical-key-probe
+          github-token: ${{ github.token }}
+          path: verified
+      - name: Verify immutable tested Cargo.lock and stage one Git blob
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -f verified/Cargo.lock
+          test "$(wc -c < verified/Cargo.lock)" -eq 96709
+          printf '%s  %s\n' '520eca17c44eaaf9215a0cd10e2fe6ec7aca3765657e6d9ddf3d3420ee65a9d1' verified/Cargo.lock | sha256sum -c -
+          base64 -w0 verified/Cargo.lock | jq -Rs '{content:.,encoding:"base64"}' > /tmp/lockblob.json
+          curl --fail-with-body --silent --show-error --retry 2 \
+            -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            --data-binary @/tmp/lockblob.json \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/blobs" \
+            | jq -r '.sha | "VERIFIED_LOCK_BLOB_SHA="+.'

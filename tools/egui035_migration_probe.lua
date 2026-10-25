@@ -251,6 +251,28 @@ replace([[let range=range.map(|mut range|{
                         let range=range.map(|mut range|{
                             let scalars=self.custom_text.chars().count();]],1)
 
+
+-- A direct regression for upstream egui issue #8576. The layout must not
+-- expose a glyph cursor past the Unicode source just because it is RTL.
+replace([[    #[test] fn keyboard_theme_cycle_keeps_explicit_system_light_dark_order() {]],
+[[    #[test] fn egui_035_rtl_galley_cursor_count_matches_unicode_scalars() {
+        let ctx=egui::Context::default();
+        ctx.begin_pass(egui::RawInput::default());
+        ctx.fonts_mut(|fonts| {
+            for source in ["سَلَام بالعربية 123","שָׁלוֹם בעברית 123","Hello 123"] {
+                let galley=fonts.layout_no_wrap(source.to_owned(),
+                    egui::FontId::proportional(18.0),egui::Color32::WHITE);
+                assert_eq!(galley.end().index.0,source.chars().count(),
+                    "egui 0.35 shaped galley must preserve Unicode cursor extent");
+                let glyphs:usize=galley.rows.iter().map(|row|row.row.glyphs.len()).sum();
+                assert_eq!(glyphs,source.chars().count(),
+                    "native editor may not treat multiple RTL glyphs as characters");
+            }
+        });
+        let _=ctx.end_pass();
+    }
+    #[test] fn keyboard_theme_cycle_keeps_explicit_system_light_dark_order() {]],1)
+
 local out=assert(io.open(path, "wb"))
 assert(out:write(src))
 assert(out:close())

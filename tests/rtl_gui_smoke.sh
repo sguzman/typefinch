@@ -480,12 +480,18 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.25
     xdotool mousemove --window "$window" 220 521
-    # Direct XTest events can be coalesced into a single egui frame when
-    # --repeat is used. Separate the clicks by real GUI frames but stay
-    # inside egui's double-click interval (<300 ms).
-    xdotool click 1
-    sleep 0.16
-    xdotool click 1
+    # Each XTest press must survive at least one egui input frame.
+    # Instant xdotool clicks can contain press+release within a single
+    # frame, yielding a missing or collapsed double-click. Hold the
+    # button briefly for each click and keep both presses inside the
+    # actual egui double-click interval; do not retry a failed assertion.
+    xdotool mousedown 1
+    sleep 0.055
+    xdotool mouseup 1
+    sleep 0.105
+    xdotool mousedown 1
+    sleep 0.055
+    xdotool mouseup 1
     sleep 0.5
     cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-double-word.json"
     import -window "$window" "$tmp/rtl-$name-preview-double-word.png"

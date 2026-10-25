@@ -91,7 +91,7 @@ fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::
                                 emulator.translate(physical, modifiers.shift)
                             }
                         } else {
-                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c|c.to_string())
+                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
                         };]],
      [[                    if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
                         let alt_gr=self.emulated_right_alt_held && !self.emulated_left_alt_held;

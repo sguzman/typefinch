@@ -441,3 +441,61 @@ arbitrary bidirectional editing in production, native Wayland Fcitx/IBus
 candidate handling, physical Hyprland keyboards or per-device input routing.
 T804's broad RTL-tests acceptance check remains open, with no added
 percentage credited for these narrower regressions.
+
+## Native shaped-preview drag selection and text recovery
+
+The shaped RTL preview now supports a deliberate **pointer drag** as well as
+click-to-caret. It remains noneditable and never owns typed input, clipboard
+or IME composition: COSMIC Text hit-tests each visual pointer endpoint into
+a logical UTF-8 byte boundary, validates a complete extended grapheme
+(including Arabic harakat, Hebrew niqqud and joined glyphs), and sets the
+source egui TextEdit's actual selection only when the mouse is released.
+This avoids switching keyboard focus halfway through a drag. Native
+Wayland click-to-caret remains independently tested.
+
+**Native X11 acceptance evidence:**
+
+- [CI 40205912651](https://github.com/sguzman/typefinch/actions/runs/40205912651)
+  passed 244 Rust tests and the complete graphical suite with genuine
+  Xvfb pointer selection inside the shaped preview. The source editor
+  reported a real, partial Unicode selection and the separate preview
+  visibly changed.
+- [CI 40206738200](https://github.com/sguzman/typefinch/actions/runs/40206738200)
+  passed the same 244 Rust tests and complete graphical suite. For Arabic
+  with marks, forward/reverse gestures selected 12 graphemes, moving the
+  primary native caret **4 → 16**; for Hebrew with niqqud, the same range
+  selected 12 graphemes with caret **3 → 15**. Both source and preview were
+  screenshot-tested. No source mutation was needed to create a selection.
+- [CI 40207316038](https://github.com/sguzman/typefinch/actions/runs/40207316038)
+  passed 244 Rust tests and the full native GUI suite. After reversing the
+  visual gesture, the selected Arabic and Hebrew ranges were actually
+  replaced with a single Latin grapheme through the source TextEdit, then
+  Undo recovered the complete original synthetic UTF-8 passage **byte for
+  byte**, not just the same grapheme count.
+
+**Native nested Wayland acceptance evidence:**
+
+- [CI 40206752996](https://github.com/sguzman/typefinch/actions/runs/40206752996)
+  passed 244 Rust tests and the complete native GUI suite. Genuine nested
+  Weston `wl_pointer` drags across the shaped preview selected **14 Arabic**
+  and **10 Hebrew** graphemes in the real editable TextEdit, with unchanged
+  total source length and visible selection differences in the shaped image.
+  Both `typefinch-wayland-rtl-*-preview-drag-{before,after}.png` screenshots
+  were opened and inspected: the native editor displays an actual highlighted
+  range and the independently shaped preview changes the corresponding
+  connected glyph colors. Existing actual Wayland click-to-caret, typed
+  insertion and Undo checks continued to pass.
+
+The Unicode tests exhaustively check ordered pairs of valid grapheme
+boundaries and reject code-point offsets inside diacritic/ZWJ clusters or
+beyond the source buffer. CI artifacts and QA reports are synthetic;
+production input is not logged or captured globally.
+
+**Acceptance boundary:** This is demonstrated on virtual X11 and nested
+Weston Wayland, not a physical Hyprland session or arbitrary complex
+bidirectional drag topology. Real Fcitx/IBus candidate overlays, every
+caret/selection path, physical keyboard attribution and assistive technology
+remain outside these tests. T804's overall RTL acceptance check therefore
+remains **open at its previous 67%**, and the overall 41-task percentage is
+**unchanged at 90.46%**. The narrower editor regressions do not justify
+claiming general-purpose production RTL editing is complete.

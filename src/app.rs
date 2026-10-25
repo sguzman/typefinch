@@ -87,6 +87,13 @@ fn rtl_preview_word_range(text:&str,clicked_byte:usize)
         .or_else(||words.iter().copied().find(|&(_,end)|end==clicked_byte))?;
     rtl_preview_editor_range(text,bounds.1,bounds.0)
 }
+/// A bounded, width-aware subset of source graphemes ensures the shaped
+/// preview's caret stays inside its image when the native window is narrow.
+/// Actual source, undo history and input method continue to use full text.
+fn rtl_editor_preview_window(total:usize,cursor:usize,width:usize)
+    ->(usize,usize) {
+    crate::engine::viewport(total,cursor,rtl_shaping::preview_window_limit(width))
+}
 fn rtl_preview_clamp_drag_endpoint(local:egui::Pos2,width:usize,height:usize)
     ->Option<egui::Pos2> {
     if width==0 || height==0 || width>2048 || height>256
@@ -1830,7 +1837,8 @@ impl Typefinch {
         let cursor_grapheme=self.rtl_editor_cursor_byte.map(|byte|
             self.custom_text.grapheme_indices(true)
                 .take_while(|(position,_)|*position<byte).count()).unwrap_or(0);
-        let (first,last)=crate::engine::viewport(total,cursor_grapheme,160);
+        let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
+        let (first,last)=rtl_editor_preview_window(total,cursor_grapheme,width);
         let preview=self.custom_text.graphemes(true).skip(first)
             .take(last-first).collect::<String>();
         let skipped=self.custom_text.graphemes(true).take(first)
@@ -1838,7 +1846,6 @@ impl Typefinch {
         let local_cursor=self.rtl_editor_cursor_byte
             .and_then(|index|index.checked_sub(skipped))
             .filter(|index|*index<=preview.len());
-        let width=ui.available_width().floor().clamp(128.0,440.0) as usize;
         let height=rtl_shaping::preview_height(&preview,width);
         let dark=ui.visuals().dark_mode;
         let visible_selection=self.rtl_editor_selection_bytes.and_then(|(start,end)|{
@@ -3334,6 +3341,23 @@ mod palette_tests {
             assert!(rtl_preview_clamp_drag_endpoint(
                 egui::pos2(1.0,1.0),w,h).is_none());
         }
+    }
+    #[test] fn shaped_editor_window_tracks_caret_without_overrunning_narrow_width() {
+        let total=640;
+        for width in [128,160,175,260,440] {
+            let limit=rtl_shaping::preview_window_limit(width);
+            for caret in [0,1,24,80,320,639,640] {
+                let (first,last)=rtl_editor_preview_window(total,caret,width);
+                assert!(last>first && last<=total && last-first<=limit,
+                    "Width-aware editor preview overran its bounded texture");
+                assert!(first<=caret && caret<=last,
+                    "Native source caret must remain in displayed source window");
+            }
+        }
+        assert_eq!(rtl_editor_preview_window(0,0,128),(0,0));
+        assert_eq!(rtl_editor_preview_window(12,12,128),(0,12));
+        assert!(rtl_shaping::preview_window_limit(128)
+            <rtl_shaping::preview_window_limit(440));
     }
     #[test] fn shaped_preview_double_click_selects_whole_unicode_words() {
         for source in [

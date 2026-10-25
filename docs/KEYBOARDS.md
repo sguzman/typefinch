@@ -4,7 +4,7 @@
 
 1. **Recognized:** a curated layout identity in the selector, not necessarily installed in system XKB. The source catalog contains many presets from English, Spanish, German, French, other European, Cyrillic, Semitic and Asian layouts.
 2. **Native OS input:** accept committed text from the compositor's layout. Keep this default for complex scripts and IME input; advanced tests remain to do.
-3. **Software emulation:** interpret physical ANSI key locations through an alternate map inside Typefinch only. Four starter layouts now have verified Base/Shift ANSI positions and outer punctuation even without installed XKB. Native physical AltGr, full modifier routing, ISO/JIS extras and live hardware QA remain pending.
+3. **Software emulation:** interpret key positions through an alternate map inside Typefinch only. Four starter layouts have verified ANSI Base/Shift and outer punctuation without installed XKB. With production egui 0.35, a distinct physical RightAlt event routes XKB Level 3 and the ISO 102nd position is scoreable in virtual X11. JIS extras, full device-specific attribution, compositor variations and live Hyprland hardware QA remain pending.
 
 | Layout | Identity in catalog | Starter emulation |
 | --- | --- | --- |
@@ -18,6 +18,16 @@
 | Arabic, Hebrew, Japanese, Korean and more | ✅ | Planned; IME/BiDi/geometry complexities |
 
 The goal is full installed-XKB inventory via `xkeyboard-config` and `libxkbcommon`, plus custom layout editing, physical geometry, modifier and dead-key correctness. Do not falsely present conceptual named layouts as installed or emulatable.
+
+## Production egui 0.35 physical-key routing — virtual X11
+
+[Production CI 40235788506](https://github.com/sguzman/typefinch/actions/runs/40235788506) passed the complete locked native suite. Its physical-key fixture runs the actual Typefinch GUI on an isolated Xvfb/X11 seat with **host XKB set to US** and in-app emulation set to **German**. Real XTest key positions scored **6/6** expected graphemes: ordinary E, RightAlt+E (€), RightAlt+Q (@), ordinary E, ISO 102nd Base (<), and ISO 102nd Shift (>). A physical LeftAlt+E control did not add an attempt. SQLite reported the correct layout, Emulated input mode, and six correct attempts. Private source text and its path were absent from settings.
+
+This is not the older OS-committed-text AltGr test: RightAlt has a distinct egui 0.35 event, not a guessed `Modifiers.alt` flag. The app synthesizes the XKB modifier only after observing RightAlt, and refuses to treat LeftAlt as AltGr. The ISO extra key maps to Linux evdev **86** / X11 **94**. Source and tests are in `src/app.rs`, `src/xkb.rs` and `tests/egui035_physical_emulation_smoke.sh`; the latter is a permanent production CI gate.
+
+The egui upgrade also exposed [upstream RTL glyph-index bug #8576](https://github.com/emilk/egui/issues/8576). Typefinch pins the narrowly patched third-party `epaint 0.35.0` source under `third_party/epaint-0.35.0` ([provenance and licenses](../third_party/epaint-0.35.0/UPSTREAM.md)). The locked native tests verify glyph/cursor extent and Arabic/Hebrew editing/Undo in X11 and nested Weston. No installed Cargo cache is patched during a production build.
+
+**Scope:** this establishes host-independent German app emulation of the tested physical positions *inside a virtual X11 seat*, not a device-identified keyboard, arbitrary ISO/JIS regional keys, other compositor-specific modifier delivery, a privileged keyboard hook, or live Hyprland acceptance. The broader T305 and hardware gates remain open.
 
 ## Multiple keyboards
 

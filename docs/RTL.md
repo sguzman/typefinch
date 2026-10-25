@@ -1,5 +1,12 @@
 # Arabic and Hebrew input: implementation and acceptance
 
+## Production egui 0.35 shaping correction — verified October 25, 2026
+
+[Full production CI 40235788506](https://github.com/sguzman/typefinch/actions/runs/40235788506) passed the native Arabic/Hebrew selection, byte-exact source Undo, X11 and nested Weston Wayland regressions after upgrading to egui 0.35. Upstream [egui bug #8576](https://github.com/emilk/egui/issues/8576) generated more shaped RTL glyph slots than Unicode source scalars and broke pointer-cursor indices. The fix now lives in the pinned, licensed [epaint 0.35.0 path dependency](../third_party/epaint-0.35.0/UPSTREAM.md) and is included in the reproducible Cargo.lock. No character-proportion guess or downgraded selection assertions were accepted.
+
+**Boundary:** these tests establish the documented synthetic X11 and nested Wayland scenarios; they do not establish arbitrary complex BiDi editing, real Hyprland/focus/IME candidate overlays, or physical-keyboard attribution. T804's broader RTL acceptance remains open.
+
+
 ## What works in source
 
 Typefinch scores input against the reference in **logical Unicode extended

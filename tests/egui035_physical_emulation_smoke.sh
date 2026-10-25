@@ -4,7 +4,7 @@
 # device-specific identity, Wayland, or production Hyprland support.
 set -Eeuo pipefail
 export LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=x11 XDG_SESSION_TYPE=x11
-export TYPEFINCH_QA_XKB_COMPOSE=1
+export TYPEFINCH_QA_XKB_COMPOSE=1 TYPEFINCH_QA_DURATION_SECONDS=15
 tmp="$(mktemp -d)"
 app='' wm='' window=''
 cleanup(){

@@ -138,6 +138,35 @@ replace([[self.rtl_editor_cursor_byte=range.as_ref()
                         self.rtl_editor_cursor_byte=range.as_ref()
                             .and_then(|range|rtl_shaping::editor_caret_byte(]],1)
 
+
+-- egui 0.35 sometimes restores the edit-time selection as part of Undo.
+-- The accepted Typefinch RTL behavior preserves restored bytes but collapses
+-- the selection, exactly as in the prior native editor. Do not touch IME.
+replace([[let edit=edit_output.response;
+                        if edit.changed(){self.rebuild_session();}]],
+[[let edit=edit_output.response;
+                        if edit.changed(){self.rebuild_session();}
+                        let plain_undo=ui.input(|i|i.events.iter().any(|event|
+                            matches!(event,egui::Event::Key{
+                                key:egui::Key::Z,pressed:true,repeat:false,modifiers,..
+                            } if modifiers.ctrl && !modifiers.alt
+                                && !modifiers.shift && !modifiers.command)));
+                        if edit.has_focus() && plain_undo && !self.rtl_editor_preedit_active {
+                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),editor_id){
+                                if let Some(mut range)=state.cursor.char_range(){
+                                    if range.primary.index!=range.secondary.index {
+                                        range.secondary=range.primary;
+                                        state.cursor.set_char_range(Some(range));
+                                        state.store(ui.ctx(),editor_id);
+                                    }
+                                }
+                            }
+                        }]],1)
+replace([[if shift_arrow || plain_arrow || pointer_selection {
+                                stored.or(native_cursor_range)]],
+[[if shift_arrow || plain_arrow || pointer_selection || plain_undo {
+                                stored.or(native_cursor_range)]],1)
+
 local out=assert(io.open(path, "wb"))
 assert(out:write(src))
 assert(out:close())

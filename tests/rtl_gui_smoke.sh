@@ -473,6 +473,61 @@ LUA
       exit 1
     }
     echo "Native RTL shaped-preview Shift-click editing byte-exact Undo PASS"
+    # Native XTest double-click on a shaped Arabic/Hebrew word. COSMIC's
+    # visual hit must select one whole lexical word in source TextEdit,
+    # without absorbing adjacent spaces/punctuation or splitting marks.
+    # The word hit position is a previously verified glyph-region point.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.25
+    xdotool mousemove --window "$window" 220 521
+    xdotool click --repeat 2 --delay 100 1
+    sleep 0.5
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-double-word.json"
+    import -window "$window" "$tmp/rtl-$name-preview-double-word.png"
+    lua5.4 - "$tmp/$name/preview-double-word.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing native word double-click audit")
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned
+  and d.total>8 and d.selected_graphemes>=2
+  and d.selected_graphemes<d.total,
+  "Double-click on a shaped script glyph must select one source word")
+print("Native shaped RTL word double-click PASS: "..
+  d.selected_graphemes.." selected graphemes")
+LUA
+    xdotool type --clearmodifiers --delay 35 z
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-double-replaced.json"
+    xdotool key --clearmodifiers ctrl+z
+    sleep 0.4
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-double-undone.json"
+    lua5.4 - "$tmp/$name/preview-double-word.json" \
+      "$tmp/$name/preview-double-replaced.json" \
+      "$tmp/$name/preview-double-undone.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing double-click edit report")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local selected,changed,restored=read(arg[1]),read(arg[2]),read(arg[3])
+assert(changed.total==selected.total-selected.selected_graphemes+1
+  and changed.selected_graphemes==0,
+  "Double-click source word replacement must insert one grapheme")
+assert(restored.total==selected.total and restored.selected_graphemes==0,
+  "Undo must restore original source grapheme count")
+print("Native RTL shaped word double-click replacement/Undo counts PASS")
+LUA
+    xdotool key --clearmodifiers ctrl+a
+    xdotool key --clearmodifiers ctrl+c
+    sleep 0.3
+    timeout 5s xclip -selection clipboard -o > "$tmp/$name/preview-double-restored.txt"
+    cmp -s "$tmp/$name.txt" "$tmp/$name/preview-double-restored.txt" || {
+      echo "Double-click edit/Undo changed original marked RTL source bytes" >&2
+      exit 1
+    }
+    echo "Native RTL word double-click byte-exact Undo PASS"
     # A preview gesture may end just outside its bitmap. The renderer must
     # clamp the active visual endpoint, retain an actual grapheme-safe editor
     # selection, and never guess or mutate source text.

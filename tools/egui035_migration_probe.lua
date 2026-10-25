@@ -101,6 +101,21 @@ replace([[let range=if edit.has_focus(){
                         }else{None};]],1)
 
 
+-- egui 0.35's native shaped TextEdit can return a visual cursor beyond
+-- the scalar length of RTL marked text (observed 29 versus 19 Arabic
+-- scalars). Bound ONLY the read-only projection; never change the native
+-- source cursor state, selected Unicode bytes or Undo history.
+replace([[self.rtl_editor_cursor_byte=range.as_ref()
+                            .and_then(|range|rtl_shaping::editor_caret_byte(]],
+[[let range=range.map(|mut range|{
+                            let scalars=self.custom_text.chars().count();
+                            range.primary.index.0=range.primary.index.0.min(scalars);
+                            range.secondary.index.0=range.secondary.index.0.min(scalars);
+                            range
+                        });
+                        self.rtl_editor_cursor_byte=range.as_ref()
+                            .and_then(|range|rtl_shaping::editor_caret_byte(]],1)
+
 -- Disposable metadata-only diagnostic for the 0.35 native RTL regression.
 -- Never print the imported source, typed text, candidate or file path.
 replace([[self.rtl_editor_cursor_byte=range.as_ref()

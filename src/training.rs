@@ -1,7 +1,7 @@
 //! In-memory targeted-practice follow-up. It is an observational paired
 //! measurement, NOT a causal study of typing-training efficacy.
 //! Never persist a source passage, character-level errors or this trial.
-use crate::{engine::{Language,Score,Session,State,TestMode,WordDifficulty},layouts::Mode};
+use crate::{engine::{Language,OpportunityCounts,Score,Session,State,TestMode,WordDifficulty},layouts::Mode};
 use std::time::Duration;
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
@@ -15,11 +15,20 @@ pub struct Comparison {
     pub retest_wpm:f64,
     pub baseline_attempts:usize,
     pub retest_attempts:usize,
+    pub baseline_opportunities:OpportunityCounts,
+    pub retest_opportunities:OpportunityCounts,
 }
 impl Comparison {
     pub fn accuracy_change_pp(self)->f64 {self.retest_accuracy-self.baseline_accuracy}
     pub fn speed_change_wpm(self)->f64 {self.retest_wpm-self.baseline_wpm}
     pub fn same_attempt_count(self)->bool {self.baseline_attempts==self.retest_attempts}
+    /// Descriptive, distinct missed-position rate delta; only computed when
+    /// each source has at least one actually reached reference position.
+    /// Never interpret a paired same-passage difference as causal efficacy.
+    pub fn missed_opportunity_change_pp(self)->Option<f64> {
+        Some(self.retest_opportunities.missed_percent()?-
+            self.baseline_opportunities.missed_percent()?)
+    }
 }
 pub struct FollowUp {
     pub reference:String,
@@ -34,6 +43,7 @@ pub struct FollowUp {
     pub recorded_layout:String,
     pub input:Mode,
     pub baseline:Score,
+    pub baseline_opportunities:OpportunityCounts,
     pub stage:Stage,
     pub comparison:Option<Comparison>,
 }
@@ -49,7 +59,9 @@ impl FollowUp {
             language:session.language,difficulty:session.difficulty,
             duration:session.duration,profile_id:profile_id.into(),
             chosen_layout:chosen_layout.into(),recorded_layout:recorded_layout.into(),
-            input,baseline,stage:Stage::Drill,comparison:None,
+            input,baseline,
+            baseline_opportunities:session.opportunity_counts(),
+            stage:Stage::Drill,comparison:None,
         })
     }
     pub fn same_context(&self,profile_id:&str,chosen_layout:&str,input:Mode)->bool{
@@ -76,6 +88,8 @@ impl FollowUp {
             retest_wpm:after.wpm,
             baseline_attempts:self.baseline.attempts,
             retest_attempts:after.attempts,
+            baseline_opportunities:self.baseline_opportunities,
+            retest_opportunities:session.opportunity_counts(),
         })
     }
 }
@@ -207,9 +221,15 @@ mod tests {
     }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,
-            baseline_wpm:30.0,retest_wpm:25.0,baseline_attempts:30,retest_attempts:50};
+            baseline_wpm:30.0,retest_wpm:25.0,baseline_attempts:30,retest_attempts:50,
+            baseline_opportunities:OpportunityCounts{observed:20,missed:5},
+            retest_opportunities:OpportunityCounts{observed:20,missed:2}};
         assert_eq!(x.accuracy_change_pp(),10.0);
         assert_eq!(x.speed_change_wpm(),-5.0);
         assert!(!x.same_attempt_count());
+        assert_eq!(x.missed_opportunity_change_pp(),Some(-15.0));
+        assert_eq!(Comparison{
+            baseline_opportunities:OpportunityCounts::default(),..x
+        }.missed_opportunity_change_pp(),None);
     }
 }

@@ -40,6 +40,17 @@ impl PreviewLayer {
 }
 const PERIWINKLE: Color32 = Color32::from_rgb(134, 150, 245);
 const KEYBOARD_POLL_INTERVAL:Duration=Duration::from_secs(20);
+/// The visual shaped reference can select only whole logical Unicode
+/// grapheme boundaries. TextEdit still owns editing and IME input.
+fn rtl_preview_editor_range(text:&str,active_byte:usize,anchor_byte:usize)
+    ->Option<egui::text::CCursorRange> {
+    let valid=|byte:usize| byte<=text.len() && text.is_char_boundary(byte)
+        && (byte==text.len() || text.grapheme_indices(true).any(|(at,_)|at==byte));
+    if !valid(active_byte) || !valid(anchor_byte){return None;}
+    Some(egui::text::CCursorRange::two(
+        egui::text::CCursor::new(text[..active_byte].chars().count()),
+        egui::text::CCursor::new(text[..anchor_byte].chars().count())))
+}
 fn keyboard_poll_interval()->Duration {
     // Only an expressly isolated synthetic GUI QA process can accelerate
     // compositor metadata polling. Production remains a bounded 20 seconds.
@@ -489,6 +500,7 @@ pub struct Typefinch {
     rtl_editor_caret:Option<(f32,f32)>,
     rtl_raw_editor_open:bool,
     rtl_editor_preedit_active:bool,
+    rtl_preview_drag_anchor:Option<usize>,
     preview_layer:PreviewLayer,
     preview_shape:Shape,
     preview_section:Section,
@@ -609,6 +621,7 @@ impl Typefinch {
             rtl_editor_cursor_byte:None,rtl_editor_selection_bytes:None,rtl_editor_caret:None,
             rtl_raw_editor_open:false,
             rtl_editor_preedit_active:false,
+            rtl_preview_drag_anchor:None,
             preview_layer:PreviewLayer::Base,
             preview_shape, preview_section, message: startup_warning }
     }
@@ -1763,7 +1776,10 @@ impl Typefinch {
     /// shaped, read-only RTL preview because egui's editor does not yet
     /// provide fully correct mixed-script visual cursor behavior.
     fn show_rtl_editor_preview(&mut self,ui:&mut egui::Ui){
-        if !rtl_shaping::contains_rtl(&self.custom_text){return;}
+        if !rtl_shaping::contains_rtl(&self.custom_text){
+            self.rtl_preview_drag_anchor=None;
+            return;
+        }
         let total=self.custom_text.graphemes(true).count();
         let cursor_grapheme=self.rtl_editor_cursor_byte.map(|byte|
             self.custom_text.grapheme_indices(true)
@@ -1812,42 +1828,61 @@ impl Typefinch {
             }
         }
         if let Some(texture)=self.rtl_editor_texture.as_ref(){
-            ui.label(RichText::new("RTL shaped preview (click to position editor caret)").strong());
+            ui.label(RichText::new("RTL shaped preview (click to seek, drag to select)").strong());
             let response=ui.add(egui::Image::new((texture.id(),
                 egui::vec2(width as f32,height as f32)))
-                .sense(egui::Sense::click()));
-            // Only an explicit click on the shaped preview repositions the
-            // ordinary native TextEdit caret. The preview itself remains
-            // read-only and takes no keyboard, clipboard or IME ownership.
-            // COSMIC gives a *logical* cursor from visual BiDi glyph
-            // geometry, then bounds/snaps that position to a Unicode
-            // grapheme before mapping to egui's scalar cursor index.
-            if self.rtl_raw_editor_open && self.session.state!=State::Running
-                && !self.rtl_editor_preedit_active && response.clicked()
-                && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_)))) {
-                if let Some(pointer)=response.interact_pointer_pos(){
-                    let local=pointer-response.rect.min;
-                    if let Some(at)=self.rtl_renderer.get_or_insert_with(
+                .sense(egui::Sense::click_and_drag()));
+            // The preview remains read-only: its visual pointer positions
+            // manipulate the ordinary native TextEdit selection, not a
+            // separate input method or synthetic keyboard stream.
+            let can_seek=self.rtl_raw_editor_open && self.session.state!=State::Running
+                && !self.rtl_editor_preedit_active
+                && !ui.input(|i|i.events.iter().any(|e|matches!(e,egui::Event::Ime(_))));
+            if !can_seek {self.rtl_preview_drag_anchor=None;}
+            if can_seek && response.drag_started() {
+                let origin=ui.input(|i|i.pointer.press_origin())
+                    .or_else(||response.interact_pointer_pos());
+                self.rtl_preview_drag_anchor=origin.and_then(|position|{
+                    let local=position-response.rect.min;
+                    self.rtl_renderer.get_or_insert_with(rtl_shaping::Renderer::new)
+                        .hit_test_byte(&preview,width,height,local.x,local.y)
+                        .and_then(|at|skipped.checked_add(at))
+                        .filter(|at|rtl_preview_editor_range(&self.custom_text,*at,*at).is_some())
+                });
+            }
+            let dragged=can_seek && response.dragged()
+                && self.rtl_preview_drag_anchor.is_some();
+            if (can_seek && response.clicked()) || dragged {
+                let position=response.interact_pointer_pos()
+                    .or_else(||ui.input(|i|i.pointer.interact_pos()));
+                if let Some(position)=position {
+                    let local=position-response.rect.min;
+                    if let Some(active)=self.rtl_renderer.get_or_insert_with(
                             rtl_shaping::Renderer::new)
-                        .hit_test_byte(&preview,width,height,local.x,local.y) {
-                        if let Some(byte)=skipped.checked_add(at).filter(|b|
-                            *b<=self.custom_text.len() && self.custom_text.is_char_boundary(*b)){
-                            let scalar=self.custom_text[..byte].chars().count();
+                        .hit_test_byte(&preview,width,height,local.x,local.y)
+                        .and_then(|at|skipped.checked_add(at)) {
+                        let anchor=if dragged {
+                            self.rtl_preview_drag_anchor.unwrap_or(active)
+                        }else{active};
+                        if let Some(range)=rtl_preview_editor_range(
+                            &self.custom_text,active,anchor) {
                             let id=egui::Id::new("custom_text_editor");
                             if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id){
-                                let cursor=egui::text::CCursor::new(scalar);
-                                state.cursor.set_char_range(Some(
-                                    egui::text::CCursorRange::two(cursor,cursor)));
+                                state.cursor.set_char_range(Some(range));
                                 state.store(ui.ctx(),id);
                                 ui.ctx().memory_mut(|m|m.request_focus(id));
-                                self.rtl_editor_cursor_byte=Some(byte);
-                                self.rtl_editor_selection_bytes=None;
+                                self.rtl_editor_cursor_byte=Some(active);
+                                self.rtl_editor_selection_bytes=(active!=anchor).then_some(
+                                    (active.min(anchor),active.max(anchor)));
                                 self.rtl_editor_signature.clear();
                                 ui.ctx().request_repaint();
                             }
                         }
                     }
                 }
+            }
+            if response.drag_stopped() || !response.is_pointer_button_down_on() {
+                self.rtl_preview_drag_anchor=None;
             }
             if self.rtl_raw_editor_open
                 && ui.ctx().memory(|m|m.has_focus(egui::Id::new("custom_text_editor"))) {
@@ -1859,7 +1894,7 @@ impl Typefinch {
             }
             let selected=self.rtl_editor_selection_bytes.map(|(from,to)|
                 self.custom_text[from..to].graphemes(true).count()).unwrap_or(0);
-            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click the shaped preview to position the native source caret; only the field above edits text. Complete BiDi/IME editing remains unverified.",
+            ui.small(format!("Graphemes {}–{} of {total}; selected {selected}. Click to position or drag across the shaped preview to select in the native editor; only the field above edits text. Complete BiDi/IME editing remains unverified.",
                 first.saturating_add(1),last));
         }
     }
@@ -3175,6 +3210,26 @@ mod palette_tests {
         assert_eq!(session.typed,"你好世界");
         assert_eq!(session.state,State::Finished);
         assert_eq!(session.score().correct,4);
+    }
+    #[test] fn shaped_preview_selection_only_maps_whole_unicode_graphemes() {
+        let source="سَ abc שָׁ 👩‍💻";
+        let boundaries=source.grapheme_indices(true).map(|(byte,_)|byte)
+            .chain(std::iter::once(source.len())).collect::<Vec<_>>();
+        for &active in &boundaries {
+            for &anchor in &boundaries {
+                let range=rtl_preview_editor_range(source,active,anchor)
+                    .expect("whole-grapheme visual cursor must map to TextEdit");
+                assert_eq!(range.primary.index,source[..active].chars().count());
+                assert_eq!(range.secondary.index,source[..anchor].chars().count());
+            }
+        }
+        for byte in 0..source.len() {
+            if !boundaries.contains(&byte) {
+                assert!(rtl_preview_editor_range(source,byte,0).is_none());
+                assert!(rtl_preview_editor_range(source,0,byte).is_none());
+            }
+        }
+        assert!(rtl_preview_editor_range(source,source.len()+1,0).is_none());
     }
     #[test] fn rtl_editor_preedit_blocks_click_seek_until_composition_is_resolved() {
         use egui::{Event,ImeEvent};

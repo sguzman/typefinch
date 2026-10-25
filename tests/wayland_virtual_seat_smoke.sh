@@ -50,6 +50,32 @@ end
 assert(active>0,"Nested Weston did not advertise a keyboard-capable virtual seat")
 print("Native nested Weston PASS: "..active.." virtual keyboard-capable aggregate seat(s); no key capture")
 LUA
+# Distinct from the legacy wl_seat capability-only probe: this short-lived
+# client requests the unfocused seat's XKB keymap and returns group LABELS,
+# never raw key events, an active group, or a physical source identifier.
+./target/debug/typefinch --_probe_wayland_xkb_seats >"$tmp/xkb-seats.json"
+lua5.4 - "$tmp/xkb-seats.json" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(assert(arg[1]),"rb"))
+local seats,_,err=json.decode(f:read("*a"));f:close()
+assert(not err and type(seats)=="table")
+local witnessed=0
+for _,seat in ipairs(seats) do
+  assert(type(seat.xkb_groups)=="table")
+  assert(seat.active_group==nil and seat.raw_keys==nil and seat.physical_device==nil)
+  if seat.keyboard then
+    assert(#seat.xkb_groups>=1,"keyboard-capable Weston seat missing XKB keymap groups")
+    for _,name in ipairs(seat.xkb_groups) do
+      assert(type(name)=="string" and #name>0 and #name<=128)
+    end
+    witnessed=witnessed+1
+  else
+    assert(#seat.xkb_groups==0)
+  end
+end
+assert(witnessed>0)
+print("Native Weston generic XKB seat groups PASS: "..witnessed.." keyboard-capable seats, active group unknown")
+LUA
 ./target/debug/typefinch --inspect-keyboards >"$tmp/seat-inventory.json"
 lua5.4 - "$tmp/seat-inventory.json" <<'LUA'
 local json=require("dkjson")
@@ -60,7 +86,9 @@ assert(#doc.rows>0,"virtual keyboard-capable seat must be visible in public CLI"
 for _,row in ipairs(doc.rows) do
   assert(row.inspection_id:match("^wayland:seat:%d+$"))
   assert(row.reported_active_keymap==nil or row.reported_active_keymap==json.null)
-  assert(row.key_events==nil and row.physical_device==nil)
+  assert(type(row.seat_xkb_groups)=="table" and #row.seat_xkb_groups>=1,
+    "generic seat XKB groups must be visible without guessing active group")
+  assert(row.key_events==nil and row.physical_device==nil and row.active_group==nil)
 end
 print("Wayland inspector CLI PASS: read-only virtual seat metadata, no keymap attribution")
 LUA

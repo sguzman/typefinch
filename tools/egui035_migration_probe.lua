@@ -62,6 +62,44 @@ replace("rect,cursor_rect:cursor\n            }",
 replace("&job.text[s.byte_range.clone()]",
   "&job.text[s.byte_range.start.0..s.byte_range.end.0]",1)
 
+
+-- The 0.35 text editor publishes the just-rendered selection in
+-- TextEditOutput.cursor_range. Reading persisted state immediately after
+-- Ui::add was returning a stale, collapsed range despite the native editor
+-- visibly selecting text. Retain the full editor output for RTL projection.
+replace([[let edit=ui.add_enabled(self.session.state!=State::Running,
+                            egui::TextEdit::multiline(&mut self.custom_text)
+                                .id(editor_id)
+                                .desired_rows(4)
+                                .desired_width(ui.available_width())
+                                .hint_text("Edit private source text"));]],
+[[let mut edit_output=None;
+                        ui.add_enabled_ui(self.session.state!=State::Running, |ui| {
+                            edit_output=Some(egui::TextEdit::multiline(&mut self.custom_text)
+                                .id(editor_id)
+                                .desired_rows(4)
+                                .desired_width(ui.available_width())
+                                .hint_text("Edit private source text")
+                                .show(ui));
+                        });
+                        let edit_output=edit_output.expect("native text editor output");
+                        let native_cursor_range=edit_output.cursor_range;
+                        let edit=edit_output.response;]],1)
+
+replace([[let range=if edit.has_focus(){
+                            egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|state|state.cursor.char_range())
+                        }else{None};]],
+[[let range=if edit.has_focus(){
+                            let stored=egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|state|state.cursor.char_range());
+                            if shift_arrow || plain_arrow || pointer_selection {
+                                stored.or(native_cursor_range)
+                            }else{
+                                native_cursor_range.or(stored)
+                            }
+                        }else{None};]],1)
+
 local out=assert(io.open(path, "wb"))
 assert(out:write(src))
 assert(out:close())

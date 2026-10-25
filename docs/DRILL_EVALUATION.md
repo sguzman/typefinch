@@ -22,7 +22,14 @@ fragment cap are **engineering behavior**, not evidence of learning.
 The in-memory follow-up workflow in `src/training.rs` and `src/app.rs`
 now gives a completed non-lesson typing session the option to practice its
 observed difficult characters or two-grapheme pairs, then **retest the
-identical original reference**. The baseline and original target remain
+identical original reference**.
+For baselines in **Words, Quotes, Numbers, Punctuation or Paragraphs**, the
+retest intentionally becomes a **Custom** session containing exactly that
+original text, not another generated benchmark. This prevents repeated
+exposure from contaminating ordinary benchmark histories or personal
+best comparisons. The before/after analysis still records the original
+baseline context in memory and requires the same duration, language,
+difficulty, profile, input mode and keyboard layout. The baseline and original target remain
 memory-only. Changing passage/settings/profile clears the trial; a changed
 input mode, layout, duration, language, scoring target or recorded seat
 provenance disqualifies the comparison. The drill itself is never treated

@@ -31,7 +31,9 @@ export TYPEFINCH_QA_REPORT="$tmp/score.json"
 export TYPEFINCH_QA_EDITOR_CARET_REPORT="$tmp/rtl-caret.json"
 export TYPEFINCH_QA_IMPORT_REPORT="$tmp/rtl-import.json"
 unset HYPRLAND_INSTANCE_SIGNATURE WAYLAND_SOCKET
-printf '%s' 'abc' > "$tmp/source.txt"
+# A 3-grapheme ASCII passage deliberately containing bytes outside [0-9a-f].
+# Whole-string non-persistence checks must not falsely match random UUIDs.
+printf '%s' 'qzx' > "$tmp/source.txt"
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm_pid=$!
 weston --backend=x11-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" \
@@ -117,7 +119,7 @@ xdotool key --clearmodifiers F5
 sleep 0.3
 xdotool key --clearmodifiers F2
 sleep 0.2
-xdotool type --clearmodifiers --delay 40 abc
+xdotool type --clearmodifiers --delay 40 qzx
 sleep 0.8
 lua5.4 - "$TYPEFINCH_QA_REPORT" "$tmp/source.txt" "$cfg" <<'LUA'
 local json=require("dkjson")

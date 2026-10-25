@@ -113,9 +113,12 @@ replace([[self.rtl_editor_cursor_byte=range.as_ref()
                                 (range.primary.index.0,range.secondary.index.0);
                             let saved=egui::TextEdit::load_state(ui.ctx(),editor_id)
                                 .and_then(|state|state.cursor.char_range());
-                            eprintln!("egui035-qa ctrl-a: focus={} id_match={} output={:?} saved={:?} used={:?}",
+                            eprintln!("egui035-qa ctrl-a: focus={} id_match={} output={:?} saved={:?} used={:?} source_chars={} source_bytes={} mapped_primary={:?} mapped_secondary={:?}",
                                 edit.has_focus(),edit.id==editor_id,
-                                native_cursor_range.map(indices),saved.map(indices),range.map(indices));
+                                native_cursor_range.map(indices),saved.map(indices),range.map(indices),
+                                self.custom_text.chars().count(),self.custom_text.len(),
+                                range.and_then(|r|rtl_shaping::editor_caret_byte(&self.custom_text,r.primary.index.0)),
+                                range.and_then(|r|rtl_shaping::editor_caret_byte(&self.custom_text,r.secondary.index.0)));
                         }
                         self.rtl_editor_cursor_byte=range.as_ref()
                             .and_then(|range|rtl_shaping::editor_caret_byte(]],1)

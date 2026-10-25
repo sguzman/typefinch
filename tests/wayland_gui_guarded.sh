@@ -11,6 +11,7 @@ weston_pre_score_crash(){
   grep -F 'Segmentation fault' "$log" >/dev/null &&
   grep -F 'weston --backend=x11-backend.so' "$log" >/dev/null &&
   ! grep -F 'Nested Weston real Wayland wl_keyboard PASS:' "$log" >/dev/null &&
+  ! grep -F 'Native Weston wl_keyboard did not deliver the complete test' "$log" >/dev/null &&
   { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null ||
     { grep -F 'Connection reset by peer' "$log" >/dev/null &&
       grep -F 'No scored native Wayland typing result' "$log" >/dev/null; }; }
@@ -27,23 +28,22 @@ if [[ "${1:-}" == --self-test ]];then
     'Connection reset by peer' \
     'No scored native Wayland typing result' >"$file"
   weston_pre_score_crash "$file" || exit 1
+  # A successful scored session and an explicit application scoring
+  # failure can NEVER be laundered into a recoverable compositor crash.
   for counterexample in \
-    'Native Weston wl_keyboard did not deliver complete test' \
     'Nested Weston real Wayland wl_keyboard PASS:' \
-    'Typefinch application panicked';do
-    printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Native Weston wl_keyboard did not deliver the complete test';do
+    printf '%s\\n' 'Segmentation fault weston --backend=x11-backend.so' \
       'Connection reset by peer' 'No scored native Wayland typing result' \
       "$counterexample" >"$file"
-    if [[ "$counterexample" == 'Nested Weston real Wayland wl_keyboard PASS:' ]];then
-      weston_pre_score_crash "$file" && exit 1
-    fi
+    if weston_pre_score_crash "$file";then exit 1;fi
   done
-  printf '%s\n' 'Native application scoring mismatch' \
+  printf '%s\\n' 'Native application scoring mismatch' \
     'No scored native Wayland typing result' >"$file"
-  weston_pre_score_crash "$file" && exit 1
-  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+  if weston_pre_score_crash "$file";then exit 1;fi
+  printf '%s\\n' 'Segmentation fault weston --backend=x11-backend.so' \
     'Native input wrong: 2/3' >"$file"
-  weston_pre_score_crash "$file" && exit 1
+  if weston_pre_score_crash "$file";then exit 1;fi
   echo "External Weston pre-score retry guard positive/negative cases PASS"
   exit 0
 fi

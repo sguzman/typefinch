@@ -195,6 +195,43 @@ impl Renderer {
             caret,
         })
     }
+    /// Map a visual point in a shaped RTL/mixed-script preview back to a
+    /// *logical UTF-8 grapheme boundary*. Uses COSMIC Text's actual BiDi
+    /// layout and cluster-aware hit testing, never reverses input or
+    /// fabricates key events. This helper is not an editable widget and
+    /// does not change the native text/IME caret until explicitly integrated.
+    pub fn hit_test_byte(&mut self,text:&str,width:usize,height:usize,
+        x:f32,y:f32)->Option<usize> {
+        if width==0 || height==0 || width>2048 || height>256
+            || text.len()>16_384 || !x.is_finite() || !y.is_finite()
+            || x<0.0 || y<0.0 || x>width as f32 || y>height as f32 {
+            return None;
+        }
+        let mut buffer=Buffer::new(&mut self.fonts,Metrics::new(21.0,30.0));
+        let mut borrowed=buffer.borrow_with(&mut self.fonts);
+        borrowed.set_size(Some(width as f32),Some(height as f32));
+        borrowed.set_text(text,&Attrs::new(),Shaping::Advanced,None);
+        let cursor=borrowed.hit(x,y)?;
+        // COSMIC's Cursor.index is line-relative BYTE position. Build
+        // the same line-relative offset model used by render_with_caret.
+        let mut start=0;
+        let mut line=cursor.line;
+        for piece in text.split('\n') {
+            if line==0 {
+                if cursor.index>piece.len() || !piece.is_char_boundary(cursor.index){
+                    return None;
+                }
+                let byte=start.checked_add(cursor.index)?;
+                return text.grapheme_indices(true)
+                    .take_while(|(at,_)|*at<=byte)
+                    .last().map(|(at,_)|at)
+                    .or_else(||(byte==0).then_some(0));
+            }
+            start=start.checked_add(piece.len())?.checked_add(1)?;
+            line-=1;
+        }
+        None
+    }
     /// Read-only diagnostics from the actual shaping library. A line's base
     /// direction is not inferred from font availability or string reversal.
     pub fn paragraph_directions(&mut self,text:&str)->Vec<bool> {

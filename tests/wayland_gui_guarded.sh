@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full native Wayland GUI acceptance with ONE narrowly scoped retry only when
+# Full native Wayland GUI acceptance with at most TWO narrowly scoped retries when
 # the external Weston 13 X11-backend process segfaults before the first
 # verified scored native typing session, with demonstrated connection loss. Never retry product/assertion failures.
 set -Eeuo pipefail
@@ -49,11 +49,11 @@ if [[ "${1:-}" == --self-test ]];then
 fi
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
-for attempt in 1 2;do
+for attempt in 1 2 3;do
   if xvfb-run -a -s "-screen 0 1280x900x24" bash tests/wayland_gui_smoke.sh >"$log" 2>&1;then
     cat "$log"
-    if ((attempt==2));then
-      echo "Confirmed external Weston pre-score SIGSEGV recovered on full fresh native acceptance rerun."
+    if ((attempt>1));then
+      echo "Confirmed external Weston pre-score SIGSEGV recovered on full fresh native acceptance rerun (attempt $attempt)."
     fi
     exit 0
   fi
@@ -64,8 +64,11 @@ for attempt in 1 2;do
   # loss of the Wayland connection, and absence of *any* successful scored
   # session. Do NOT retry failed product assertions, incomplete scores,
   # or a crash after a successfully completed native typing session.
-  if ((attempt==1)) && weston_pre_score_crash "$log";then
-    echo "Confirmed external Weston SIGSEGV before the first verified native typing result. Retrying the entire isolated GUI test once; all app assertions remain strict." >&2
+  if ((attempt<3)) && weston_pre_score_crash "$log";then
+    echo "Confirmed external Weston SIGSEGV before first verified native typing (attempt $attempt/3). Retrying the entire isolated GUI test; every app assertion remains strict." >&2
+    # Give the previous isolated Xvfb/Weston processes time to relinquish
+    # their display resources before the next clean compositor launch.
+    sleep 0.75
   else
     echo "Native Wayland assertion failed or compositor crash outside bootstrap; not retried." >&2
     exit 1

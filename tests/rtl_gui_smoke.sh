@@ -367,13 +367,18 @@ LUA
       exit 1
     }
     echo "Native shaped-preview selection editing and byte-exact Undo PASS"
+    # Hebrew at x=175 lands on the *last* logical grapheme and selects
+    # the entire fixture. Its connected glyphs begin farther right than
+    # Arabic's; x=220 is an independently demonstrated partial-range hit.
+    shift_click_x=175
+    if [[ "$name" == hebrew ]];then shift_click_x=220;fi
     # Shift+click in the shaped *image* must extend the native TextEdit's
     # existing source anchor. A second Shift+click moves only the active
     # endpoint; a plain click collapses it. No IME or key capture is used.
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
     xdotool keydown Shift_L
-    xdotool mousemove --window "$window" 175 521 click 1
+    xdotool mousemove --window "$window" "$shift_click_x" 521 click 1
     sleep 0.3
     xdotool keyup Shift_L
     sleep 0.35
@@ -420,7 +425,7 @@ LUA
     xdotool key --clearmodifiers ctrl+Home
     sleep 0.2
     xdotool keydown Shift_L
-    xdotool mousemove --window "$window" 175 521 click 1
+    xdotool mousemove --window "$window" "$shift_click_x" 521 click 1
     sleep 0.25
     xdotool keyup Shift_L
     sleep 0.25

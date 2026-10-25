@@ -3313,6 +3313,30 @@ mod palette_tests {
                 egui::pos2(1.0,1.0),w,h).is_none());
         }
     }
+    #[test] fn shaped_preview_shift_click_uses_native_anchor_in_both_directions() {
+        let source="سَلَام Latin שָׁלוֹם";
+        let starts=source.grapheme_indices(true)
+            .map(|(byte,_)|byte).chain(std::iter::once(source.len()))
+            .collect::<Vec<_>>();
+        let pos=|i:usize| starts[i];
+        let original=rtl_preview_click_range(source,pos(3),None,false).unwrap();
+        assert_eq!(original.primary.index,original.secondary.index);
+        let extended=rtl_preview_click_range(source,pos(9),Some(original),true)
+            .expect("Shift-click should extend from original source caret");
+        assert_eq!(extended.primary.index,source[..pos(9)].chars().count());
+        assert_eq!(extended.secondary.index,source[..pos(3)].chars().count());
+        let reversed=rtl_preview_click_range(source,pos(1),Some(extended),true)
+            .expect("Reverse Shift-click must retain the original anchor");
+        assert_eq!(reversed.primary.index,source[..pos(1)].chars().count());
+        assert_eq!(reversed.secondary.index,source[..pos(3)].chars().count());
+        let collapsed=rtl_preview_click_range(source,pos(5),Some(reversed),false)
+            .expect("Plain click should clear the prior source selection");
+        assert_eq!(collapsed.primary.index,collapsed.secondary.index);
+        assert_eq!(collapsed.primary.index,source[..pos(5)].chars().count());
+        assert!(rtl_preview_click_range(source,1,Some(collapsed),true).is_none(),
+            "Shift-click must reject partial Unicode grapheme endpoints");
+        assert!(rtl_preview_click_range(source,source.len()+1,None,false).is_none());
+    }
     #[test] fn shaped_preview_selection_only_maps_whole_unicode_graphemes() {
         let source="سَ abc שָׁ 👩‍💻";
         let boundaries=source.grapheme_indices(true).map(|(byte,_)|byte)

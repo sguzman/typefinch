@@ -7,7 +7,23 @@ if [[ "${1:-}" == --self-test ]];then
   rect="$(jq -nr --argjson rows "$fixture" --argjson pid 42 \
     '$rows | first(.[] | select(.pid==$pid) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])")')"
   [[ "$rect" == "18,27 800x600" ]] || exit 1
-  echo "Hyprland QA parser self-test PASS (no compositor accessed)"
+  # Test-only synthetic metadata: no compositor is contacted and no actual
+  # device identifiers or typed material are ever embedded in the fixture.
+  inventory='{"keyboards":[{"name":"synthetic"}]}'
+  inspection='{"schema":1,"capture_policy":"inspection-only","input_attribution":"aggregate seat; no per-device key-event attribution","rows":[{}]}'
+  jq -en --argjson d "$inspection" '$d.schema==1 and
+    $d.capture_policy=="inspection-only" and
+    $d.input_attribution=="aggregate seat; no per-device key-event attribution"
+    and ($d.rows|type=="array")' >/dev/null
+  [[ "$(jq -n --argjson d "$inventory" '$d.keyboards|length')" ==
+     "$(jq -n --argjson d "$inspection" '$d.rows|length')" ]] || exit 1
+  wrong='{"schema":1,"capture_policy":"global-evdev","input_attribution":"physical","rows":[{}]}'
+  if jq -en --argjson d "$wrong" '$d.capture_policy=="inspection-only"
+    and $d.input_attribution=="aggregate seat; no per-device key-event attribution"' >/dev/null;then
+    echo "Unsafe global-capture claim accepted by QA validator" >&2
+    exit 1
+  fi
+  echo "Hyprland QA metadata and rectangle self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2

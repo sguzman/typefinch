@@ -385,6 +385,32 @@ mod tests {
             assert!(hits>0,"COSMIC layout did not permit an in-bounds line hit");
         }
     }
+    #[test] fn wrapped_mixed_rtl_visual_rows_map_to_later_logical_source_offsets(){
+        // A long *single logical paragraph* wraps visually; unlike hard
+        // newlines, its lower visual rows retain COSMIC line index zero.
+        // Hit-testing must use the wrapped row's logical byte offset rather
+        // than treating each visual row as a new paragraph.
+        let passage="שָׁלוֹם العربية abc ".repeat(22);
+        let boundaries=passage.grapheme_indices(true)
+            .map(|(byte,_)|byte)
+            .chain(std::iter::once(passage.len()))
+            .collect::<std::collections::HashSet<_>>();
+        let mut shaper=Renderer::new();
+        let mut row_hits=Vec::new();
+        for y in [13.0,43.0,73.0,103.0,133.0] {
+            let hits=[12.0,44.0,90.0,130.0].into_iter()
+                .filter_map(|x|shaper.hit_test_byte(&passage,160,220,x,y))
+                .collect::<Vec<_>>();
+            assert!(hits.iter().all(|byte|boundaries.contains(byte)),
+                "Visual wrapping must never split a marked cluster");
+            if !hits.is_empty(){row_hits.push(hits);}
+        }
+        assert!(row_hits.len()>=3,"Expected multiple real wrapped visual rows");
+        let first_max=*row_hits.first().unwrap().iter().max().unwrap();
+        let last_min=*row_hits.last().unwrap().iter().min().unwrap();
+        assert!(last_min>first_max,
+            "Lower visual rows must resolve later source bytes, not repeat first row");
+    }
     #[test] fn keyboard_selection_expands_and_contracts_complete_clusters(){
         let hebrew="שָׁלוֹם";
         assert_eq!(snap_partial_selection(hebrew,1,0,0),Some(3));

@@ -195,6 +195,54 @@ assert(after.total==before.total and after.index>0 and after.index<after.total
 print("Native Weston RTL visual hit-test and source caret move PASS: 0 -> "..after.index)
 LUA
   import -window "$parent" "typefinch-wayland-rtl-$script-preview-click.png"
+  # The visual click must also leave the *native* source field writable:
+  # type an ordinary Latin character at the hit-tested grapheme boundary,
+  # verify the insertion, and Undo the edit before running other checks.
+  xdotool type --clearmodifiers --delay 35 x
+  inserted=0
+  for _ in $(seq 1 45);do
+    if [[ -s "$TYPEFINCH_QA_EDITOR_CARET_REPORT" ]] &&
+      lua5.4 - "$tmp/$script-click-after.json" "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"))
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret")
+  return d
+end
+local prior,updated=read(arg[1]),read(arg[2])
+assert(updated.total==prior.total+1 and updated.index==prior.index+1
+  and updated.selected_graphemes==0,
+  "Visual click must position actual editable caret before insertion")
+LUA
+    then inserted=1;break;fi
+    sleep 0.12
+  done
+  ((inserted==1)) || {
+    echo "Native Wayland $script shaped click did not allow insertion at selected grapheme" >&2
+    exit 1
+  }
+  xdotool key --clearmodifiers ctrl+z
+  restored=0
+  for _ in $(seq 1 45);do
+    if [[ -s "$TYPEFINCH_QA_EDITOR_CARET_REPORT" ]] &&
+      lua5.4 - "$tmp/$script-click-before.json" "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA' >/dev/null 2>&1
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"))
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret")
+  return d
+end
+local original,restored=read(arg[1]),read(arg[2])
+assert(restored.total==original.total and restored.selected_graphemes==0,
+  "Undo after visual caret seek must preserve original source")
+LUA
+    then restored=1;break;fi
+    sleep 0.12
+  done
+  ((restored==1)) || { echo "Native Wayland $script preview-click Undo failed" >&2;exit 1; }
+  echo "Native Weston $script shaped-preview seek, actual edit and Undo PASS"
   xdotool key --clearmodifiers ctrl+Home
   sleep 0.3
   cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$script-start.json"

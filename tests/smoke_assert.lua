@@ -20,7 +20,11 @@ local function quoted(s) return "'" .. s:gsub("'", "'\\''") .. "'" end
 local function dbquery(sql)
     local root = assert(os.getenv("XDG_CONFIG_HOME"))
     local path = root .. "/typefinch/sessions.sqlite3"
-    local cmd = "sqlite3 -json " .. quoted(path) .. " " .. quoted(sql)
+    -- The live GUI may commit another session while this read starts.
+    -- SQLite's default zero busy timeout spuriously fails healthy sessions
+    -- with SQLITE_BUSY. Wait briefly for the writer without dropping any
+    -- row-count, provenance or score assertion.
+    local cmd = "sqlite3 -cmd '.timeout 5000' -json " .. quoted(path) .. " " .. quoted(sql)
     local pipe = assert(io.popen(cmd, "r"))
     local raw = assert(pipe:read("*a"))
     local ok, kind, code = pipe:close()

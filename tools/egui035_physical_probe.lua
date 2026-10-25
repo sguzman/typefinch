@@ -80,35 +80,19 @@ fn pressed_key_modifiers(events:&[egui::Event],desired:egui::Key)->Option<egui::
                          && emulated_key_accepted(repeat,modifiers))
                       || emulated_level3_key_accepted(repeat,modifiers,
                              self.emulated_right_alt_held,self.emulated_left_alt_held)) =>]]},
-    {[[                    if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
-                        let mapped = if let Some(personal)=self.prefs.custom_layouts.iter()
-                            .find(|l|l.id==self.prefs.layout) {
-                            personal.translate(physical,modifiers.shift)
-                        } else if let Some(emulator) = &self.emulator {
-                            if let Some(compose) = self.composition.as_mut() {
-                                emulator.translate_composed(physical, modifiers.shift, compose)
-                            } else {
-                                emulator.translate(physical, modifiers.shift)
-                            }
-                        } else {
-                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())
-                        };]],
-     [[                    if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
+    {[[if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
+                        let mapped]],
+     [[if let Some(physical) = physical_key.or(if key == egui::Key::Space { Some(key) } else { None }) {
                         let alt_gr=self.emulated_right_alt_held && !self.emulated_left_alt_held;
-                        let mapped = if let Some(personal)=self.prefs.custom_layouts.iter()
-                            .find(|l|l.id==self.prefs.layout) {
-                            if alt_gr {None} else {personal.translate(physical,modifiers.shift)}
-                        } else if let Some(emulator) = &self.emulator {
-                            if let Some(compose) = self.composition.as_mut() {
-                                emulator.translate_composed_layer(physical,modifiers.shift,alt_gr,compose)
-                            } else {
-                                emulator.translate_layer(physical,modifiers.shift,alt_gr)
-                            }
-                        } else if alt_gr {
-                            None
-                        } else {
-                            layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c|c.to_string())
-                        };]]},
+                        let mapped]]},
+    {[[personal.translate(physical,modifiers.shift)]],
+     [[if alt_gr {None} else {personal.translate(physical,modifiers.shift)}]]},
+    {[[emulator.translate_composed(physical, modifiers.shift, compose)]],
+     [[emulator.translate_composed_layer(physical,modifiers.shift,alt_gr,compose)]]},
+    {[[emulator.translate(physical, modifiers.shift)]],
+     [[emulator.translate_layer(physical,modifiers.shift,alt_gr)]]},
+    {[[layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())]],
+     [[if alt_gr {None} else {layouts::emulate(physical, &self.prefs.layout, modifiers.shift).map(|c| c.to_string())}]]},
     {[[    #[test] fn emulated_key_repeat_and_modifier_shortcuts_are_not_scored() {]],
      [[    #[test] fn explicit_right_alt_gates_emulated_level_three_without_left_alt_leak() {
         let plain=egui::Modifiers::default();

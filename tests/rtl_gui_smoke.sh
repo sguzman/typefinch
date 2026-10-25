@@ -367,6 +367,54 @@ LUA
       exit 1
     }
     echo "Native shaped-preview selection editing and byte-exact Undo PASS"
+    # Shift+click in the shaped *image* must extend the native TextEdit's
+    # existing source anchor. A second Shift+click moves only the active
+    # endpoint; a plain click collapses it. No IME or key capture is used.
+    xdotool key --clearmodifiers ctrl+Home
+    sleep 0.2
+    xdotool keydown Shift_L
+    xdotool mousemove --window "$window" 175 521 click 1
+    sleep 0.3
+    xdotool keyup Shift_L
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-shift-first.json"
+    import -window "$window" "$tmp/rtl-$name-preview-shift-first.png"
+    xdotool keydown Shift_L
+    xdotool mousemove --window "$window" 265 521 click 1
+    sleep 0.3
+    xdotool keyup Shift_L
+    sleep 0.35
+    cp "$TYPEFINCH_QA_EDITOR_CARET_REPORT" "$tmp/$name/preview-shift-second.json"
+    import -window "$window" "$tmp/rtl-$name-preview-shift-second.png"
+    lua5.4 - "$tmp/$name/preview-shift-first.json" \
+      "$tmp/$name/preview-shift-second.json" <<'LUA'
+local json=require("dkjson")
+local function read(path)
+  local f=assert(io.open(path,"rb"),"Missing native shaped Shift-click audit")
+  local d=assert(json.decode(assert(f:read("*a"))));f:close()
+  assert(d.synthetic and d.state=="rtl-editor-caret" and d.caret_positioned)
+  return d
+end
+local first,second=read(arg[1]),read(arg[2])
+assert(first.total>8 and first.selected_graphemes>=2
+  and first.selected_graphemes<first.total,
+  "First shaped-preview Shift-click did not extend a native source selection")
+assert(second.total==first.total and second.selected_graphemes<first.selected_graphemes,
+  "Second shaped-preview Shift-click did not retract toward the original anchor")
+print("Native shaped-preview Shift-click selection PASS: "..
+  first.selected_graphemes.." -> "..second.selected_graphemes.." graphemes")
+LUA
+    xdotool mousemove --window "$window" 220 521 click 1
+    sleep 0.4
+    lua5.4 - "$TYPEFINCH_QA_EDITOR_CARET_REPORT" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"))
+local d=assert(json.decode(assert(f:read("*a"))));f:close()
+assert(d.synthetic and d.state=="rtl-editor-caret"
+  and d.selected_graphemes==0 and d.caret_positioned,
+  "Plain shaped-preview click failed to collapse Shift-click selection")
+print("Native shaped-preview plain click collapses Shift-selection PASS")
+LUA
     # A preview gesture may end just outside its bitmap. The renderer must
     # clamp the active visual endpoint, retain an actual grapheme-safe editor
     # selection, and never guess or mutate source text.

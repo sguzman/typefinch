@@ -1807,14 +1807,21 @@ impl Typefinch {
             if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
             if self.session.state == State::Finished {
-                if let Some(drill)=self.session.weak_character_drill() {
-                    if ui.button("Practice missed keys").clicked() {
-                        self.start_weak_drill(drill,ctx);
+                // Do not silently replace the original baseline with a
+                // second drill's errors. A follow-up either retests its
+                // original passage or is discarded by a new configuration.
+                let drill_followup=self.training_followup.as_ref().is_some_and(|trial|
+                    trial.stage==Stage::Drill);
+                if !drill_followup {
+                    if let Some(drill)=self.session.weak_character_drill() {
+                        if ui.button("Practice missed keys").clicked() {
+                            self.start_weak_drill(drill,ctx);
+                        }
                     }
-                }
-                if let Some(drill)=self.session.weak_bigram_drill() {
-                    if ui.button("Practice missed pairs").clicked() {
-                        self.start_weak_drill(drill,ctx);
+                    if let Some(drill)=self.session.weak_bigram_drill() {
+                        if ui.button("Practice missed pairs").clicked() {
+                            self.start_weak_drill(drill,ctx);
+                        }
                     }
                 }
                 let can_retest=self.training_followup.as_ref().is_some_and(|trial|

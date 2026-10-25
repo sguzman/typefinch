@@ -59,6 +59,21 @@ fn rtl_preview_editor_range(text:&str,active_byte:usize,anchor_byte:usize)
 /// A gesture that *begins* in the preview may end beyond its image edges.
 /// Clamp that endpoint to the closest pixel without treating unbounded or
 /// nonfinite coordinates as valid; the origin still has to be inside.
+/// A shaped-preview Shift+click extends from the native editor's existing
+/// selection anchor. Plain click collapses. The existing caret state must
+/// be observed *before* the click's own release is processed; this preserves
+/// reverse selections and does not infer visual reading order.
+fn rtl_preview_click_range(text:&str,active_byte:usize,
+    existing:Option<egui::text::CCursorRange>,extend:bool)
+    ->Option<egui::text::CCursorRange> {
+    let anchor=if extend {
+        existing.as_ref()
+            .and_then(|range|rtl_shaping::editor_caret_byte(
+                text,range.secondary.index))
+            .unwrap_or(active_byte)
+    }else{active_byte};
+    rtl_preview_editor_range(text,active_byte,anchor)
+}
 fn rtl_preview_clamp_drag_endpoint(local:egui::Pos2,width:usize,height:usize)
     ->Option<egui::Pos2> {
     if width==0 || height==0 || width>2048 || height>256
@@ -814,6 +829,7 @@ impl Typefinch {
         self.rtl_editor_texture=None;
         self.rtl_editor_caret=None;
         self.rtl_editor_selection_bytes=None;
+        self.rtl_preview_drag_anchor=None;
         let input=if self.prefs.test_mode==TestMode::Lesson {
             lesson::get(&self.prefs.lesson_id).passage
         } else { &self.custom_text };
@@ -1877,7 +1893,7 @@ impl Typefinch {
                                 &self.custom_text,*at,*at).is_some())
                     });
             }
-            if can_seek && released {
+            if can_seek && released && !response.clicked() {
                 if let Some(anchor)=self.rtl_preview_drag_anchor.take() {
                     if let Some(position)=current_pos {
                         let local=position-response.rect.min;
@@ -1911,21 +1927,34 @@ impl Typefinch {
             // true by the time this widget is built. Preserve the previously
             // accepted click-to-caret path independently of drag tracking.
             if can_seek && response.clicked() {
+                // A completed click is not a drag; discard its temporary
+                // press anchor after preserving the pre-click TextEdit range.
+                self.rtl_preview_drag_anchor=None;
+                let shift_click=ui.input(|i|i.modifiers.shift || i.events.iter()
+                    .any(|event|matches!(event,egui::Event::PointerButton {
+                        button:egui::PointerButton::Primary,pressed:true,modifiers,..
+                    } if modifiers.shift)));
                 if let Some(pointer)=response.interact_pointer_pos() {
                     let local=pointer-response.rect.min;
                     if let Some(active)=self.rtl_renderer.get_or_insert_with(
                             rtl_shaping::Renderer::new)
                         .hit_test_byte(&preview,width,height,local.x,local.y)
                         .and_then(|at|skipped.checked_add(at)) {
-                        if let Some(range)=rtl_preview_editor_range(
-                                &self.custom_text,active,active) {
-                            let id=egui::Id::new("custom_text_editor");
-                            if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id) {
+                        let id=egui::Id::new("custom_text_editor");
+                        if let Some(mut state)=egui::TextEdit::load_state(ui.ctx(),id) {
+                            if let Some(range)=rtl_preview_click_range(
+                                &self.custom_text,active,
+                                state.cursor.char_range(),shift_click) {
+                                let anchor=rtl_shaping::editor_caret_byte(
+                                    &self.custom_text,range.secondary.index)
+                                    .unwrap_or(active);
                                 state.cursor.set_char_range(Some(range));
                                 state.store(ui.ctx(),id);
                                 ui.ctx().memory_mut(|m|m.request_focus(id));
                                 self.rtl_editor_cursor_byte=Some(active);
-                                self.rtl_editor_selection_bytes=None;
+                                self.rtl_editor_selection_bytes=
+                                    (active!=anchor).then_some((
+                                        active.min(anchor),active.max(anchor)));
                                 self.rtl_editor_signature.clear();
                                 ui.ctx().request_repaint();
                             }

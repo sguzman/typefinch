@@ -32,7 +32,7 @@ SVG export is explicit and writes to the local `exports/typefinch-profile.svg`; 
 
 ## Keyboard capabilities
 
-The static catalog is recognition-oriented. When the operating system provides the selected XKB symbols, `libxkbcommon` compiles their character mapping for a known subset of physical ANSI keys. Installed XKB layouts now support session-local dead-key Compose for recognized ANSI positions when a locale table is available. Physical AltGr, dedicated Compose-key routing, ISO/JIS extras, complex IMEs and trusted per-device attribution are not complete. The device selector inspects Hyprland device metadata or one explicitly aggregate X11 seat, never per-device key input. See [KEYBOARDS.md](KEYBOARDS.md).
+The static catalog is recognition-oriented. When the operating system provides the selected XKB symbols, `libxkbcommon` compiles their character mapping for a known subset of physical ANSI keys. Installed XKB layouts now support session-local dead-key Compose for recognized ANSI positions when a locale table is available. Physical modifiers and Compose beyond the tested paths, national keys beyond virtual-X11 ISO 102nd and JIS RO/YEN, complex IMEs and trusted per-device attribution are not complete. The device selector inspects Hyprland device metadata or one explicitly aggregate X11 seat, never per-device key input. See [KEYBOARDS.md](KEYBOARDS.md).
 
 ## QA boundary
 

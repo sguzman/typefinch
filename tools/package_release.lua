@@ -22,7 +22,7 @@ run("install -m 755 target/release/typefinch "..q(root.."/bin/typefinch"))
 run("install -m 755 tools/install_release.sh "..q(root.."/install.sh"))
 run("install -m 644 README.md "..q(root.."/share/doc/typefinch/README.md"))
 run("install -m 644 LICENSE "..q(root.."/share/doc/typefinch/LICENSE"))
--- Retain upstream notices for the exact egui 0.35 RTL shaping backport.
+-- Retain upstream notices for pinned RTL shaping and JIS physical-key bridges.
 for _,vendor in ipairs({"epaint-0.35.0","egui-0.35.0","egui-winit-0.35.0"}) do
     local vendor_docs=root.."/share/doc/typefinch/third-party/"..vendor
     run("mkdir -p "..q(vendor_docs))

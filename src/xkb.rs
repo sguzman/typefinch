@@ -91,7 +91,8 @@ impl Emulator {
         self.dead_evdev_name(evdev_code(physical)?, shift, alt_gr)
     }
     /// Read-only symbol inspection for an explicit Linux evdev physical slot.
-    /// Extra ISO/JIS symbols are not attributed to egui/Wayland key events.
+    /// ISO 102nd and JIS RO/YEN have explicit egui physical-key mappings;
+    /// inspection alone never proves live hardware or device attribution.
     pub fn dead_evdev_name(&self, evdev:u32, shift:bool, alt_gr:bool) -> Option<String> {
         if evdev==0 {return None;}
         let code = xkb::Keycode::new(evdev + 8);
@@ -122,7 +123,7 @@ impl Emulator {
     }
 }
 /// Common ANSI positions plus the physically distinct ISO 102nd key.
-/// Other ISO/JIS physical positions remain separate acceptance gates.
+/// Other regional physical positions and live hardware remain separate gates.
 /// Linux evdev keycodes + 8 are XKB keycodes.
 fn evdev_code(key: Key) -> Option<u32> {
     const ROWS: [[u32;10];3] = [

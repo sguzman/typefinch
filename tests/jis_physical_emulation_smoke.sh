@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T305: JIS physical RO/YEN and non-scoring conversion-key experimental probe.
+# T305: production JIS physical RO/YEN scoring and non-scoring mode-key regression.
 # Run in an isolated Xvfb CI seat. Does NOT certify actual hardware,
 # device-specific identity, Wayland, or production Hyprland support.
 set -Eeuo pipefail
@@ -33,10 +33,10 @@ start_app(){
   for _ in $(seq 1 120);do
     window="$(xdotool search --onlyvisible --pid "$app" --name Typefinch 2>/dev/null | head -n1 || true)"
     [[ -z "$window" ]] || break
-    kill -0 "$app" 2>/dev/null || { echo "Migrated emulation app exited" >&2;exit 1; }
+    kill -0 "$app" 2>/dev/null || { echo "Native emulation app exited" >&2;exit 1; }
     sleep 0.25
   done
-  [[ -n "$window" ]] || { echo "Migrated emulation window absent" >&2;exit 1; }
+  [[ -n "$window" ]] || { echo "Native emulation window absent" >&2;exit 1; }
   xdotool windowactivate --sync "$window" 2>/dev/null || true
   xdotool windowfocus --sync "$window"
   sleep 0.35
@@ -105,7 +105,7 @@ sleep 0.7
 lua5.4 - "$TYPEFINCH_QA_REPORT" "$tmp/source.txt" <<'LUA'
 local json=require("dkjson")
 local result_path,source=assert(arg[1]),assert(arg[2])
-local file=assert(io.open(result_path,"rb"),"Physical Level-3/ISO fixture did not finish")
+local file=assert(io.open(result_path,"rb"),"Physical JIS fixture did not finish")
 local result=assert(json.decode(file:read("*a")));file:close()
 assert(result.synthetic and result.state=="finished" and result.entered==4
   and result.correct==4 and result.accuracy==100,

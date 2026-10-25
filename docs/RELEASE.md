@@ -58,14 +58,14 @@ a bit-identical executable across different machines is **not yet proven**.
 Maintainers can build with `cargo build --release --locked` and run
 `lua5.4 tools/package_release.lua VERSION COMMIT_SHA` followed by
 `bash tests/release_smoke.sh`. The explicit file allowlist excludes private
-profiles, exports and arbitrary local files. It also includes the exact
-`epaint 0.35.0` MIT and Apache-2.0 license files and upstream provenance
-under `share/doc/typefinch/third-party/epaint-0.35.0/`, because Typefinch
-currently includes a narrowly patched egui RTL shaping dependency.
-`tests/release_smoke.sh` verifies these three files against the checked-in
-third-party originals, alongside the existing checksum, install, upgrade,
-rollback and unmanaged-file refusal tests. Installation also places these
-notices under the user's `share/doc/typefinch/third-party/` prefix;
+profiles, exports and arbitrary local files. It also includes the original MIT and Apache-2.0 licenses and upstream
+provenance for three pinned egui 0.35 dependencies: `epaint` (RTL shaping),
+`egui` (physical JIS keys) and `egui-winit` (winit-to-egui JIS routing), under
+`share/doc/typefinch/third-party/{epaint-0.35.0,egui-0.35.0,egui-winit-0.35.0}/`.
+`tests/release_smoke.sh` compares all nine installed/archived notices
+byte-for-byte to the tracked originals, in addition to checksum, install,
+upgrade, rollback and unmanaged-file refusal tests. Installation also places
+these notices under the user's `share/doc/typefinch/third-party/` prefix;
 preflight refuses symlinked notice files, their parent directories,
 and managed executable paths before writing a binary. Tar metadata and gzip headers
 are normalized for repeatable archives *given identical binary contents*;

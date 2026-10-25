@@ -368,3 +368,48 @@ acceptance check remains open for production Hyprland hardware,
 native Wayland Fcitx/IBus candidate overlays, arbitrary mixed-script editor
 hit-testing and end-to-end IME behavior. No physical-keyboard or full BiDi
 acceptance percentage is claimed from this run.
+
+## Native Wayland pointer dragging and clickable COSMIC preview
+
+[CI 40154992897](https://github.com/sguzman/typefinch/actions/runs/40154992897)
+passed **235 Rust tests and the full native GUI suite**, including actual
+Weston `wl_pointer` forward and backward drags within the *editable*
+Arabic and Hebrew marked-script source fields. Selection contained
+**9/9 logical graphemes for Arabic** and **11/11 for Hebrew** in both
+directions. The native editor source counts remained unchanged; screenshot
+pairs (`typefinch-wayland-rtl-*-pointer-{forward,backward}.png`) were opened
+and visually inspected. The raw egui selection and separate COSMIC shaped
+preview both reflected the selection. This checks two specific same-line
+visual ranges in a virtual Wayland compositor, **not arbitrary BiDi
+mouse hit-testing** or physical Hyprland.
+
+[CI 40155868325](https://github.com/sguzman/typefinch/actions/runs/40155868325)
+then passed **237 Rust tests and the complete native graphical suite**.
+`Renderer::hit_test_byte` uses COSMIC Text's shaped bidirectional
+`Buffer::hit` method with bounded dimensions, source bytes and pointer
+coordinates. It converts a visual click into a logical UTF-8 byte offset,
+then snaps to a whole Unicode extended grapheme boundary without reversing
+the passage. Unit tests exhaustively exercise selection endpoint pairs for
+marked Hebrew, Arabic, mixed Latin/RTL text, Indic conjuncts, joined emoji,
+regional-indicator flags and decomposed accents; the hit-test tests check
+that valid visual points return genuine grapheme boundaries and invalid
+coordinates are rejected.
+
+The native GUI now allows an explicit **click on the separate shaped
+preview to position the ordinary source TextEdit caret**. Under the same
+disposable Weston session, the real editor's logical cursor moved
+**0 → 12 graphemes (Arabic)** and **0 → 9 (Hebrew)** after a normal mouse
+click on the shaped glyphs, with zero selected graphemes and the full
+original source preserved. `typefinch-wayland-rtl-*-preview-click.png`
+screenshots were archived and opened. The shaped preview is still
+**not an editable text surface** and does not own keyboard or IME events;
+it hands a validated logical caret to the existing editor. No typed text,
+source file path, clipboard content or device identity is collected in
+normal use, and CI's numeric audit excludes source text.
+
+**Acceptance boundary:** The two tests verify limited native Weston
+pointer selection and click-to-caret interactions. They do not establish
+correctness of arbitrary mixed-direction selection, native Fcitx/IBus
+candidate overlays, physical Hyprland keyboard input, or full assistive
+technology integration. T804's broader RTL-tests gate remains **open**
+and its tracked completion remains unchanged.

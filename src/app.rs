@@ -2559,6 +2559,30 @@ impl eframe::App for Typefinch {
         if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
             ctx.memory_mut(|m|m.request_focus(egui::Id::new("typing_surface")));
         }
+        // Keyboard-first practice/retest. These are the same UI actions as
+        // the visible buttons, never global hotkeys or background capture.
+        let practice_keys=ctx.input(|i|
+            pressed_key_modifiers(&i.events,egui::Key::K)
+                .is_some_and(|m|m.ctrl && m.shift && !m.alt));
+        if practice_keys && self.session.state==State::Finished
+            && !self.settings_read_only
+            && !self.training_followup.as_ref().is_some_and(|t|t.stage==Stage::Drill) {
+            if let Some(drill)=self.session.weak_character_drill(){
+                self.start_weak_drill(drill,ctx);
+            }
+        }
+        let retest_keys=ctx.input(|i|
+            pressed_key_modifiers(&i.events,egui::Key::R)
+                .is_some_and(|m|m.ctrl && m.shift && !m.alt));
+        if retest_keys && self.session.state==State::Finished
+            && !self.settings_read_only {
+            let enabled=self.training_followup.as_ref().is_some_and(|t|
+                t.stage==Stage::Drill
+                && self.session.target==t.drill_reference
+                && t.same_context(&self.prefs.profiles[self.prefs.active_profile].id,
+                    &self.prefs.layout,self.mode));
+            if enabled {self.start_training_retest(ctx);}
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
             self.preview_layer=self.preview_layer.next();
         }

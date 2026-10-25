@@ -100,6 +100,26 @@ replace([[let range=if edit.has_focus(){
                             }
                         }else{None};]],1)
 
+
+-- Disposable metadata-only diagnostic for the 0.35 native RTL regression.
+-- Never print the imported source, typed text, candidate or file path.
+replace([[self.rtl_editor_cursor_byte=range.as_ref()
+                            .and_then(|range|rtl_shaping::editor_caret_byte(]],
+[[if std::env::var_os("TYPEFINCH_QA_EDITOR_CARET_REPORT").is_some()
+                            && ui.input(|i|i.events.iter().any(|event|matches!(event,
+                                egui::Event::Key{key:egui::Key::A,pressed:true,modifiers,..}
+                                    if modifiers.ctrl))) {
+                            let indices=|range:egui::text::CCursorRange|
+                                (range.primary.index.0,range.secondary.index.0);
+                            let saved=egui::TextEdit::load_state(ui.ctx(),editor_id)
+                                .and_then(|state|state.cursor.char_range());
+                            eprintln!("egui035-qa ctrl-a: focus={} id_match={} output={:?} saved={:?} used={:?}",
+                                edit.has_focus(),edit.id==editor_id,
+                                native_cursor_range.map(indices),saved.map(indices),range.map(indices));
+                        }
+                        self.rtl_editor_cursor_byte=range.as_ref()
+                            .and_then(|range|rtl_shaping::editor_caret_byte(]],1)
+
 local out=assert(io.open(path, "wb"))
 assert(out:write(src))
 assert(out:close())

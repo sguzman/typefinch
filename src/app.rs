@@ -1696,14 +1696,16 @@ impl Typefinch {
             self.message="Practice retest unavailable: source, profile or input context changed.".into();
             return;
         }
-        self.prefs.test_mode=trial.mode;
+        // A held-out benchmark/word corpus is not a new random benchmark
+        // after an adaptive drill. Replay the exact baseline as Custom text,
+        // explicitly excluding this familiarity-biased retest from normal
+        // benchmark leaderboard/history aggregations.
+        self.prefs.test_mode=TestMode::Custom;
         self.prefs.language=trial.language;
         self.prefs.word_difficulty=trial.difficulty;
         self.prefs.duration_seconds=trial.duration.as_secs();
-        if trial.mode==TestMode::Custom {
-            self.custom_text=trial.reference.clone();
-            Self::reset_custom_editor_history(ctx);
-        }
+        self.custom_text=trial.reference.clone();
+        Self::reset_custom_editor_history(ctx);
         self.rebuild_session();
         if self.session.target!=trial.reference
             || self.session.duration!=trial.duration {

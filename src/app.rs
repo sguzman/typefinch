@@ -56,6 +56,17 @@ fn rtl_preview_editor_range(text:&str,active_byte:usize,anchor_byte:usize)
         h_pos:None,
     })
 }
+/// A gesture that *begins* in the preview may end beyond its image edges.
+/// Clamp that endpoint to the closest pixel without treating unbounded or
+/// nonfinite coordinates as valid; the origin still has to be inside.
+fn rtl_preview_clamp_drag_endpoint(local:egui::Pos2,width:usize,height:usize)
+    ->Option<egui::Pos2> {
+    if width==0 || height==0 || width>2048 || height>256
+        || !local.x.is_finite() || !local.y.is_finite(){return None;}
+    Some(egui::pos2(
+        local.x.clamp(0.0,(width-1) as f32),
+        local.y.clamp(0.0,(height-1) as f32)))
+}
 fn keyboard_poll_interval()->Duration {
     // Only an expressly isolated synthetic GUI QA process can accelerate
     // compositor metadata polling. Production remains a bounded 20 seconds.
@@ -1869,9 +1880,11 @@ impl Typefinch {
                 if let Some(anchor)=self.rtl_preview_drag_anchor.take() {
                     if let Some(position)=current_pos {
                         let local=position-response.rect.min;
-                        if let Some(active)=self.rtl_renderer.get_or_insert_with(
+                        if let Some(active)=rtl_preview_clamp_drag_endpoint(
+                                local,width,height)
+                            .and_then(|local|self.rtl_renderer.get_or_insert_with(
                                 rtl_shaping::Renderer::new)
-                            .hit_test_byte(&preview,width,height,local.x,local.y)
+                                .hit_test_byte(&preview,width,height,local.x,local.y))
                             .and_then(|at|skipped.checked_add(at)) {
                             if let Some(range)=rtl_preview_editor_range(
                                     &self.custom_text,active,anchor) {
@@ -3245,6 +3258,26 @@ mod palette_tests {
         assert_eq!(session.typed,"你好世界");
         assert_eq!(session.state,State::Finished);
         assert_eq!(session.score().correct,4);
+    }
+    #[test] fn rtl_preview_drag_endpoint_is_clamped_only_to_valid_pixels() {
+        let left_top=rtl_preview_clamp_drag_endpoint(
+            egui::pos2(-100.0,-20.0),440,120).unwrap();
+        assert_eq!(left_top,egui::pos2(0.0,0.0));
+        let right_bottom=rtl_preview_clamp_drag_endpoint(
+            egui::pos2(900.0,500.0),440,120).unwrap();
+        assert_eq!(right_bottom,egui::pos2(439.0,119.0));
+        assert_eq!(rtl_preview_clamp_drag_endpoint(
+            egui::pos2(42.0,33.0),440,120),Some(egui::pos2(42.0,33.0)));
+        for bad in [f32::NAN,f32::INFINITY,f32::NEG_INFINITY] {
+            assert!(rtl_preview_clamp_drag_endpoint(
+                egui::pos2(bad,1.0),440,120).is_none());
+            assert!(rtl_preview_clamp_drag_endpoint(
+                egui::pos2(1.0,bad),440,120).is_none());
+        }
+        for (w,h) in [(0,120),(440,0),(2049,120),(440,257)] {
+            assert!(rtl_preview_clamp_drag_endpoint(
+                egui::pos2(1.0,1.0),w,h).is_none());
+        }
     }
     #[test] fn shaped_preview_selection_only_maps_whole_unicode_graphemes() {
         let source="سَ abc שָׁ 👩‍💻";

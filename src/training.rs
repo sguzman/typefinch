@@ -241,6 +241,21 @@ impl ControlledTrial {
         });
         serde_json::to_string_pretty(&record).ok()
     }
+    /// Guard the native UI BEFORE typing starts, not merely when a finished
+    /// session reaches the study recorder. No silently normalized, changed,
+    /// timed or profile-incompatible source can enter a pilot phase.
+    pub fn can_start_stage(&self,session:&Session)->bool {
+        let expected=match self.stage {
+            TrialStage::Practice=>&self.practice,
+            TrialStage::Immediate|TrialStage::Delayed=>&self.held_out,
+            TrialStage::Complete=>return false,
+        };
+        session.state==State::Ready && session.mode==TestMode::Custom
+            && &session.target==expected
+            && session.language==self.language
+            && session.difficulty==self.difficulty
+            && session.duration==self.duration
+    }
     pub fn practice_source(&self)->&str {&self.practice}
     pub fn held_out_source(&self)->&str {&self.held_out}
     pub fn same_context(&self,profile_id:&str,layout:&str,
@@ -512,6 +527,34 @@ mod tests {
             }
         }
         assert_eq!((adaptive,neutral),(128,128));
+    }
+    #[test] fn native_pilot_preflight_rejects_wrong_phase_source_and_settings() {
+        let baseline=synthetic_custom("abab","axab");
+        let mut t=ControlledTrial::begin(&baseline,"xyxy",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).unwrap();
+        let practice=Session::new_with_custom(0,TestMode::Custom,"xyxy");
+        let original=Session::new_with_custom(0,TestMode::Custom,"abab");
+        assert!(t.can_start_stage(&practice));
+        assert!(!t.can_start_stage(&original),
+            "A repeated baseline is not the practice exercise");
+        let too_long=Session::new_with_custom(30,TestMode::Custom,"xyxy");
+        assert!(!t.can_start_stage(&too_long));
+        let different=Session::new_with_custom(0,TestMode::Custom,"xyxz");
+        assert!(!t.can_start_stage(&different));
+        let mut active=Session::new_with_custom(0,TestMode::Custom,"xyxy");
+        active.begin();
+        assert!(!t.can_start_stage(&active));
+        let practiced=synthetic_custom("xyxy","xyxy");
+        assert!(t.record_practice(&practiced,"a","us","os:unknown",Mode::System));
+        assert_eq!(t.stage,TrialStage::Immediate);
+        assert!(t.can_start_stage(&original));
+        assert!(!t.can_start_stage(&practice));
+        let immediate=synthetic_custom("abab","abab");
+        assert!(t.record_immediate(&immediate,"a","us","os:unknown",Mode::System));
+        assert!(t.can_start_stage(&original));
+        t.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(3600));
+        assert!(t.record_delayed(&immediate,"a","us","os:unknown",Mode::System));
+        assert!(!t.can_start_stage(&original),"Completed studies never restart");
     }
     #[test] fn transfer_requires_different_held_out_text_and_actual_practice() {
         let baseline=synthetic_custom("abab","axab");

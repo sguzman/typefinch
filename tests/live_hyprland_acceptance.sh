@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 # Explicitly opted-in local QA, never CI-run against a real desktop.
 set -Eeuo pipefail
+# Compare the read-only inventory itself, not only its count.
+inventory_parity(){
+  jq -en --slurpfile own "$1" --slurpfile host "$2" '
+    def reported: if type=="string" and length>0 then . else null end;
+    ($own[0].rows // null) as $rows |
+    ($host[0].keyboards // null) as $keys |
+    if (($rows|type)!="array" or ($keys|type)!="array") then false else
+      ($rows|length) as $n |
+      ($n>0) and ($n<=128) and (($keys|length)==$n) and
+      (([$rows[]|.inspection_id]|unique|length)==$n) and
+      (([$keys[]|.address]|unique|length)==$n) and
+      (([$rows[] | {
+        id:.inspection_id, name:.label, keymap:.reported_active_keymap,
+        layout:.configured_layout, variant:.configured_variant
+      }] | sort_by(.id)) ==
+      ([$keys[] | {
+        id:.address,
+        name:(if (.name|type)=="string" and (.name|length)>0
+          then .name else "Unlabeled keyboard" end),
+        keymap:(.active_keymap|reported),
+        layout:(.layout|reported),
+        variant:(.variant|reported)
+      }] | sort_by(.id)))
+    end
+  ' >/dev/null
+}
 if [[ "${1:-}" == --self-test ]];then
   command -v jq >/dev/null
   fixture='[{"pid":21,"at":[1,2],"size":[3,4]},{"pid":42,"at":[18,27],"size":[800,600]}]'
@@ -9,8 +35,8 @@ if [[ "${1:-}" == --self-test ]];then
   [[ "$rect" == "18,27 800x600" ]] || exit 1
   # Test-only synthetic metadata: no compositor is contacted and no actual
   # device identifiers or typed material are ever embedded in the fixture.
-  inventory='{"keyboards":[{"name":"synthetic"}]}'
-  inspection='{"schema":1,"capture_policy":"inspection-only","input_attribution":"aggregate seat; no per-device key-event attribution","rows":[{}]}'
+  inventory='{"keyboards":[{"address":"sim:01","name":"Virtual Alpha","active_keymap":"English (US)","layout":"us","variant":""},{"address":"sim:02","name":"Virtual Beta","active_keymap":"German","layout":"de","variant":""}]}'
+  inspection='{"schema":1,"capture_policy":"inspection-only","input_attribution":"aggregate seat; no per-device key-event attribution","rows":[{"inspection_id":"sim:02","label":"Virtual Beta","reported_active_keymap":"German","configured_layout":"de","configured_variant":null},{"inspection_id":"sim:01","label":"Virtual Alpha","reported_active_keymap":"English (US)","configured_layout":"us","configured_variant":null}]}'
   jq -en --argjson d "$inspection" '$d.schema==1 and
     $d.capture_policy=="inspection-only" and
     $d.input_attribution=="aggregate seat; no per-device key-event attribution"
@@ -18,13 +44,31 @@ if [[ "${1:-}" == --self-test ]];then
   inventory_count="$(jq -n --argjson d "$inventory" '$d.keyboards|length')"
   inspection_count="$(jq -n --argjson d "$inspection" '$d.rows|length')"
   [[ "$inventory_count" == "$inspection_count" ]] || exit 1
+  # Equal-count mismatches must not certify read-only device parity.
+  fixture_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$fixture_dir"' EXIT
+  printf '%s' "$inventory" >"$fixture_dir/hyprland.json"
+  printf '%s' "$inspection" >"$fixture_dir/typefinch.json"
+  inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/hyprland.json" || exit 1
+  jq '.keyboards |= reverse' "$fixture_dir/hyprland.json" >"$fixture_dir/reordered.json"
+  inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/reordered.json" || exit 1
+  for change in '.keyboards[0].address="sim:99"' \
+    '.keyboards[0].active_keymap="German"' \
+    '.keyboards[1].address="sim:01"' \
+    '.keyboards[0].name="A different keyboard"';do
+    jq "$change" "$fixture_dir/hyprland.json" >"$fixture_dir/mismatch.json"
+    if inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/mismatch.json";then
+      echo "Equal-count but mismatched inventory passed QA" >&2
+      exit 1
+    fi
+  done
   wrong='{"schema":1,"capture_policy":"global-evdev","input_attribution":"physical","rows":[{}]}'
   if jq -en --argjson d "$wrong" '$d.capture_policy=="inspection-only"
     and $d.input_attribution=="aggregate seat; no per-device key-event attribution"' >/dev/null;then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA metadata and rectangle self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA inventory identity/map, schema and rectangle self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -71,6 +115,8 @@ connected="$(jq -r '.keyboards | length' "$tmp/hyprland-devices.json")"
 [[ "$observed" =~ ^[0-9]+$ && "$connected" =~ ^[0-9]+$ &&
    "$connected" -gt 0 && "$observed" == "$connected" ]] ||
   { echo "Actual Hyprland keyboard inventory parity failed" >&2;exit 1; }
+inventory_parity "$tmp/typefinch-devices.json" "$tmp/hyprland-devices.json" ||
+  { echo "Actual Hyprland keyboard identities or keymaps diverged" >&2;exit 1; }
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
 app=$!
 found=0

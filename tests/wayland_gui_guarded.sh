@@ -21,7 +21,10 @@ weston_pre_score_crash(){
     { grep -F 'Connection reset by peer' "$log" >/dev/null &&
       grep -F 'No scored native Wayland typing result' "$log" >/dev/null; } ||
     { grep -F 'Wayland app exited' "$log" >/dev/null &&
-      grep -F 'Connection reset by peer' "$log" >/dev/null; }; }
+      grep -F 'Connection reset by peer' "$log" >/dev/null; } ||
+    { grep -F 'X Error of failed request:  BadWindow' "$log" >/dev/null &&
+      grep -F 'Connection reset by peer' "$log" >/dev/null &&
+      grep -F 'WinitEventLoop(ExitFailure(1))' "$log" >/dev/null; }; }
 }
 # Tiny standalone contract test: explicitly reject after-score crashes,
 # Typefinch application assertion failures and unrelated interruptions.
@@ -48,6 +51,18 @@ if [[ "${1:-}" == --self-test ]];then
   printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
     'Connection reset by peer' 'Wayland app exited' >"$file"
   weston_pre_score_crash "$file" || exit 1
+  # A Weston X11 BadWindow SIGSEGV immediately after socket startup
+  # can terminate winit without reaching the normal pre-score diagnostic.
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'X Error of failed request:  BadWindow' 'Connection reset by peer' \
+    'WinitEventLoop(ExitFailure(1))' >"$file"
+  weston_pre_score_crash "$file" || exit 1
+  printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
+    'Connection reset by peer' 'WinitEventLoop(ExitFailure(1))' >"$file"
+  if weston_pre_score_crash "$file";then exit 1;fi
+  printf '%s\n' 'X Error of failed request:  BadWindow' \
+    'Connection reset by peer' 'WinitEventLoop(ExitFailure(1))' >"$file"
+  if weston_pre_score_crash "$file";then exit 1;fi
   # A scored session or application scoring mismatch must NEVER be
   # laundered into a compositor-bootstrap retry, for either fixture.
   for counterexample in \

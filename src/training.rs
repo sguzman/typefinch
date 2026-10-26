@@ -423,7 +423,7 @@ mod tests {
             "a","us","os:unknown",Mode::System).is_none(),
             "A full held-out passage embedded in practice is not withheld");
         let unicode=synthetic_custom("é","é");
-        assert!(ControlledTrial::begin(&unicode,"e\\u{301}",Arm::Adaptive,
+        assert!(ControlledTrial::begin(&unicode,"e\u{301}",Arm::Adaptive,
             "a","us","os:unknown",Mode::System).is_none(),
             "Canonical Unicode equivalents must never count as separate texts");
         let normalized_practice=ControlledTrial::begin(&baseline,"x   y",

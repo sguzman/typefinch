@@ -155,6 +155,38 @@ impl TransferSample {
             elapsed_ms:u64::try_from(score.elapsed.as_millis()).ok()?})
     }
 }
+/// Enrollment must validate BOTH practice candidates before random arm
+/// assignment. Otherwise a reference that invalidates only one arm causes
+/// differential exclusion after randomization, biasing the pilot sample.
+/// The eligible alternatives never leave this process or enter history.
+pub struct EligiblePilotArms {
+    adaptive:ControlledTrial,
+    non_adaptive:ControlledTrial,
+}
+impl EligiblePilotArms {
+    pub fn prepare(baseline:&Session,adaptive_source:&str,profile_id:&str,
+        layout:&str,recorded_layout:&str,input:Mode)->Option<Self> {
+        let control_source=neutral_practice(adaptive_source,&baseline.target)?;
+        let adaptive=ControlledTrial::begin(baseline,adaptive_source,Arm::Adaptive,
+            profile_id,layout,recorded_layout,input)?;
+        let non_adaptive=ControlledTrial::begin(baseline,&control_source,
+            Arm::NonAdaptive,profile_id,layout,recorded_layout,input)?;
+        if adaptive.practice_source().nfc().collect::<String>()
+            ==non_adaptive.practice_source().nfc().collect::<String>() {
+            return None;
+        }
+        Some(Self {adaptive,non_adaptive})
+    }
+    /// Production calls this only AFTER both arms have passed the same
+    /// eligibility rules. QA may supply its forced synthetic arm separately.
+    pub fn assign(self,arm:Arm)->ControlledTrial {
+        match arm {
+            Arm::Adaptive=>self.adaptive,
+            Arm::NonAdaptive=>self.non_adaptive,
+        }
+    }
+}
+
 /// This self-contained local series still cannot establish causation by itself:
 /// held-out passage difficulty, recruitment, order, and practice dose require
 /// independently verified comparative human evidence.
@@ -509,6 +541,39 @@ mod tests {
         assert_eq!(neutral_practice("aaa","asdfjkl;"),Some("asd".into()));
         assert!(neutral_practice("","aaa").is_none());
         assert!(neutral_practice("aaa","").is_none());
+    }
+    #[test] fn eligibility_is_checked_for_both_arms_before_any_assignment() {
+        let valid=Session::new_with_custom(0,TestMode::Custom,"aba");
+        let mut baseline=valid;
+        baseline.begin();
+        baseline.type_text("axa");
+        let eligible=EligiblePilotArms::prepare(&baseline,"b b b b b b b b",
+            "profile","us","os:unknown",Mode::System).unwrap();
+        let left=eligible.assign(Arm::Adaptive);
+        assert_eq!(left.arm,Arm::Adaptive);
+        assert_eq!(left.practice_source(),"b b b b b b b b");
+        let eligible=EligiblePilotArms::prepare(&baseline,"b b b b b b b b",
+            "profile","us","os:unknown",Mode::System).unwrap();
+        let right=eligible.assign(Arm::NonAdaptive);
+        assert_eq!(right.arm,Arm::NonAdaptive);
+        assert_eq!(right.practice_source(),"a s d f j k l ;");
+        assert_eq!(left.held_out_source(),right.held_out_source());
+        // The control alone could be eligible, but a single-character
+        // adaptive source necessarily includes the complete reference.
+        // Reject the WHOLE trial rather than skew assignment toward control.
+        let mut short=Session::new_with_custom(0,TestMode::Custom,"b");
+        short.begin();
+        short.type_text("x");
+        assert!(ControlledTrial::begin(&short,"asdf",Arm::NonAdaptive,
+            "profile","us","os:unknown",Mode::System).is_some());
+        assert!(ControlledTrial::begin(&short,"b b b",Arm::Adaptive,
+            "profile","us","os:unknown",Mode::System).is_none());
+        assert!(EligiblePilotArms::prepare(&short,"b b b",
+            "profile","us","os:unknown",Mode::System).is_none());
+        // Incomplete baselines cannot be eligible for either study arm.
+        let unfinished=Session::new_with_custom(0,TestMode::Custom,"aba");
+        assert!(EligiblePilotArms::prepare(&unfinished,"b b b",
+            "profile","us","os:unknown",Mode::System).is_none());
     }
     fn synthetic_custom(reference:&str,typed:&str)->Session {
         let mut session=Session::new_with_custom(0,TestMode::Custom,reference);

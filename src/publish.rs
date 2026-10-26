@@ -67,7 +67,7 @@ pub fn repository(input:&str)->Result<String,String> {
     }
     Ok(format!("{owner}/{repo}"))
 }
-fn owned_card(data:&Value)->Result<String,String> {
+fn owned_card(data:&Value)->Result<(String,Vec<u8>),String> {
     if data.get("type").and_then(Value::as_str)!=Some("file") {
         return Err("Existing GitHub path is not an ordinary file; it will not be overwritten.".into());
     }
@@ -89,7 +89,7 @@ fn owned_card(data:&Value)->Result<String,String> {
             && !current.contains("aria-label=\"Typefinch compact profile\"") {
         return Err("Existing file does not identify as a Typefinch card; refusing overwrite.".into());
     }
-    Ok(sha.to_owned())
+    Ok((sha.to_owned(),bytes))
 }
 /// Every call is authorized by a fresh user-facing consent checkbox and
 /// concrete click, and only the fixed card path can be updated. The SVG
@@ -109,7 +109,7 @@ pub fn publish_via<A:Api>(api:&A,input:&str,svg:&str,consent:bool)->Result<Strin
     }
     let card_endpoint=format!("{repo_endpoint}/contents/{CARD_PATH}");
     let old=match api.get(&card_endpoint) {
-        Ok(file)=>Some(owned_card(&file)?),
+        Ok(file)=>Some(owned_card(&file)?.0),
         Err(ApiFailure::NotFound)=>None,
         Err(ApiFailure::Unavailable)=>return Err(
             "Cannot verify the existing card (network or authentication failure); nothing was uploaded.".into()),
@@ -123,6 +123,19 @@ pub fn publish_via<A:Api>(api:&A,input:&str,svg:&str,consent:bool)->Result<Strin
         "GitHub declined or could not complete the upload; check the repository manually.".to_owned())?;
     if receipt.get("content").and_then(|c|c.get("path")).and_then(Value::as_str)!=Some(CARD_PATH){
         return Err("GitHub response did not confirm the card path; inspect the repository.".into());
+    }
+    // A successful PUT response with a filename is not proof that the
+    // intended bytes are actually readable in the public repository. Do
+    // not display a publication-success link until GitHub returns exactly
+    // our newly submitted SVG from the fixed Contents API path.
+    // A read-back failure may follow a real write (e.g., network outage
+    // or API cache delay), so never claim that no upload occurred here.
+    let stored=api.get(&card_endpoint).map_err(|_|
+        "GitHub accepted an upload, but read-back could not verify it; inspect the repository.".to_owned())?;
+    let (_,bytes)=owned_card(&stored).map_err(|_|
+        "GitHub read-back did not verify a Typefinch card; inspect the repository.".to_owned())?;
+    if bytes!=svg.as_bytes() {
+        return Err("GitHub read-back did not match the uploaded card; inspect the repository.".into());
     }
     Ok(format!("https://github.com/{repo}"))
 }
@@ -156,6 +169,8 @@ mod tests {
     const DEMO:&str="<svg xmlns=\"http://www.w3.org/2000/svg\" aria-label=\"Typefinch compact profile\"></svg>";
     fn repo_info()->Value{json!({"permissions":{"push":true}})}
     fn uploaded()->Value{json!({"content":{"path":"typefinch-profile.svg"}})}
+    fn verified_card()->Value{json!({"type":"file","sha":"a".repeat(40),
+        "encoding":"base64","content":STANDARD.encode(DEMO)})}
     #[test] fn rejects_nonconforming_target_and_missing_consent_without_api_access(){
         for target in ["owner/repo/README.md","https://github.com/owner/repo",
             "owner/repo?x=1","evil;rm/repo","owner/..","-/repo","owner/repo and more"]{
@@ -167,14 +182,16 @@ mod tests {
         assert!(mock.calls.borrow().is_empty());
     }
     #[test] fn publishing_new_card_never_handles_tokens_or_other_repository_paths(){
-        let mock=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),Ok(uploaded())]);
+        let mock=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),Ok(uploaded()),Ok(verified_card())]);
         assert_eq!(publish_via(&mock,"alice/cards",DEMO,true).unwrap(),
             "https://github.com/alice/cards");
         let c=mock.calls.borrow();
-        assert_eq!(c.len(),3);
+        assert_eq!(c.len(),4);
         assert_eq!(c[0].0,"repos/alice/cards");
         assert_eq!(c[1].0,"repos/alice/cards/contents/typefinch-profile.svg");
         assert_eq!(c[2].0,c[1].0);
+        assert_eq!(c[3].0,c[1].0);
+        assert!(c[3].1.is_none());
         let body=c[2].1.as_ref().unwrap();
         assert_eq!(body.get("sha"),None);
         assert_eq!(STANDARD.decode(body["content"].as_str().unwrap()).unwrap(),DEMO.as_bytes());
@@ -190,9 +207,31 @@ mod tests {
     #[test] fn updates_owned_card_only_when_sha_is_verified(){
         let existing=json!({"type":"file","sha":"a".repeat(40),
             "encoding":"base64","content":STANDARD.encode(DEMO)});
-        let mock=Mock::new(vec![Ok(repo_info()),Ok(existing),Ok(uploaded())]);
+        let mock=Mock::new(vec![Ok(repo_info()),Ok(existing),Ok(uploaded()),Ok(verified_card())]);
         publish_via(&mock,"alice/cards",DEMO,true).unwrap();
         assert_eq!(mock.calls.borrow()[2].1.as_ref().unwrap()["sha"],"a".repeat(40));
+    }
+    #[test] fn upload_receipt_is_not_publication_success_without_exact_readback(){
+        let no_readback=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
+            Ok(uploaded()),Err(ApiFailure::Unavailable)]);
+        assert!(publish_via(&no_readback,"alice/cards",DEMO,true).unwrap_err()
+            .contains("read-back could not verify"));
+        assert_eq!(no_readback.calls.borrow().len(),4);
+
+        let stale=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
+            Ok(uploaded()),Ok(json!({"type":"file","sha":"b".repeat(40),
+                "encoding":"base64","content":STANDARD.encode(
+                    "<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" aria-label=\\\"Typefinch compact profile\\\"></svg>different")}))]);
+        assert!(publish_via(&stale,"alice/cards",DEMO,true).unwrap_err()
+            .contains("did not match"));
+        assert_eq!(stale.calls.borrow().len(),4);
+
+        let wrong_kind=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
+            Ok(uploaded()),Ok(json!({"type":"dir","sha":"a".repeat(40),
+                "encoding":"base64","content":STANDARD.encode(DEMO)}))]);
+        assert!(publish_via(&wrong_kind,"alice/cards",DEMO,true).unwrap_err()
+            .contains("did not verify"));
+        assert_eq!(wrong_kind.calls.borrow().len(),4);
     }
     #[test] fn rejects_foreign_or_unverifiable_remote_card_without_put(){
         for invalid in [

@@ -147,6 +147,9 @@ pub struct ControlledTrial {
     pub practiced:Option<TransferSample>,
     pub immediate:Option<TransferSample>,
     pub delayed:Option<TransferSample>,
+    // Local monotonic time, never persisted or represented as a timestamp.
+    // An app restart invalidates the incomplete trial.
+    immediate_at:Option<std::time::Instant>,
 }
 impl ControlledTrial {
     /// Baseline is an actual finished *held-out* Custom session. Its source
@@ -167,7 +170,7 @@ impl ControlledTrial {
             duration:baseline.duration,profile_id:profile_id.into(),
             layout:layout.into(),recorded_layout:recorded_layout.into(),input,
             baseline:TransferSample::from_session(baseline)?,
-            practiced:None,immediate:None,delayed:None,
+            practiced:None,immediate:None,delayed:None,immediate_at:None,
         })
     }
     fn valid(&self,session:&Session,source:&str,profile_id:&str,layout:&str,
@@ -198,16 +201,18 @@ impl ControlledTrial {
         }
         let Some(sample)=TransferSample::from_session(session) else {return false;};
         self.immediate=Some(sample);
+        self.immediate_at=Some(std::time::Instant::now());
         self.stage=TrialStage::Delayed;
         true
     }
-    /// Delayed retention requires real wall-clock separation from immediate
-    /// testing, supplied by the caller and checked against a fixed minimum.
-    /// This in-memory method does not claim the delay actually elapsed.
-    pub fn record_delayed(&mut self,session:&Session,after_immediate:Duration,
+    /// Use a local monotonic clock rather than trusting an elapsed duration
+    /// supplied by a caller. At least one real hour must separate the
+    /// immediate measurement and this retest in the *same running app*.
+    pub fn record_delayed(&mut self,session:&Session,
         profile_id:&str,layout:&str,recorded_layout:&str,input:Mode)->bool {
         if self.stage!=TrialStage::Delayed || self.immediate.is_none() ||
-            after_immediate<Duration::from_secs(3600) ||
+            !self.immediate_at.is_some_and(|time|
+                time.elapsed()>=Duration::from_secs(3600)) ||
             !self.valid(session,&self.held_out,profile_id,layout,recorded_layout,input) {
             return false;
         }
@@ -422,13 +427,16 @@ mod tests {
         assert!(!trial.record_immediate(&immediate,"a","us","os:unknown",Mode::Emulated));
         assert!(trial.record_immediate(&immediate,"a","us","os:unknown",Mode::System));
         assert_eq!(trial.stage,TrialStage::Delayed);
-        assert!(!trial.record_delayed(&immediate,Duration::from_secs(3599),
+        assert!(!trial.record_delayed(&immediate,
             "a","us","os:unknown",Mode::System),
-            "A too-early check cannot be recorded as delayed retention");
-        assert!(trial.record_delayed(&immediate,Duration::from_secs(3600),
+            "An immediate repeat cannot be recorded as delayed retention");
+        // Inject a previously measured monotonic instant only within this
+        // isolated unit test. Production callers cannot set the clock.
+        trial.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(3600));
+        assert!(trial.record_delayed(&immediate,
             "a","us","os:unknown",Mode::System));
         assert_eq!(trial.stage,TrialStage::Complete);
-        assert!(!trial.record_delayed(&immediate,Duration::from_secs(7200),
+        assert!(!trial.record_delayed(&immediate,
             "a","us","os:unknown",Mode::System),
             "A second delayed observation must not silently overwrite the first");
         assert_eq!(trial.baseline.opportunities,OpportunityCounts{observed:4,missed:1});
@@ -444,7 +452,8 @@ mod tests {
         let later=synthetic_custom("abab",delayed);
         assert!(trial.record_practice(&drill,profile,"us","os:unknown",Mode::System));
         assert!(trial.record_immediate(&instant,profile,"us","os:unknown",Mode::System));
-        assert!(trial.record_delayed(&later,Duration::from_secs(3600),profile,
+        trial.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(3600));
+        assert!(trial.record_delayed(&later,profile,
             "us","os:unknown",Mode::System));
         trial
     }

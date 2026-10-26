@@ -2,7 +2,7 @@
 //! This does NOT establish independent participants, valid randomization,
 //! equal training dose, or human efficacy. No network or implicit file search.
 use crate::training::{PUBLIC_STUDY_REFERENCE,PUBLIC_STUDY_REFERENCE_ID};
-use serde::Deserialize;
+use serde::{Deserialize,Serialize};
 use serde_json::{json,Value};
 use std::{collections::HashSet,fs::OpenOptions,io::Read,
     os::unix::fs::{MetadataExt,OpenOptionsExt},path::PathBuf};
@@ -12,7 +12,7 @@ const MAX_FILE_BYTES:u64=32_768;
 const MAX_RECORDS:usize=200;
 const EXPORT_CONSENT:&str="explicit local clipboard action; no network publication";
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug,Deserialize,Serialize)]
 #[serde(deny_unknown_fields)]
 struct Measurement {
     opportunities:usize,
@@ -37,7 +37,7 @@ impl Measurement {
         self.ever_missed as f64*100.0/self.opportunities as f64
     }
 }
-#[derive(Debug,Deserialize)]
+#[derive(Debug,Deserialize,Serialize)]
 #[serde(deny_unknown_fields)]
 struct Pilot {
     schema:u32,
@@ -185,6 +185,10 @@ pub fn analyze(paths:&[PathBuf])->Result<Value,String> {
         return Err("Supply 2 to 200 explicitly selected aggregate files".into());
     }
     let mut identities=HashSet::new();
+    // A copied or differently formatted version of the exact same exported
+    // aggregates must not be treated as another independent observation.
+    // Canonical bytes remain in process memory only, never persisted or sent.
+    let mut canonical_records=HashSet::new();
     let mut records=Vec::with_capacity(paths.len());
     for path in paths {
         let (record,identity)=read_local(path)?;
@@ -192,6 +196,11 @@ pub fn analyze(paths:&[PathBuf])->Result<Value,String> {
             // Reject exact same opened inode, even through a hard link.
             // Do not print paths, hashes, or participant-level data.
             return Err("Repeated input file; each aggregate may be supplied only once".into());
+        }
+        let canonical=serde_json::to_string(&record)
+            .map_err(|_|"Cannot normalize local aggregate record")?;
+        if !canonical_records.insert(canonical) {
+            return Err("Duplicate aggregate observations cannot be counted twice".into());
         }
         records.push(record);
     }

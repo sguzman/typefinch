@@ -26,6 +26,36 @@ pub fn write_synthetic_pilot_audit(held_out:&str,
     })).map_err(|e|e.to_string())?;
     fs::write(path,bytes).map_err(|e|e.to_string())
 }
+/// Disposable native-GUI QA: verify interruption actually retires the
+/// in-memory pilot. Only the fixed synthetic "aba" fixture is permitted.
+pub fn write_synthetic_pilot_exclusion_audit(held_out:&str,
+    arm:crate::training::Arm,previous:crate::training::TrialStage,
+    reason:crate::training::PilotExclusionReason)->Result<(),String> {
+    if held_out!="aba" || env::var_os("TYPEFINCH_QA_REPORT").is_none() {return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_PILOT_REPORT") else{return Ok(());};
+    let arm=match arm {
+        crate::training::Arm::Adaptive=>"adaptive",
+        crate::training::Arm::NonAdaptive=>"non_adaptive",
+    };
+    let previous=match previous {
+        crate::training::TrialStage::Practice=>"practice",
+        crate::training::TrialStage::Immediate=>"immediate",
+        crate::training::TrialStage::Delayed=>"delayed",
+        crate::training::TrialStage::Complete=>"complete",
+    };
+    let reason=match reason {
+        crate::training::PilotExclusionReason::ParticipantWithdrew=>"participant_withdrew",
+        crate::training::PilotExclusionReason::ProtocolInvalid=>"protocol_invalid",
+        crate::training::PilotExclusionReason::FocusLost=>"focus_lost",
+        crate::training::PilotExclusionReason::ManualRestart=>"manual_restart",
+    };
+    let bytes=serde_json::to_vec_pretty(&serde_json::json!({
+        "synthetic":true,"source":"fixed-disposable-fixture",
+        "arm":arm,"stage":"abandoned","previous_stage":previous,
+        "reason":reason,"causal_claim":false
+    })).map_err(|e|e.to_string())?;
+    fs::write(path,bytes).map_err(|e|e.to_string())
+}
 pub fn write_smoke_report(session: &Session, completed_tests: u32) -> Result<(), String> {
     let Some(path) = env::var_os("TYPEFINCH_QA_REPORT") else { return Ok(()); };
     let score = session.score();

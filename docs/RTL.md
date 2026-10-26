@@ -649,3 +649,43 @@ on a nested virtual Wayland seat, not physical Hyprland keyboards, scoped
 per-device capture, Fcitx/IBus candidate overlays, arbitrary mixed-direction
 editing or full accessibility integration. T804's broad RTL test gate
 remains open; do not claim real hardware or comprehensive RTL acceptance.
+
+## Native Wayland mixed-script OS input and atomic caret QA (October 26, 2026)
+
+[Full CI 40346017191](https://github.com/sguzman/typefinch/actions/runs/40346017191)
+passed **265 Rust tests and the complete graphical suite** after adding a
+the RTL acceptance runner now exercises **five independently
+isolated Weston compositor cases**: Arabic Emulated, Hebrew Emulated, Arabic
+OS-input, Hebrew OS-input, and a mixed Arabic/Latin/Hebrew OS-input case.
+The Emulated cases each retain their earlier separate four-grapheme,
+mistake-correction and hard-newline five-grapheme sessions.
+
+The new **mixed OS-input** case imports a synthetic private Custom reference
+of exactly 13 extended graphemes, then scores the actual focused native
+Wayland input session in logical order through Arabic -> US Latin -> Hebrew.
+For each run it changes both the disposable parent Xvfb XKB layout and the
+nested Weston keyboard group, with numeric X11 physical-key input. The
+native Typefinch software emulator is disabled. The single completed
+session must persist 13/13 correct graphemes, exactly 14 attempts including
+one corrected mistake, and correct **OS** input-mode provenance in SQLite.
+Neither the reference text nor import path may enter preferences. The
+strict runner does not retry scoring assertion failures as compositor
+bootstrap failures.
+
+**QA-read race corrected:** In [commit 9fa0228](https://github.com/sguzman/typefinch/commit/9fa02284d4f40aa5d75b4f2b8fa7a7b2db31b984),
+the synthetic-only RTL editor caret audit switched from in-place
+truncate-and-write to private same-directory staging plus atomic rename.
+The previous CI
+[40344362111](https://github.com/sguzman/typefinch/actions/runs/40344362111)
+had failed an unrelated existing mixed-script X11 selection check because
+it copied an incomplete JSON snapshot between GUI frames. A concurrent
+writer/reader Rust regression now requires complete JSON on every read,
+and verifies no symlinked external file is modified. In the successful run
+the full original RTL X11 selection/edit/Undo assertions remained enabled
+and passed; no retry or weaker selection check was introduced.
+
+**Remaining boundary:** The test is synthetic input through a genuine nested
+Wayland compositor, not a connected physical Hyprland keyboard, a native
+Wayland IME candidate overlay, or unrestricted bidirectional editing.
+It provides additional evidence within T804 without passing T804's
+broader RTL acceptance check.

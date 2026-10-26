@@ -45,6 +45,10 @@ both `permissions.push = true` and a **public** repository
 (`private = false`, `visibility = public`). Private, internal and
 indeterminate-visibility repositories are rejected; a successful upload to
 a private repository would not fulfill the public-publishing promise.
+The response's canonical `full_name` must also match the selected
+owner/repository (ignoring GitHub's case-insensitive spelling); renamed
+repositories reached through redirects and unidentified API targets fail
+closed before any card access.
 If the destination already contains a file, the publisher requires
 the GitHub file SHA and inspectable base64-encoded text identifying a
 Typefinch SVG; foreign content, a directory, corrupt data or an

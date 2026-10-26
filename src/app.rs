@@ -16,7 +16,7 @@ use crate::{
     publish,
     registry::{self, InstalledLayout},
     rtl_shaping,
-    training::{FollowUp,Stage},
+    training::{self,Arm,ControlledTrial,FollowUp,Stage,TrialStage},
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
@@ -550,6 +550,8 @@ pub struct Typefinch {
     layout_import_path:String,
     history: Vec<Record>,
     training_followup:Option<FollowUp>,
+    controlled_trial:Option<ControlledTrial>,
+    controlled_consent:bool,
     earned_badges: Vec<achievements::Achievement>,
     all_history:Vec<Record>,
     history_only_matching: bool,
@@ -692,7 +694,7 @@ impl Typefinch {
         Self { prefs, settings_read_only, normal_animation_time, show_keyboard_help:false, unicode_fonts, session, mode: initial_mode, session_layout: "os:unknown".into(), session_input_mode: "OS".into(), emulator, composition:None, ime_preedit:String::new(),
              emulated_right_alt_held:false, emulated_left_alt_held:false, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
-             training_followup:None,
+             training_followup:None,controlled_trial:None,controlled_consent:false,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
@@ -851,6 +853,22 @@ impl Typefinch {
         if let Err(err) = crate::qa::write_smoke_report(&self.session, completed_tests) {
             self.message = format!("QA report failed: {err}");
         }
+        // A new pilot phase advances only after normal local score persistence.
+        if let Some(trial)=self.controlled_trial.as_mut() {
+            let ok=match trial.stage {
+                TrialStage::Practice=>trial.record_practice(&self.session,&identity,
+                    &self.prefs.layout,&self.session_layout,self.mode),
+                TrialStage::Immediate=>trial.record_immediate(&self.session,&identity,
+                    &self.prefs.layout,&self.session_layout,self.mode),
+                TrialStage::Delayed=>trial.record_delayed(&self.session,&identity,
+                    &self.prefs.layout,&self.session_layout,self.mode),
+                TrialStage::Complete=>false,
+            };
+            if !ok {
+                self.controlled_trial=None;
+                self.message="Local transfer pilot stopped: source, layout or phase mismatch.".into();
+            }
+        }
         // Compare only after the identical source retest was successfully
         // persisted. Never turn generated-drill performance into a success
         // claim, and invalidate a changed profile, layout or input mode.
@@ -873,6 +891,8 @@ impl Typefinch {
         // A new source, preference or profile invalidates an in-memory trial.
         // The explicit retest path temporarily takes and restores it.
         self.training_followup=None;
+        self.controlled_trial=None;
+        self.controlled_consent=false;
         self.ime_preedit.clear();
         // Textures and their cache signatures can contain pixels/strings from
         // a previously loaded private passage. Discard them when the source
@@ -892,6 +912,8 @@ impl Typefinch {
         self.session = Session::new_with_settings(duration, self.prefs.test_mode, input, self.prefs.language, self.prefs.word_difficulty);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
+        // Ordinary manual restarts abandon a pilot; stage transitions restore it.
+        self.controlled_trial=None;
         // Results from an earlier finished follow-up never decorate the
         // next independent test.
         if self.training_followup.as_ref().is_some_and(|t|t.stage==Stage::Compared) {
@@ -920,6 +942,7 @@ impl Typefinch {
         if !ctx.input(|i| i.focused) {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
+            self.controlled_trial=None;
             self.ime_preedit.clear();
             self.emulated_right_alt_held=false;
             self.emulated_left_alt_held=false;
@@ -958,6 +981,7 @@ impl Typefinch {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                     if !ime_owns_navigation(self.mode,&mut self.ime_preedit,egui::Key::Escape) {
                         self.session.state = State::Ready;
+                        self.controlled_trial=None;
                         self.ime_preedit.clear();
                         if let Some(compose) = self.composition.as_mut() { compose.reset(); }
                     }
@@ -1830,6 +1854,146 @@ impl Typefinch {
         });
         ui.small("Inspection only. Neither Wayland seat-level typing nor X11 configuration metadata provides per-device key attribution.");
     }
+    /// Explicitly opt-in, private, one-process transfer pilot; arm assignment
+    /// does not imply efficacy or equal training effort.
+    fn start_controlled_pilot(&mut self,ctx:&egui::Context) {
+        if !self.controlled_consent || self.settings_read_only
+            || self.session.state!=State::Finished || self.session.mode!=TestMode::Custom
+            || self.training_followup.is_some() || self.controlled_trial.is_some() {
+            return;
+        }
+        let Some(adaptive)=self.session.weak_character_drill()
+            .or_else(||self.session.weak_bigram_drill()) else {return;};
+        let arm=Arm::random();
+        let practice=match arm {
+            Arm::Adaptive=>adaptive,
+            Arm::NonAdaptive=>match training::neutral_practice(&adaptive,&self.session.target) {
+                Some(source)=>source,
+                None=>{
+                    self.message="Cannot construct a disjoint non-adaptive practice passage.".into();
+                    return;
+                }
+            },
+        };
+        let identity=&self.prefs.profiles[self.prefs.active_profile].id;
+        let Some(trial)=ControlledTrial::begin(&self.session,&practice,arm,identity,
+            &self.prefs.layout,&self.session_layout,self.mode) else {
+            self.message="Pilot rejected overlapping passages or an invalid baseline.".into();
+            return;
+        };
+        self.start_controlled_stage(trial,practice,ctx);
+    }
+    fn start_controlled_stage(&mut self,trial:ControlledTrial,source:String,
+        ctx:&egui::Context) {
+        let identity=&self.prefs.profiles[self.prefs.active_profile].id;
+        if !trial.same_context(identity,&self.prefs.layout,&self.session_layout,self.mode)
+            || self.settings_read_only {
+            self.controlled_trial=None;
+            self.message="Pilot stopped: profile or keyboard context changed.".into();
+            return;
+        }
+        self.prefs.test_mode=TestMode::Custom;
+        self.custom_text=source;
+        Self::reset_custom_editor_history(ctx);
+        self.rebuild_session();
+        self.start_test(ctx);
+        let identity=&self.prefs.profiles[self.prefs.active_profile].id;
+        if self.session.state!=State::Running
+            || !trial.same_context(identity,&self.prefs.layout,&self.session_layout,self.mode) {
+            self.message="Pilot stopped: new session layout or target was not confirmed.".into();
+            return;
+        }
+        self.message=match trial.stage {
+            TrialStage::Practice=>format!("Pilot: {} practice, local only.",
+                if trial.arm==Arm::Adaptive {"adaptive"} else {"fixed-pattern control"}),
+            TrialStage::Immediate=>"Pilot: held-out immediate retest. No causal claim.".into(),
+            TrialStage::Delayed=>"Pilot: held-out delayed retest. No upload.".into(),
+            TrialStage::Complete=>"Pilot already complete.".into(),
+        };
+        self.controlled_consent=false;
+        self.controlled_trial=Some(trial);
+        self.save();
+    }
+    fn advance_controlled_pilot(&mut self,ctx:&egui::Context) {
+        if self.session.state!=State::Finished {return;}
+        let Some(trial)=self.controlled_trial.take() else{return;};
+        let source=match trial.stage {
+            TrialStage::Immediate=>trial.held_out_source().to_owned(),
+            TrialStage::Delayed if trial.delay_ready()=>trial.held_out_source().to_owned(),
+            _=>{self.controlled_trial=Some(trial);return;},
+        };
+        self.start_controlled_stage(trial,source,ctx);
+    }
+    fn show_controlled_pilot(&mut self,ui:&mut egui::Ui,ctx:&egui::Context) {
+        if let Some(trial)=self.controlled_trial.as_ref() {
+            let stage=trial.stage;
+            let arm=trial.arm;
+            let ready=trial.delay_ready();
+            let baseline=trial.baseline;
+            let immediate=trial.immediate;
+            let delayed=trial.delayed;
+            ui.group(|ui|{
+                ui.strong("Opt-in held-out transfer pilot (local only)");
+                ui.small(format!("Assigned {} practice. No trial export, upload or efficacy claim.",
+                    if arm==Arm::Adaptive {"adaptive"} else {"non-adaptive"}));
+                match stage {
+                    TrialStage::Practice=>ui.label("Complete the practice passage."),
+                    TrialStage::Immediate=>ui.label("Practice finished. Retest the original held-out passage."),
+                    TrialStage::Delayed=>ui.label(if ready {
+                        "One-hour minimum interval verified; delayed retest available."
+                    }else{
+                        "Keep Typefinch open; delayed retest unlocks one hour after the immediate score."
+                    }),
+                    TrialStage::Complete=>ui.label("Completed. Outcomes remain descriptive, not evidence of efficacy."),
+                };
+                if stage==TrialStage::Complete {
+                    if let (Some(now),Some(later))=(immediate,delayed) {
+                        ui.label(format!("Held-out missed positions: baseline {} / {}, immediate {} / {}, delayed {} / {}.",
+                            baseline.opportunities.missed,baseline.opportunities.observed,
+                            now.opportunities.missed,now.opportunities.observed,
+                            later.opportunities.missed,later.opportunities.observed));
+                        let delta=|sample:training::TransferSample| {
+                            Some(sample.opportunities.missed_percent()?-
+                                baseline.opportunities.missed_percent()?)
+                        };
+                        if let (Some(a),Some(b))=(delta(now),delta(later)) {
+                            ui.small(format!("Immediate {a:+.1} pp, delayed {b:+.1} pp relative to baseline. Not control-adjusted."));
+                        }
+                    }
+                }
+                if self.session.state==State::Finished {
+                    if stage==TrialStage::Immediate && ui.button("Start held-out immediate retest").clicked() {
+                        self.advance_controlled_pilot(ctx);
+                    }
+                    if stage==TrialStage::Delayed {
+                        if ui.add_enabled(ready,egui::Button::new("Start held-out delayed retest")).clicked() {
+                            self.advance_controlled_pilot(ctx);
+                        }
+                        if !ready {ctx.request_repaint_after(Duration::from_secs(30));}
+                    }
+                }
+                if ui.button("Discard local pilot").clicked() {
+                    self.controlled_trial=None;
+                    self.controlled_consent=false;
+                    self.message="Pilot discarded. Existing ordinary local aggregate scores unchanged.".into();
+                }
+            });
+        }else if !self.settings_read_only && self.session.state==State::Finished
+            && self.session.mode==TestMode::Custom
+            && self.training_followup.is_none()
+            && (self.session.weak_character_drill().is_some()
+                || self.session.weak_bigram_drill().is_some()) {
+            ui.group(|ui|{
+                ui.strong("Optional held-out transfer pilot (experimental)");
+                ui.small("Randomized adaptive/fixed-pattern practice followed by immediate and one-hour delayed retests of the same held-out passage. Not validated research; no trial data saved or uploaded. Ordinary aggregate scores still enter local history.");
+                ui.checkbox(&mut self.controlled_consent,"I opt in to this local, memory-only pilot");
+                if ui.add_enabled(self.controlled_consent,
+                    egui::Button::new("Start randomized transfer pilot")).clicked() {
+                    self.start_controlled_pilot(ctx);
+                }
+            });
+        }
+    }
     fn start_weak_drill(&mut self, drill:String, ctx:&egui::Context) {
         // The source and baseline exist only in memory, scoped to this one
         // profile, keyboard layout and app invocation.
@@ -2100,7 +2264,10 @@ impl Typefinch {
         ui.horizontal_wrapped(|ui| {
             let name = if self.session.state == State::Running { "Restart test" } else { "Start test" };
             if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
-            if self.session.state == State::Running && ui.button("Stop").clicked() { self.session.state=State::Ready; }
+            if self.session.state == State::Running && ui.button("Stop").clicked() {
+                self.session.state=State::Ready;
+                self.controlled_trial=None;
+            }
             if self.session.state == State::Finished {
                 // Do not silently replace the original baseline with a
                 // second drill's errors. A follow-up either retests its
@@ -2170,6 +2337,7 @@ impl Typefinch {
                 }
             }
         }
+        self.show_controlled_pilot(ui,ctx);
         if self.session.state==State::Running && self.mode==Mode::Emulated
             && self.composition.as_ref().is_some_and(|state|
                 state.status()==xkbcommon::xkb::compose::Status::Composing) {

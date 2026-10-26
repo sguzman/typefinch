@@ -5,6 +5,7 @@ mod daily;
 mod goal_transfer;
 mod custom_layout;
 mod app;
+mod system_theme;
 mod devices;
 mod wayland_seat;
 mod engine;

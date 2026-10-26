@@ -67,6 +67,38 @@ human training-efficacy gate. The original benchmark protocol below
 requires held-out transfer, an intervention control, counterbalanced
 order and delayed retention.
 
+## Controlled-transfer protocol primitives (engineering only)
+
+The new in-memory `src/training.rs::ControlledTrial` state machine provides
+part of the previously proposed evaluation infrastructure. It distinguishes
+**adaptive** versus **non-adaptive** arms, with an equal-probability assignment
+from a fresh random byte (`Arm::random()` uses the existing OS-backed UUID
+generator). It rejects the exact practice passage as a held-out source. The
+test sequence is **held-out baseline → different practice passage → same
+held-out immediate retest → same held-out delayed retest**. It validates
+identical language, difficulty, duration, input mode, profile and reported
+layout/seat provenance. The delayed stage requires a *caller-reported* elapsed
+interval of at least one hour; this mechanism **cannot independently attest
+wall-clock retention**.
+
+`control_adjusted_transfer` compares two completed, distinct-profile,
+opposite-arm series only when their configured context and observed practice
+opportunity counts match. It produces descriptive control-adjusted changes
+in held-out missed-reference-opportunity percentage points and corrected WPM.
+Tests include an exactly null difference, an unfavorable adaptive difference,
+premature retests, repeated submissions, missing retention, inconsistent
+input or source context, identical participant identity, unequal exposure and
+balanced synthetic random-byte assignments. Missing denominators cannot be
+silently treated as zero.
+
+**Not yet implemented:** an in-app enrollment/consent UI, matched
+non-adaptive passage generation, trusted time-on-task matching, reliable
+real-world retention scheduling, crossover/order controls, preregistered
+analysis with uncertainty, real participant recruitment or any evidence of
+better learning. These types are not attached to existing `FollowUp` scores
+and are not exported, persisted or sent to GitHub. Pure unit tests cannot
+supply the needed comparative human data; **T502 remains unaccepted**.
+
 ## Proposed empirical acceptance design (not implemented)
 
 A privacy-first evaluation should compare **adaptive targeting** against

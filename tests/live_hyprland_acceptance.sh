@@ -49,6 +49,25 @@ window_is_clear(){
     end
   ' >/dev/null
 }
+# Require the current focused surface to retain the same on-screen
+# rectangle and workspace as the screenshot captured at startup. A moved or
+# resized window must never yield stale window-only screenshot evidence.
+window_geometry_matches(){
+  jq -en --slurpfile data "$1" --argjson pid "$2" --arg expected "$3" \
+    --argjson workspace "$4" '
+    ($data[0] // null) as $window |
+    if ($window|type)!="object" then false else
+      ($window.pid==$pid and $window.mapped==true and
+       $window.workspace.id==$workspace and
+       ($window.at|type)=="array" and
+       ($window.size|type)=="array" and
+       ($window.at|length)==2 and ($window.size|length)==2 and
+       ([$window.at[], $window.size[]] | all(.[]; type=="number" and .==floor)) and
+       $window.size[0]>0 and $window.size[1]>0 and
+       ("\($window.at[0]),\($window.at[1]) \($window.size[0])x\($window.size[1])"==$expected))
+    end
+  ' >/dev/null
+}
 # Hyprland's Lua API uses structured dispatch expressions; older
 # versions use the legacy dispatcher vocabulary. Only fixed QA arguments.
 lua_focus_pid(){ printf 'hl.dsp.focus({ window = "pid:%s" })' "$1"; }
@@ -158,6 +177,14 @@ if [[ "${1:-}" == --self-test ]];then
     echo "QA artifact destination symlink overwritten" >&2;exit 1
   fi
   [[ -L "$fixture_dir/symlink-result" && ! -e "$fixture_dir/absent" ]] || exit 1
+  printf '%s' '{"pid":42,"mapped":true,"workspace":{"id":3},"at":[18,27],"size":[800,600]}' >"$fixture_dir/active.json"
+  window_geometry_matches "$fixture_dir/active.json" 42 '18,27 800x600' 3 || exit 1
+  for mutation in '.pid=21' '.workspace.id=4' '.at[0]=19' '.size[0]=799' '.mapped=false';do
+    jq "$mutation" "$fixture_dir/active.json" >"$fixture_dir/moved.json"
+    if window_geometry_matches "$fixture_dir/moved.json" 42 '18,27 800x600' 3;then
+      echo "Changed window geometry or identity passed screenshot guard" >&2;exit 1
+    fi
+  done
   # Unrelated workspaces cannot obscure Typefinch; same-workspace overlap
   # must fail even when the native compositor screenshot tool succeeds.
   printf '%s' '[{"pid":42,"mapped":true,"hidden":false,"workspace":{"id":3},"at":[18,27],"size":[800,600]},{"pid":21,"mapped":true,"hidden":false,"workspace":{"id":4},"at":[25,35],"size":[80,80]}]' >"$fixture_dir/clients.json"
@@ -183,7 +210,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map, focused-input schema, no-clobber evidence, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map, focused-input schema, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -273,12 +300,15 @@ rect="$(jq -r --argjson pid "$app" \
 # Refuse screenshots if focus changed or another visible client overlaps.
 # Layer-shell overlays are not in hyprctl clients; evidence remains local.
 assert_capture_clear(){
-  [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
+  hyprctl -j activewindow >"$tmp/current-window.json"
+  [[ "$(jq -r '.pid // empty' "$tmp/current-window.json")" == "$app" ]] ||
     { echo "Cannot capture unfocused Typefinch window" >&2;exit 1; }
   local active_ws
   active_ws="$(hyprctl -j activeworkspace | jq -r '.id // empty')"
   [[ "$active_ws" =~ ^-?[0-9]+$ ]] ||
     { echo "Hyprland workspace identity unavailable" >&2;exit 1; }
+  window_geometry_matches "$tmp/current-window.json" "$app" "$rect" "$active_ws" ||
+    { echo "Typefinch screenshot rectangle moved or became ambiguous" >&2;exit 1; }
   hyprctl -j clients >"$tmp/clients.json"
   window_is_clear "$tmp/clients.json" "$app" "$active_ws" ||
     { echo "Other window overlaps Typefinch; screenshot refused" >&2;exit 1; }
@@ -286,6 +316,7 @@ assert_capture_clear(){
 assert_capture_clear
 grim -g "$rect" "$tmp/before.png"
 [[ -s "$tmp/before.png" ]] || exit 1
+assert_capture_clear
 # Events target only the Typefinch foreground window.
 send_key(){
   local mods="$1" key="$2" legacy_mods=''
@@ -307,6 +338,7 @@ snapshot(){
   assert_capture_clear
   grim -g "$rect" "$tmp/$1.png"
   [[ -s "$tmp/$1.png" ]] || { echo "Missing $1 native screenshot" >&2;exit 1; }
+  assert_capture_clear
 }
 pixel_delta(){
   local changed

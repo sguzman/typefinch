@@ -20,6 +20,45 @@ pub fn write_smoke_report(session: &Session, completed_tests: u32) -> Result<(),
         .map_err(|e| e.to_string())
 }
 
+/// One scored, focused, app-targeted event for explicit local QA. This
+/// reports only aggregate counts; never the key, text, layout address or
+/// profile identity. No output exists outside opt-in disposable QA.
+fn focused_input_payload(session:&Session,input_mode:&str)->serde_json::Value {
+    serde_json::json!({
+        "state":"focused-input",
+        "synthetic":true,
+        "input_mode":input_mode,
+        "attempts":session.attempts,
+        "entered":session.score().entered,
+    })
+}
+pub fn write_focused_input_audit(session:&Session,input_mode:&str)->Result<(),String>{
+    if env::var_os("TYPEFINCH_QA_REPORT").is_none()
+        || session.state!=crate::engine::State::Running
+        || session.attempts!=1 {return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_INPUT_REPORT") else{return Ok(());};
+    let data=focused_input_payload(session,input_mode);
+    fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}
+#[cfg(test)]
+mod focused_input_tests {
+    #[test] fn audit_contains_only_aggregates_not_private_source_or_keystroke(){
+        use crate::engine::{Session,TestMode};
+        let mut session=Session::new_with_custom(15,TestMode::Custom,"SECRET-QA-REFERENCE");
+        session.begin();
+        session.type_text("z");
+        let info=super::focused_input_payload(&session,"OS");
+        assert_eq!(info["state"],"focused-input");
+        assert_eq!(info["attempts"],1);
+        assert_eq!(info["entered"],1);
+        assert_eq!(info["input_mode"],"OS");
+        assert!(info.get("key").is_none());
+        assert!(info.get("text").is_none());
+        assert!(!info.to_string().contains("SECRET-QA-REFERENCE"));
+    }
+}
+
 /// Test-only marker proving that a focused timed session actually reached the
 /// persistence guard. No typed text or profile identities are included.
 pub fn write_guarded_report()->Result<(),String> {

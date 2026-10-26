@@ -173,13 +173,17 @@ if [[ "${1:-}" == --self-test ]];then
   if window_is_clear "$fixture_dir/ambiguous.json" 42 3;then
     echo "Ambiguous target window accepted for screenshot" >&2;exit 1
   fi
+  input_meta='{"state":"focused-input","synthetic":true,"input_mode":"OS","attempts":1,"entered":1}'
+  jq -en --argjson x "$input_meta" '$x.state=="focused-input"
+    and $x.synthetic and $x.input_mode=="OS" and $x.attempts==1
+    and $x.entered==1 and ($x|has("text")|not) and ($x|has("key")|not)' >/dev/null
   wrong='{"schema":1,"capture_policy":"global-evdev","input_attribution":"physical","rows":[{}]}'
   if jq -en --argjson d "$wrong" '$d.capture_policy=="inspection-only"
     and $d.input_attribution=="aggregate seat; no per-device key-event attribution"' >/dev/null;then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map, no-clobber evidence, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map, focused-input schema, no-clobber evidence, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -222,6 +226,7 @@ export XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$
 export XDG_SESSION_TYPE=wayland WINIT_UNIX_BACKEND=wayland
 # Ephemeral structured F4/F10 audit; never save characters or hardware IDs.
 export TYPEFINCH_QA_REPORT="$tmp/geometry.json" TYPEFINCH_QA_PREVIEW_SHAPE=1
+export TYPEFINCH_QA_INPUT_REPORT="$tmp/focused-input.json"
 # Disposable profile: never open the user's existing settings/database.
 cargo build --locked >/dev/null
 # Real, read-only compositor inventory parity. Keep names and opaque addresses
@@ -285,7 +290,7 @@ grim -g "$rect" "$tmp/before.png"
 send_key(){
   local mods="$1" key="$2" legacy_mods=''
   case "$mods:$key" in
-    ':F1'|':F4'|':F10'|'CTRL + SHIFT:T') ;;
+    ':F1'|':F4'|':F10'|':F5'|':F2'|':A'|'CTRL + SHIFT:T') ;;
     *) echo "Non-QA shortcut refused" >&2;exit 2 ;;
   esac
   [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
@@ -359,6 +364,26 @@ snapshot dark
 theme_pixels="$(pixel_delta light dark 2000)"
 send_key "CTRL + SHIFT" T
 theme system
+# Native compositor target-only keyboard input: start an ordinary typing
+# session and send exactly one letter to its focused typing widget. The
+# app audits numeric attempts, not source text or physical device identity.
+send_key "" F5
+send_key "" F2
+[[ ! -e "$TYPEFINCH_QA_INPUT_REPORT" ]] ||
+  { echo "Focused input audit predated QA key event" >&2;exit 1; }
+send_key "" A
+received=0
+for _ in $(seq 1 30);do
+  if [[ -s "$TYPEFINCH_QA_INPUT_REPORT" ]] &&
+     jq -e '.synthetic==true and .state=="focused-input" and
+       .input_mode=="OS" and .attempts==1 and .entered==1' \
+       "$TYPEFINCH_QA_INPUT_REPORT" >/dev/null 2>&1;then
+    received=1;break
+  fi
+  sleep 0.15
+done
+((received==1)) ||
+  { echo "Focused Wayland shortcut failed to count one typed attempt" >&2;exit 1; }
 # Opt-in local evidence only. Preflight all targets; never overwrite.
 if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
   out="$TYPEFINCH_QA_OUTPUT_DIR"
@@ -378,7 +403,8 @@ jq -n --argjson help_pixels "$pixels" --argjson theme_pixels "$theme_pixels" \
   --argjson connected "$connected" \
   '{state:"passed",compositor:"real-hyprland",profile:"disposable",
     actual_keyboard_inspection_rows:$connected,
-    input:"targeted compositor shortcuts F1 F4 F10 Ctrl+Shift+T",
+    input:"targeted compositor shortcuts F1 F4 F10 Ctrl+Shift+T F5 F2 A",
+    synthetic_focused_typing_attempt_verified:true,
     help_changed_pixels:$help_pixels,light_dark_changed_pixels:$theme_pixels,
     illustrated_geometry:["ISO","JIS","navigation","keypad"],
     app_theme_cycle:["system","light","dark","system"],

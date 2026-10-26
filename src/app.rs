@@ -1018,6 +1018,7 @@ impl Typefinch {
                 _ => {}
             }
         }
+        let _=crate::qa::write_focused_input_audit(&self.session,&self.session_input_mode);
     }
     fn reset_custom_editor_history(ctx:&egui::Context) {
         // Importing a new private passage is a document boundary, not a

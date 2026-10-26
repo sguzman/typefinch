@@ -80,6 +80,8 @@ jobs:
         run: TYPEFINCH_QA_UNICODE_FONTS=1 cargo test fonts::tests::system_noto_fallbacks_render_required_glyphs -- --nocapture
       - name: Build graphical executable
         run: cargo build --locked
+      - name: Native GUI follows synthetic XDG portal System appearance changes
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/system_theme_gui_smoke.sh
       - name: Offline public-pilot aggregate comparison and strict input rejection
         run: bash tests/pilot_analysis_cli_smoke.sh
       - name: Offline public-pilot exclusion tally and strict input rejection

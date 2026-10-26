@@ -867,6 +867,9 @@ impl Typefinch {
             if !ok {
                 self.controlled_trial=None;
                 self.message="Local transfer pilot stopped: source, layout or phase mismatch.".into();
+            } else {
+                let _=crate::qa::write_synthetic_pilot_audit(
+                    trial.held_out_source(),trial.arm,trial.stage);
             }
         }
         // Compare only after the identical source retest was successfully
@@ -1912,6 +1915,10 @@ impl Typefinch {
         };
         self.controlled_consent=false;
         self.controlled_trial=Some(trial);
+        if let Some(active)=self.controlled_trial.as_ref() {
+            let _=crate::qa::write_synthetic_pilot_audit(
+                active.held_out_source(),active.arm,active.stage);
+        }
         self.save();
     }
     fn advance_controlled_pilot(&mut self,ctx:&egui::Context) {
@@ -3062,6 +3069,35 @@ impl eframe::App for Typefinch {
         }
         if ctx.input(|i| i.key_pressed(egui::Key::F2)) {
             ctx.memory_mut(|m|m.request_focus(egui::Id::new("typing_surface")));
+        }
+        // Private native-smoke fixture only: exercise the SAME consent and
+        // stage methods as the buttons, but without needing fragile pixel
+        // coordinates in an ephemeral virtual X11 window. Disabled in any
+        // ordinary session; cannot run on real passages or devices.
+        let qa_pilot=std::env::var_os("TYPEFINCH_QA_REPORT").is_some()
+            && std::env::var_os("TYPEFINCH_QA_PILOT_REPORT").is_some();
+        let synthetic_pilot_key=|key:egui::Key| ctx.input(|i|
+            pressed_key_modifiers(&i.events,key)
+                .is_some_and(|m|m.ctrl && m.shift && !m.alt));
+        if qa_pilot && self.session.state==State::Finished {
+            if self.session.mode==TestMode::Custom && self.session.target=="aba"
+                && self.controlled_trial.is_none()
+                && synthetic_pilot_key(egui::Key::P) {
+                self.controlled_consent=true;
+                self.start_controlled_pilot(ctx);
+            } else if self.controlled_trial.as_ref().is_some_and(|t|
+                t.held_out_source()=="aba") {
+                if self.controlled_trial.as_ref().is_some_and(|t|
+                    t.stage==TrialStage::Immediate)
+                    && synthetic_pilot_key(egui::Key::I) {
+                    self.advance_controlled_pilot(ctx);
+                }else if self.controlled_trial.as_ref().is_some_and(|t|
+                    t.stage==TrialStage::Delayed)
+                    && synthetic_pilot_key(egui::Key::D) {
+                    // Must stay blocked until the real monotonic hour passes.
+                    self.advance_controlled_pilot(ctx);
+                }
+            }
         }
         // Keyboard-first practice/retest. These are the same UI actions as
         // the visible buttons, never global hotkeys or background capture.

@@ -56,6 +56,23 @@ pub fn write_synthetic_pilot_exclusion_audit(held_out:&str,
     })).map_err(|e|e.to_string())?;
     fs::write(path,bytes).map_err(|e|e.to_string())
 }
+/// Disposable GUI-only observation of actual resolved System appearance.
+/// The report records no desktop settings, keyboard data, private passages,
+/// identifiers, process arguments or profile content.
+pub fn write_system_theme_audit(portal_dark:Option<bool>,resolved_dark:bool)->Result<(),String>{
+    if env::var_os("TYPEFINCH_QA_REPORT").is_none(){return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_SYSTEM_THEME_REPORT") else{return Ok(());};
+    let value=serde_json::json!({
+        "synthetic":true,
+        "state":"xdg-portal-system-theme",
+        "portal_dark":portal_dark,
+        "actual_dark":resolved_dark,
+        "source":"read-only-settings-portal",
+        "os_theme_transition_verified":false
+    });
+    fs::write(path,serde_json::to_vec_pretty(&value).map_err(|e|e.to_string())?)
+        .map_err(|e|e.to_string())
+}
 pub fn write_smoke_report(session: &Session, completed_tests: u32) -> Result<(), String> {
     let Some(path) = env::var_os("TYPEFINCH_QA_REPORT") else { return Ok(()); };
     let score = session.score();

@@ -17,19 +17,21 @@ local function save(path, content)
     assert(file:close())
 end
 local function quoted(s) return "'" .. s:gsub("'", "'\\''") .. "'" end
-local function dbquery(sql)
-    local root = assert(os.getenv("XDG_CONFIG_HOME"))
-    local path = root .. "/typefinch/sessions.sqlite3"
-    -- The live GUI may commit another session while this read starts.
-    -- SQLite's default zero busy timeout spuriously fails healthy sessions
-    -- with SQLITE_BUSY. Wait briefly for the writer without dropping any
-    -- row-count, provenance or score assertion.
+-- Both the active database and explicitly named backup/recovery files can
+-- briefly be locked while the native GUI finishes a transaction. Never
+-- interpret SQLite's default zero-timeout BUSY error as a failed backup.
+-- Preserve every result assertion and check the CLI exit code before parsing.
+local function dbquery_path(path, sql)
     local cmd = "sqlite3 -cmd '.timeout 5000' -json " .. quoted(path) .. " " .. quoted(sql)
     local pipe = assert(io.popen(cmd, "r"))
     local raw = assert(pipe:read("*a"))
     local ok, kind, code = pipe:close()
     assert(ok and (not code or code == 0), "sqlite3 failed: " .. cmd)
     return assert(json.decode(raw))
+end
+local function dbquery(sql)
+    local root = assert(os.getenv("XDG_CONFIG_HOME"))
+    return dbquery_path(root .. "/typefinch/sessions.sqlite3", sql)
 end
 local function report(path)
     return assert(json.decode(read(path)))
@@ -111,16 +113,9 @@ elseif mode == "backup" then
     local settings=assert(json.decode(read(assert(arg[3]))))
     assert(settings.profiles and #settings.profiles>=1)
     assert(settings.language=="es-MX")
-    local query="sqlite3 -json "..quoted(database).." "..quoted("SELECT COUNT(*) AS n FROM sessions")
-    local pipe=assert(io.popen(query,"r"))
-    local rows=assert(json.decode(assert(pipe:read("*a"))))
-    local ok=pipe:close()
-    assert(ok,"SQLite backup must open cleanly")
+    local rows=dbquery_path(database,"SELECT COUNT(*) AS n FROM sessions")
     equals(rows[1].n,5)
-    local modequery="sqlite3 -json "..quoted(database).." "..quoted("PRAGMA user_version")
-    local p=assert(io.popen(modequery,"r"))
-    local versions=assert(json.decode(assert(p:read("*a"))))
-    assert(p:close())
+    local versions=dbquery_path(database,"PRAGMA user_version")
     equals(versions[1].user_version,3)
     print("Private backup PASS: paired JSON settings and complete consistent SQLite snapshot")
 elseif mode == "prepare-personal-keymap" then
@@ -288,10 +283,7 @@ elseif mode == "recovery" then
     local f=io.open(path,"rb")
     if f then
         f:close()
-        local query="sqlite3 -json "..quoted(path).." "..quoted("SELECT COUNT(*) AS n FROM sessions")
-        local pipe=assert(io.popen(query,"r"))
-        local records=assert(json.decode(assert(pipe:read("*a"))))
-        assert(pipe:close())
+        local records=dbquery_path(path,"SELECT COUNT(*) AS n FROM sessions")
         equals(records[1].n,0,"Guarded session must not create any saved scores")
     end
     print("Recovery safety PASS: invalid settings preserved, no scored session or synthetic success report")

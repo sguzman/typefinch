@@ -73,6 +73,23 @@ hypr_focus_workspace(){
     hyprctl dispatch workspace "$1"
   fi
 }
+# Atomic no-overwrite publication, including when the source temp tree
+# and explicitly chosen evidence directory are on different filesystems.
+# mktemp creates a private file in the destination's own filesystem;
+# the subsequent hardlink fails atomically for existing files or symlinks.
+qa_stage=''
+publish_evidence(){
+  local src="$1" dst="$2" dir="$3"
+  qa_stage="$(mktemp "$dir/.typefinch-qa-stage.XXXXXXXX")" || return 1
+  if ! install -m 600 "$src" "$qa_stage";then
+    rm -f -- "$qa_stage"; qa_stage='';return 1
+  fi
+  if ! ln -- "$qa_stage" "$dst";then
+    rm -f -- "$qa_stage"; qa_stage='';return 1
+  fi
+  rm -f -- "$qa_stage"
+  qa_stage=''
+}
 if [[ "${1:-}" == --self-test ]];then
   command -v jq >/dev/null
   [[ "$(lua_focus_pid 42)" == 'hl.dsp.focus({ window = "pid:42" })' ]] || exit 1
@@ -126,6 +143,21 @@ if [[ "${1:-}" == --self-test ]];then
       exit 1
     fi
   done
+  # Verify actual no-clobber semantics (including a dangling symlink)
+  # using text-only fixtures. No screenshot or compositor access occurs.
+  printf '%s' 'a' >"$fixture_dir/evidence-source"
+  publish_evidence "$fixture_dir/evidence-source" "$fixture_dir/result" "$fixture_dir" || exit 1
+  [[ "$(cat "$fixture_dir/result")" == a ]] || exit 1
+  printf '%s' 'b' >"$fixture_dir/evidence-source"
+  if publish_evidence "$fixture_dir/evidence-source" "$fixture_dir/result" "$fixture_dir";then
+    echo "Existing QA artifact overwritten" >&2;exit 1
+  fi
+  [[ "$(cat "$fixture_dir/result")" == a ]] || exit 1
+  ln -s "$fixture_dir/absent" "$fixture_dir/symlink-result"
+  if publish_evidence "$fixture_dir/evidence-source" "$fixture_dir/symlink-result" "$fixture_dir";then
+    echo "QA artifact destination symlink overwritten" >&2;exit 1
+  fi
+  [[ -L "$fixture_dir/symlink-result" && ! -e "$fixture_dir/absent" ]] || exit 1
   # Unrelated workspaces cannot obscure Typefinch; same-workspace overlap
   # must fail even when the native compositor screenshot tool succeeds.
   printf '%s' '[{"pid":42,"mapped":true,"hidden":false,"workspace":{"id":3},"at":[18,27],"size":[800,600]},{"pid":21,"mapped":true,"hidden":false,"workspace":{"id":4},"at":[25,35],"size":[80,80]}]' >"$fixture_dir/clients.json"
@@ -147,7 +179,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map, no-clobber evidence, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -172,6 +204,7 @@ app='' previous='' workspace=''
 cleanup(){
   result=$?
   set +e
+  [[ -z "$qa_stage" ]] || rm -f -- "$qa_stage"
   [[ -z "$app" ]] || { kill "$app" 2>/dev/null; wait "$app" 2>/dev/null; }
   if [[ -n "$previous" && "$previous" != null ]];then
     hypr_focus_pid "$previous" >/dev/null 2>&1
@@ -337,7 +370,8 @@ if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
       { echo "Refusing to overwrite existing QA evidence" >&2;exit 1; }
   done
   for name in help iso jis navigation keypad light dark;do
-    install -m 600 "$tmp/$name.png" "$out/typefinch-hyprland-$name.png"
+    publish_evidence "$tmp/$name.png" "$out/typefinch-hyprland-$name.png" "$out" ||
+      { echo "Cannot atomically publish local QA evidence without replacing a file" >&2;exit 1; }
   done
 fi
 jq -n --argjson help_pixels "$pixels" --argjson theme_pixels "$theme_pixels" \

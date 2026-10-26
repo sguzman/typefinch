@@ -26,6 +26,7 @@ mkdir -m 700 "$tmp/runtime"
 export XDG_RUNTIME_DIR="$tmp/runtime" XDG_CONFIG_HOME="$tmp/config"
 unset WAYLAND_SOCKET HYPRLAND_INSTANCE_SIGNATURE DISPLAY_BACKEND
 export TYPEFINCH_QA_REPORT="$tmp/result.json" TYPEFINCH_QA_START_REPORT="$tmp/started.json"
+export TYPEFINCH_QA_INPUT_REPORT="$tmp/first-focused-input.json"
 mkdir -p "$XDG_CONFIG_HOME"
 # Host XKB is US; German Level-3 symbols MUST originate from Typefinch's
 # German software-emulated physical layout rather than committed OS text.
@@ -136,6 +137,17 @@ assert(result.synthetic and result.state=="finished" and result.entered==8
   string.format("Native German Wayland physical mismatch state=%s entered=%s correct=%s accuracy=%s",
     tostring(result.state),tostring(result.entered),tostring(result.correct),
     tostring(result.accuracy)))
+-- Assert the first key was scored via the focused native Wayland
+-- surface, not just a later synthetic success report. Private key text and
+-- input identifiers are intentionally absent from this numeric-only audit.
+local first=assert(io.open(os.getenv("TYPEFINCH_QA_INPUT_REPORT"),"rb"),
+  "Missing native Wayland first-focus keyboard report")
+local focus=assert(json.decode(first:read("*a")));first:close()
+assert(focus.state=="focused-input" and focus.synthetic==true
+  and focus.input_mode=="Emulated" and focus.attempts==1
+  and focus.entered==1 and focus.key==nil and focus.text==nil
+  and focus.source==nil,
+  "Native Wayland first-attempt audit or privacy boundary invalid")
 local database=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local cmd=string.format("sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",database)
 local p=assert(io.popen(cmd,"r"))

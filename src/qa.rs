@@ -156,6 +156,77 @@ pub fn write_custom_import_audit(text:&str,count:usize)->Result<(),String>{
     fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
         .map_err(|e| e.to_string())
 }
+// The shaped editor republishes a numeric caret snapshot on many GUI
+// frames. Truncate-and-write can expose empty or partial JSON to a real
+// compositor test copying the file between frames. Publish a COMPLETE
+// same-directory private file through atomic rename instead. Neither bytes
+// nor source paths are logged, and this is only used for explicit QA.
+fn write_atomic_editor_audit(path:&std::path::Path,bytes:&[u8])->Result<(),String>{
+    use std::{io::Write,os::unix::fs::OpenOptionsExt,
+        sync::atomic::{AtomicU64,Ordering}};
+    static NEXT_REPORT:AtomicU64=AtomicU64::new(0);
+    let mut name=path.file_name().ok_or("QA report path needs a file name")?
+        .to_os_string();
+    name.push(format!(".typefinch-{}-{}.tmp",std::process::id(),
+        NEXT_REPORT.fetch_add(1,Ordering::Relaxed)));
+    let stage=path.with_file_name(name);
+    let mut file=fs::OpenOptions::new().write(true).create_new(true)
+        .mode(0o600).open(&stage).map_err(|e|e.to_string())?;
+    let result=(||->std::io::Result<()>{
+        file.write_all(bytes)?;
+        file.flush()?;
+        drop(file);
+        fs::rename(&stage,path)?;
+        Ok(())
+    })();
+    if result.is_err(){let _=fs::remove_file(&stage);}
+    result.map_err(|e|e.to_string())
+}
+#[cfg(test)]
+mod atomic_editor_audit_tests {
+    use super::*;
+    #[test]
+    fn repeated_caret_snapshots_never_expose_partial_json_to_concurrent_reader(){
+        let dir=std::env::temp_dir().join(format!("typefinch-rtl-audit-{}",
+            uuid::Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let path=dir.join("caret.json");
+        let first:&[u8]=br#"{"state":"rtl-editor-caret","index":0}"#;
+        let second:&[u8]=br#"{"state":"rtl-editor-caret","index":123,"reserved":"abcdefghijabcdefghijabcdefghijabcdefghij"}"#;
+        write_atomic_editor_audit(&path,first).unwrap();
+        let writer_path=path.clone();
+        let writer=std::thread::spawn(move||{
+            for i in 0..500 {
+                write_atomic_editor_audit(&writer_path,
+                    if i%2==0 {second} else {first}).unwrap();
+                if i%4==0 {std::thread::yield_now();}
+            }
+        });
+        for _ in 0..1500 {
+            let data=fs::read(&path).unwrap();
+            let object:serde_json::Value=serde_json::from_slice(&data)
+                .expect("A live QA reader must never observe truncated JSON");
+            assert_eq!(object["state"],"rtl-editor-caret");
+            assert!(data.as_slice()==first || data.as_slice()==second);
+            std::thread::yield_now();
+        }
+        writer.join().unwrap();
+        // Rename must replace a symlink itself, never follow its target.
+        let external=dir.join("external");
+        fs::write(&external,b"protected").unwrap();
+        std::os::unix::fs::symlink(&external,&path).unwrap_err();
+        fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(&external,&path).unwrap();
+        write_atomic_editor_audit(&path,first).unwrap();
+        assert_eq!(fs::read(&external).unwrap(),b"protected");
+        assert_eq!(fs::read(&path).unwrap(),first);
+        assert!(fs::symlink_metadata(&path).unwrap().file_type().is_file());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(),2,
+            "Temporary QA stages must not accumulate");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
 /// Synthetic, explicitly opted-in evidence of the *actual native editor*
 /// caret being projected into the separate shaped preview. No source text,
 /// profile, path, script, key identity or raw selection is recorded.
@@ -173,8 +244,8 @@ pub fn write_rtl_editor_caret_audit(index:usize,total:usize,
         "caret_y_px":caret.map(|(_,y)|y.round() as i32),
         "selected_graphemes":selected_graphemes,
     });
-    fs::write(path,serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
-        .map_err(|e|e.to_string())
+    write_atomic_editor_audit(std::path::Path::new(&path),
+        &serde_json::to_vec_pretty(&report).map_err(|e|e.to_string())?)
 }
 #[cfg(test)]
 mod import_audit_tests {

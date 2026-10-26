@@ -132,21 +132,30 @@ assert(p.state=="custom-import" and p.synthetic and p.script==arg[2] and p.graph
   "Native Wayland imported the wrong RTL reference")
 LUA
   if [[ -n "$native_os_case" ]];then
-    # Import uses the initial US keymap. Switch groups only after the path
-    # has been entered; score the four RTL characters as OS text events.
+    # X11-backed Weston may inherit the parent XKB mapping.
+    # Change only this disposable Xvfb display; emit raw numeric positions.
+    if [[ "$layout" == ara ]];then
+      physical_codes=(39 42 43 46) wrong_code=38
+    else
+      physical_codes=(38 45 30 32) wrong_code=39
+    fi
+    setxkbmap -layout "$layout"
+    setxkbmap -query | grep -Eq "^layout:[[:space:]]+$layout$" ||
+      { echo "Disposable parent XKB layout did not change" >&2;exit 1; }
+    sleep 0.4
     xdotool key --clearmodifiers Alt_L+Shift_L
     sleep 0.35
     xdotool key --clearmodifiers F5
     sleep 0.30
     xdotool key --clearmodifiers F2
     sleep 0.25
-    xdotool key --clearmodifiers "$wrong"
+    xdotool key --clearmodifiers "$wrong_code"
     sleep 0.16
     [[ ! -s "$TYPEFINCH_QA_REPORT" ]] ||
       { echo "Wrong Wayland OS RTL key unexpectedly completed a session" >&2;exit 1; }
     xdotool key --clearmodifiers BackSpace
     sleep 0.15
-    for key in $keys;do
+    for key in "${physical_codes[@]}";do
       xdotool key --clearmodifiers "$key"
       sleep 0.12
     done
@@ -157,7 +166,8 @@ local f=assert(io.open(arg[1],"rb"),"Native RTL Wayland OS score missing")
 local r=assert(json.decode(f:read("*a")));f:close()
 assert(r.synthetic and r.state=="finished" and r.entered==4
   and r.correct==4 and r.accuracy==100,
-  "Native Wayland OS RTL scoring failed: Weston did not deliver the expected committed script")
+  string.format("Native Wayland OS RTL scoring failed: entered=%s correct=%s accuracy=%s state=%s",
+    tostring(r.entered),tostring(r.correct),tostring(r.accuracy),tostring(r.state)))
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local cmd=string.format(
   "sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions'",db)

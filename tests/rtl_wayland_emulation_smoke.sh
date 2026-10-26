@@ -158,6 +158,65 @@ assert(not cfg:find(target,1,true) and not cfg:find(source,1,true),
   "RTL reference or its path leaked into persistent preferences")
 print("Native Weston wl_keyboard RTL Emulated PASS: "..layout..", 4/4 after one corrected mistake")
 LUA
+  # A second session on the same native Wayland surface must score an
+  # actual hard newline through Return, not only four single-line letters.
+  if [[ "$layout" == ara ]];then
+    printf 'سل\nام' >"$tmp/$layout/multiline.txt"
+    multiline_keys=(s g Return h l)
+  else
+    printf 'של\nום' >"$tmp/$layout/multiline.txt"
+    multiline_keys=(a k Return u o)
+  fi
+  xdotool windowfocus "$parent" 2>/dev/null || true
+  xdotool key --clearmodifiers F11
+  sleep 0.35
+  xdotool type --clearmodifiers --delay 22 "$tmp/$layout/multiline.txt"
+  xdotool key --clearmodifiers Return
+  sleep 0.6
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Native RTL multiline import missing")
+local p=assert(json.decode(f:read("*a")));f:close()
+assert(p.synthetic and p.state=="custom-import" and p.script==arg[2]
+  and p.graphemes==5,"RTL multiline import did not retain hard line break")
+LUA
+  rm -f -- "$TYPEFINCH_QA_REPORT"
+  xdotool key --clearmodifiers F5
+  sleep 0.3
+  xdotool key --clearmodifiers F2
+  sleep 0.3
+  for key in "${multiline_keys[@]}";do
+    xdotool key --clearmodifiers "$key"
+    sleep 0.12
+  done
+  sleep 0.75
+  lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" "$tmp/$layout/multiline.txt" <<'LUA'
+local json=require("dkjson")
+local report,layout,source=assert(arg[1]),assert(arg[2]),assert(arg[3])
+local f=assert(io.open(report,"rb"),"No multiline Wayland RTL score")
+local r=assert(json.decode(f:read("*a")));f:close()
+assert(r.synthetic and r.state=="finished" and r.entered==5
+  and r.correct==5 and r.accuracy==100,
+  "Native Wayland RTL newline scoring failed")
+local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local p=assert(io.popen(string.format(
+  "sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions ORDER BY id'",db),"r"))
+local rows=assert(json.decode(p:read("*a")));assert(p:close())
+assert(#rows==2 and rows[1].entered==4 and rows[1].correct==4
+  and rows[1].mistakes==1 and rows[1].corrections==1,
+  "Prior corrected RTL score changed after second import")
+assert(rows[2].layout==layout and rows[2].input_mode=="Emulated"
+  and rows[2].test_mode=="custom" and rows[2].entered==5
+  and rows[2].correct==5 and rows[2].attempts==5
+  and rows[2].mistakes==0 and rows[2].corrections==0,
+  "Multiline RTL score provenance mismatch")
+local pf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
+local prefs=pf:read("*a");pf:close()
+local sf=assert(io.open(source,"rb"));local content=sf:read("*a");sf:close()
+assert(not prefs:find(content,1,true) and not prefs:find(source,1,true),
+  "RTL multiline source or local path leaked into persistent preferences")
+print("Native RTL Wayland multiline Enter PASS: "..layout..", 5/5; two isolated scores")
+LUA
   # Keep the final scored child surface alive through the acceptance
   # verdict. Weston 13 can SIGSEGV during rapid child-client teardown;
   # cleanup owns the orderly final app/compositor shutdown. Only a

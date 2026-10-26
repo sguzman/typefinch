@@ -1934,7 +1934,7 @@ impl Typefinch {
         if self.session.state!=State::Finished {return;}
         let Some(trial)=self.controlled_trial.take() else{return;};
         let source=match trial.stage {
-            TrialStage::Immediate=>trial.held_out_source().to_owned(),
+            TrialStage::Immediate if trial.immediate_ready()=>trial.held_out_source().to_owned(),
             TrialStage::Delayed if trial.delay_ready()=>trial.held_out_source().to_owned(),
             _=>{self.controlled_trial=Some(trial);return;},
         };
@@ -1945,6 +1945,9 @@ impl Typefinch {
             let stage=trial.stage;
             let arm=trial.arm;
             let ready=trial.delay_ready();
+            let immediate_ready=trial.immediate_ready();
+            let immediate_expired=trial.immediate_expired();
+            let delayed_expired=trial.delay_expired();
             let baseline=trial.baseline;
             let immediate=trial.immediate;
             let delayed=trial.delayed;
@@ -1954,11 +1957,17 @@ impl Typefinch {
                     if arm==Arm::Adaptive {"adaptive"} else {"non-adaptive"}));
                 match stage {
                     TrialStage::Practice=>ui.label("Complete the practice passage."),
-                    TrialStage::Immediate=>ui.label("Practice finished. Retest the original baseline (previously seen text)."),
-                    TrialStage::Delayed=>ui.label(if ready {
-                        "One-hour minimum interval verified; delayed retest available."
+                    TrialStage::Immediate=>ui.label(if immediate_expired {
+                        "Pilot expired: the immediate retest was not completed within 10 minutes of practice. Discard this pilot."
                     }else{
-                        "Keep Typefinch open; delayed retest unlocks one hour after the immediate score."
+                        "Practice finished. Complete the original-baseline retest within 10 minutes."
+                    }),
+                    TrialStage::Delayed=>ui.label(if delayed_expired {
+                        "Pilot expired: delayed retest exceeded the 24-hour maximum. Discard this pilot."
+                    }else if ready {
+                        "One-to-24-hour retention window is open; delayed retest available."
+                    }else{
+                        "Keep Typefinch open; retention retest unlocks one hour after the immediate score."
                     }),
                     TrialStage::Complete=>ui.label("Completed. Outcomes remain descriptive, not evidence of efficacy."),
                 };
@@ -1978,14 +1987,17 @@ impl Typefinch {
                     }
                 }
                 if self.session.state==State::Finished {
-                    if stage==TrialStage::Immediate && ui.button("Retest original baseline now").clicked() {
-                        self.advance_controlled_pilot(ctx);
+                    if stage==TrialStage::Immediate {
+                        if ui.add_enabled(immediate_ready,egui::Button::new("Retest original baseline now")).clicked() {
+                            self.advance_controlled_pilot(ctx);
+                        }
+                        if immediate_ready {ctx.request_repaint_after(Duration::from_secs(15));}
                     }
                     if stage==TrialStage::Delayed {
                         if ui.add_enabled(ready,egui::Button::new("Retest original baseline after delay")).clicked() {
                             self.advance_controlled_pilot(ctx);
                         }
-                        if !ready {ctx.request_repaint_after(Duration::from_secs(30));}
+                        if !ready && !delayed_expired {ctx.request_repaint_after(Duration::from_secs(30));}
                     }
                 }
                 if stage==TrialStage::Complete {

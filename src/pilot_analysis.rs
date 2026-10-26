@@ -87,7 +87,9 @@ impl Pilot {
         Ok(())
     }
 }
-fn read_local(path:&PathBuf)->Result<(Pilot,(u64,u64)),String> {
+/// Strict fixed-size no-follow local reader shared by both completed
+/// aggregate comparison and public-cohort exclusion summaries.
+pub(crate) fn read_local_bytes(path:&PathBuf)->Result<(Vec<u8>,(u64,u64)),String> {
     // A caller must provide every input path. Never follow symlinks, read a
     // directory/device, or print file content/path in diagnostic errors.
     let mut file=OpenOptions::new().read(true)
@@ -104,6 +106,10 @@ fn read_local(path:&PathBuf)->Result<(Pilot,(u64,u64)),String> {
     if data.len() as u64>MAX_FILE_BYTES {
         return Err("Study aggregate file exceeds 32 KiB".into());
     }
+    Ok((data,identity))
+}
+fn read_local(path:&PathBuf)->Result<(Pilot,(u64,u64)),String> {
+    let (data,identity)=read_local_bytes(path)?;
     let item: Pilot=serde_json::from_slice(&data)
         .map_err(|_|"Study aggregate is not valid schema-4 JSON")?;
     item.check()?;

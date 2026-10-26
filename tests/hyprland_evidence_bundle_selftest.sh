@@ -36,6 +36,7 @@ jq -n --arg sha "$sha" --argjson images "$hashes" '{
 chmod 600 "$dir/typefinch-hyprland-receipt.json"
 original="$tmp/original"
 cp "$dir/typefinch-hyprland-receipt.json" "$original"
+cp "$dir/typefinch-hyprland-help.png" "$tmp/help-original.png"
 bash tests/verify_hyprland_evidence.sh "$dir" >"$tmp/safe-result"
 grep -q 'PRIVATE_HYPRLAND_EVIDENCE_STRUCTURALLY_VALID' "$tmp/safe-result"
 refused(){
@@ -63,8 +64,8 @@ refused
 chmod 700 "$dir"
 printf 'tampered' >>"$dir/typefinch-hyprland-help.png"
 refused
-# Restore image to its previously hashed bytes without trusting user input.
-convert -size 800x600 xc:lightgray "$dir/typefinch-hyprland-help.png"
+# Restore exact original bytes. PNG encoders may embed variable metadata.
+cp "$tmp/help-original.png" "$dir/typefinch-hyprland-help.png"
 chmod 600 "$dir/typefinch-hyprland-help.png"
 bash tests/verify_hyprland_evidence.sh "$dir" >"$tmp/safe-result"
 ln -s "$tmp/private-image" "$dir/extra"

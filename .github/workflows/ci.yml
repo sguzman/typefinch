@@ -75,6 +75,8 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/starter_layout_gui_smoke.sh
       - name: Native adaptive drill and identical-source retest without private-data persistence
         run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/training_gui_smoke.sh
+      - name: Native opt-in held-out pilot and locked delayed-retention gate
+        run: xvfb-run -a -s "-screen 0 1280x900x24" bash tests/controlled_pilot_gui_smoke.sh
       - name: Verify headless version and help flags
         run: |
           ./target/debug/typefinch --version | grep -Fx "typefinch $(awk -F '"' '/^version = / {print $2; exit}' Cargo.toml)"

@@ -99,6 +99,14 @@ input or source context, identical participant identity, unequal exposure and
 balanced synthetic random-byte assignments. Missing denominators cannot be
 silently treated as zero.
 
+**Randomization/eligibility safeguard:** the two in-memory candidate
+interventions are constructed and validated before selecting a random arm.
+The native synthetic GUI test still forces either arm only in an isolated
+disposable QA session. No arm-specific failed enrollment is silently
+counted as a successful randomized assignment. This establishes a
+mechanical protection against differential arm attrition, not balanced
+real-world recruitment or causal effectiveness.
+
 **Still missing:** real human participant
 recruitment, controlled time-on-task and effort equivalence, novel-reference
 transfer, cross-restart
@@ -112,10 +120,18 @@ automatically persisted or sent to GitHub. **T502 remains unaccepted**.
 
 After finishing a Custom passage with observed missed characters, the
 native Typefinch interface now offers a **default-off consent checkbox** and
-a **Start randomized transfer pilot** action. The app chooses an adaptive
-missed-pattern drill or a fixed, non-adaptive comparison with the same
-displayed grapheme and whitespace counts. It does **not** establish equal
-practice time, effort, difficulty, fluency or a controlled population.
+a **Start randomized transfer pilot** action. **Before** arm assignment, the
+app checks that BOTH the adaptive drill and the fixed non-adaptive comparison
+are valid for the SAME baseline. If either overlaps the complete baseline,
+is empty/invalid, or equals the other practice passage, neither arm is
+assigned. This prevents arm-specific rejection after randomization.
+The fixed comparator matches displayed grapheme and whitespace counts but
+does **not** establish equal practice time, effort, difficulty, fluency or a
+controlled population. Its fixed QWERTY alphabet is currently appropriate
+only for Latin-script content, including accented Mexican Spanish; the pilot
+therefore declines Arabic, Hebrew, CJK, emoji and mixed-script sources until
+a genuinely comparable control is implemented. Ordinary Unicode typing and
+drill features are unaffected.
 
 After a valid practice score is saved, the app permits one **immediate
 held-out retest** of the *original* source. After that score is saved, it

@@ -104,29 +104,36 @@ window_is_clear(){
 layer_surfaces_clear(){
   jq -en --slurpfile layers "$1" --slurpfile monitors "$2" --arg rect "$3" '
     def integer: type=="number" and floor==.;
+    # Hyprland monitor x/y and layer x/y are logical compositor pixels;
+    # monitor width/height are physical pixels. Their quotient by scale
+    # must be integral before comparing rectangles with grim -g.
+    # Rotated displays are denied until their transformed extents are
+    # independently validated: a guessed crop is never screenshot evidence.
+    def valid_monitor:
+      (.name|type)=="string" and (.name|length)>0 and
+      (.x|integer) and (.y|integer) and (.width|integer) and
+      (.height|integer) and .width>0 and .height>0 and
+      (.scale|type)=="number" and .scale>0 and .scale<=8 and
+      (.transform|integer) and .transform==0 and
+      ((.width/.scale)|integer) and ((.height/.scale)|integer);
+    def logical_w: .width/.scale;
+    def logical_h: .height/.scale;
     ($rect | capture("^(?<x>-?[0-9]+),(?<y>-?[0-9]+) (?<w>[1-9][0-9]*)x(?<h>[1-9][0-9]*)$")
       | map_values(tonumber)) as $w |
     ($layers[0]) as $ls | ($monitors[0]) as $ms |
     if ($ls|type)!="object" or ($ms|type)!="array" then false
     else
       ($ms|length)>0 and
+      all($ms[];valid_monitor) and
       ([$ms[]|.name] | unique | length)==($ms|length) and
       ($ls|keys|sort)==([$ms[]|.name]|sort) and
-      # Window-only screenshots must occupy exactly ONE physical logical
-      # monitor: no cross-display crop, unaccounted gap or mirrored region.
-      # Reject both rectangles crossing monitor seams and ambiguous overlap.
-      all($ms[]; (.x|integer) and (.y|integer) and
-        (.width|integer) and (.height|integer) and
-        .width>0 and .height>0) and
+      # Exactly one *logical* monitor must fully own the crop, and the
+      # rectangle must not overlap another monitor even at a scaled seam.
       ([$ms[] | select($w.x>=.x and $w.y>=.y and
-        $w.x+$w.w<=.x+.width and $w.y+$w.h<=.y+.height)]|length)==1 and
-      ([$ms[] | select($w.x<.x+.width and $w.x+$w.w>.x and
-        $w.y<.y+.height and $w.y+$w.h>.y)]|length)==1 and
+        $w.x+$w.w<=.x+logical_w and $w.y+$w.h<=.y+logical_h)]|length)==1 and
+      ([$ms[] | select($w.x<.x+logical_w and $w.x+$w.w>.x and
+        $w.y<.y+logical_h and $w.y+$w.h>.y)]|length)==1 and
       all($ms[]; . as $mon |
-        ($mon.name|type)=="string" and ($mon.name|length)>0 and
-        ($mon.x|integer) and ($mon.y|integer) and
-        ($mon.width|integer) and ($mon.height|integer) and
-        $mon.width>0 and $mon.height>0 and
         ($ls[$mon.name].levels|type)=="object" and
         all(["2","3"][]; . as $lvl |
           ($ls[$mon.name].levels[$lvl]|type)=="array" and
@@ -341,8 +348,8 @@ if [[ "${1:-}" == --self-test ]];then
   # Typefinch must invalidate screenshots. Monitor-local coordinates on a
   # second display must be translated to compositor-global coordinates.
   cat >"$fixture_dir/monitors.json" <<'JSON'
-[{"name":"A","x":0,"y":0,"width":1920,"height":1080},
- {"name":"B","x":1920,"y":0,"width":1920,"height":1080}]
+[{"name":"A","x":0,"y":0,"width":1920,"height":1080,"scale":1,"transform":0},
+ {"name":"B","x":1920,"y":0,"width":1920,"height":1080,"scale":1,"transform":0}]
 JSON
   cat >"$fixture_dir/layers.json" <<'JSON'
 {"A":{"levels":{"0":[],"1":[],"2":[{"x":0,"y":0,"w":1920,"h":20}],"3":[]}},
@@ -367,6 +374,34 @@ JSON
   for badrect in '1800,30 300x400' '4000,30 300x400' '-40,30 100x100';do
     if layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors.json" "$badrect";then
       echo "Out-of-bounds or cross-monitor screenshot crop accepted" >&2;exit 1
+    fi
+  done
+  # A 3840x2160 output at scale 2 occupies only 1920x1080 logical
+  # pixels. The old physical-width check wrongly allowed off-monitor
+  # captures on single-display HiDPI setups.
+  jq '.[0].width=3840 | .[0].height=2160 | .[0].scale=2 |
+    . = [.[0]]' "$fixture_dir/monitors.json" >"$fixture_dir/hidpi-single.json"
+  jq 'del(.B)' "$fixture_dir/layers.json" >"$fixture_dir/layers-single.json"
+  layer_surfaces_clear "$fixture_dir/layers-single.json" "$fixture_dir/hidpi-single.json" \
+    '1400,50 300x400' || { echo "Safe HiDPI logical crop refused" >&2;exit 1; }
+  if layer_surfaces_clear "$fixture_dir/layers-single.json" "$fixture_dir/hidpi-single.json" \
+      '2100,50 300x400';then
+    echo "Physical-pixel-only HiDPI crop escaped logical monitor bounds" >&2;exit 1
+  fi
+  jq '.[0].width=3840 | .[0].height=2160 | .[0].scale=2' \
+    "$fixture_dir/monitors.json" >"$fixture_dir/hidpi-dual.json"
+  if layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/hidpi-dual.json" \
+      '1850,50 150x400';then
+    echo "Scaled logical monitor seam crossed by screenshot" >&2;exit 1
+  fi
+  layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/hidpi-dual.json" \
+    '2400,500 300x400' || { echo "Safe adjacent unscaled monitor refused" >&2;exit 1; }
+  for change in '.[0].scale=0' '.[0].scale="2"' 'del(.[0].scale)' \
+    '.[0].width=1921' '.[0].transform=1' 'del(.[0].transform)';do
+    jq "$change" "$fixture_dir/hidpi-single.json" >"$fixture_dir/hidpi-unsafe.json"
+    if layer_surfaces_clear "$fixture_dir/layers-single.json" \
+       "$fixture_dir/hidpi-unsafe.json" '1400,50 300x400';then
+      echo "Malformed scale, fractional extent or rotation enabled capture" >&2;exit 1
     fi
   done
   jq '.[1].x=1500' "$fixture_dir/monitors.json" >"$fixture_dir/monitors-overlap.json"

@@ -46,8 +46,15 @@ if [[ -n "$native_os_case" ]];then
     "$keymap_groups" >"$tmp/weston.ini"
   weston_options=(--config="$tmp/weston.ini")
 fi
-weston --backend=x11-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" \
-  "${weston_options[@]}" --idle-time=0 --width=1024 --height=768 \
+# This fixture renders one focused Typefinch surface. Weston 13's
+# desktop-shell spawns weston-keyboard and weston-desktop-shell helper
+# clients, and has exhibited pre-score SIGSEGV in hosted Xvfb after repeated
+# RTL compositor starts. Kiosk-shell keeps the exact wl_keyboard/scoring
+# path while avoiding those unrelated desktop-shell processes. Do not hide
+# startup failures or alter any test assertions.
+weston --backend=x11-backend.so --renderer=pixman --shell=kiosk-shell.so \
+  --socket="$WAYLAND_DISPLAY" "${weston_options[@]}" \
+  --idle-time=0 --width=1024 --height=768 \
   --log="$tmp/weston.log" >"$tmp/weston-out.log" 2>&1 &
 weston=$!
 for _ in $(seq 1 120);do

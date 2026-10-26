@@ -3,10 +3,21 @@
 //! The GitHub CLI owns authentication; this code never reads credentials.
 use base64::{engine::general_purpose::STANDARD,Engine as _};
 use serde_json::{json,Value};
-use std::{io::Write,process::{Command,Stdio}};
+use std::{io::{Read,Write},process::{Command,Stdio},thread};
 
 const CARD_PATH:&str="typefinch-profile.svg";
 const MAX_REMOTE_JSON:usize=2_500_000;
+const MAX_REMOTE_STDERR:usize=64*1024;
+
+/// Enforce response bounds *while* consuming a pipe, not after an
+/// unbounded wait_with_output allocation. The extra byte distinguishes
+/// an exact-size response from an oversized or malicious API reply.
+fn read_bounded<R:Read>(reader:R,limit:usize)->Result<Vec<u8>,()> {
+    let mut result=Vec::new();
+    reader.take((limit+1) as u64).read_to_end(&mut result).map_err(|_|())?;
+    if result.len()>limit {return Err(());}
+    Ok(result)
+}
 
 #[derive(Debug,PartialEq,Eq)]
 pub enum ApiFailure {NotFound,Unavailable}
@@ -27,21 +38,32 @@ impl Gh {
             .stdin(if body.is_some(){Stdio::piped()}else{Stdio::null()})
             .stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child=cmd.spawn().map_err(|_|ApiFailure::Unavailable)?;
+        let stdout=child.stdout.take().ok_or(ApiFailure::Unavailable)?;
+        let stderr=child.stderr.take().ok_or(ApiFailure::Unavailable)?;
+        let out=thread::spawn(move||read_bounded(stdout,MAX_REMOTE_JSON));
+        let err=thread::spawn(move||read_bounded(stderr,MAX_REMOTE_STDERR));
         if let Some(data)=body {
             let bytes=serde_json::to_vec(data).map_err(|_|ApiFailure::Unavailable)?;
             let Some(mut input)=child.stdin.take() else{return Err(ApiFailure::Unavailable)};
-            if input.write_all(&bytes).is_err() {return Err(ApiFailure::Unavailable);}
+            if input.write_all(&bytes).is_err(){
+                let _=child.kill();
+                let _=child.wait();
+                return Err(ApiFailure::Unavailable);
+            }
             drop(input);
         }
-        let result=child.wait_with_output().map_err(|_|ApiFailure::Unavailable)?;
-        if !result.status.success() {
-            let error=String::from_utf8_lossy(&result.stderr);
+        let status=child.wait().map_err(|_|ApiFailure::Unavailable)?;
+        let stdout=out.join().map_err(|_|ApiFailure::Unavailable)?
+            .map_err(|_|ApiFailure::Unavailable)?;
+        let stderr=err.join().map_err(|_|ApiFailure::Unavailable)?
+            .map_err(|_|ApiFailure::Unavailable)?;
+        if !status.success() {
+            let error=String::from_utf8_lossy(&stderr);
             return Err(if error.contains("HTTP 404") {
                 ApiFailure::NotFound
             } else {ApiFailure::Unavailable});
         }
-        if result.stdout.len()>MAX_REMOTE_JSON {return Err(ApiFailure::Unavailable);}
-        serde_json::from_slice(&result.stdout).map_err(|_|ApiFailure::Unavailable)
+        serde_json::from_slice(&stdout).map_err(|_|ApiFailure::Unavailable)
     }
 }
 impl Api for Gh {
@@ -263,6 +285,15 @@ mod tests {
     fn uploaded()->Value{json!({"content":{"path":"typefinch-profile.svg"}})}
     fn verified_card()->Value{json!({"type":"file","sha":"a".repeat(40),
         "encoding":"base64","content":STANDARD.encode(DEMO)})}
+    #[test] fn api_subprocess_output_is_bounded_before_allocation(){
+        use std::io::Cursor;
+        assert_eq!(read_bounded(Cursor::new(b"1234"),4).unwrap(),b"1234");
+        assert!(read_bounded(Cursor::new(b"12345"),4).is_err());
+        let huge=vec![b'x';MAX_REMOTE_STDERR+1];
+        assert!(read_bounded(Cursor::new(huge),MAX_REMOTE_STDERR).is_err());
+        let example=serde_json::to_vec(&repo_info()).unwrap();
+        assert_eq!(read_bounded(Cursor::new(&example),MAX_REMOTE_JSON).unwrap(),example);
+    }
     #[test] fn rejects_nonconforming_target_and_missing_consent_without_api_access(){
         for target in ["owner/repo/README.md","https://github.com/owner/repo",
             "owner/repo?x=1","evil;rm/repo","owner/..","-/repo","owner/repo and more"]{

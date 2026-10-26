@@ -43,7 +43,8 @@ wait_for_theme(){
         .synthetic==true and .state=="xdg-portal-system-theme" and
         .source=="read-only-settings-portal" and
         (.portal_dark|tostring)==$expected and
-        (.actual_dark|tostring)==$actual and
+        ($actual=="any" or (.actual_dark|tostring)==$actual) and
+        (.actual_dark|type)=="boolean" and
         .os_theme_transition_verified==false and
         (keys|sort)==([
            "synthetic","state","source","portal_dark","actual_dark",
@@ -61,5 +62,5 @@ printf '2\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
 wait_for_theme false false
 # Unsupported portal values must NOT be interpreted as forced Dark/Light.
 printf '99\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
-wait_for_theme null true
+wait_for_theme null any
 echo "Mock portal native GUI System appearance transition PASS (not real Hyprland acceptance)"

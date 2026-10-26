@@ -55,8 +55,7 @@ if grep -Fq "$tmp/" "$tmp/result.json" ||
   echo "Local group comparison disclosed a file path or source text" >&2;exit 1
 fi
 require_refused(){
-  local one="$1" two="$2"
-  if ./target/debug/typefinch --compare-public-pilots "$one" "$two" \
+  if ./target/debug/typefinch --compare-public-pilots "$@" \
     >"$tmp/refused-out" 2>"$tmp/refused-err";then
     echo "Unsafe or incompatible study exports were accepted" >&2;exit 1
   fi
@@ -79,4 +78,9 @@ require_refused "$tmp/a.json" "$tmp/different.json"
 ln -s "$tmp/b.json" "$tmp/alias.json"
 require_refused "$tmp/a.json" "$tmp/alias.json"
 require_refused "$tmp/a.json" "$tmp/a.json"
+# These sets contain both arms and would otherwise appear comparable.
+# Never treat a repeated file path or hard link as another participant.
+require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a.json"
+ln "$tmp/a.json" "$tmp/a-hardlink.json"
+require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a-hardlink.json"
 echo "Offline public pilot analyzer PASS: descriptive two-arm output, strict malformed/private/symlink rejection; synthetic records only"

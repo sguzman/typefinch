@@ -27,6 +27,23 @@ inventory_parity(){
     end
   ' >/dev/null
 }
+# A connected keyboard unplugged, replaced or remapped halfway through
+# native GUI QA must invalidate the starting inventory evidence. Compare
+# normalized rows in local disposable files; ordering is not identity.
+inventory_stable(){
+  jq -en --slurpfile before "$1" --slurpfile after "$2" '
+    def canonical: [.rows[] | {
+      inspection_id,label,reported_active_keymap,
+      configured_layout,configured_variant
+    }] | sort_by(.inspection_id);
+    ($before[0] // null) as $first |
+    ($after[0] // null) as $last |
+    if (($first.rows|type)!="array" or ($last.rows|type)!="array")
+    then false
+    else (($first.rows|length)>0 and ($first|canonical)==($last|canonical))
+    end
+  ' >/dev/null
+}
 # Fail closed when a visible same-workspace Hyprland client intersects the
 # Typefinch capture rectangle. This does not detect layer-shell overlays.
 window_is_clear(){
@@ -165,6 +182,12 @@ if [[ "${1:-}" == --self-test ]];then
   inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/hyprland.json" || exit 1
   jq '.keyboards |= reverse' "$fixture_dir/hyprland.json" >"$fixture_dir/reordered.json"
   inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/reordered.json" || exit 1
+  jq '.rows |= reverse' "$fixture_dir/typefinch.json" >"$fixture_dir/inspector-reordered.json"
+  inventory_stable "$fixture_dir/typefinch.json" "$fixture_dir/inspector-reordered.json" || exit 1
+  jq '.rows[0].configured_layout="changed"' "$fixture_dir/typefinch.json" >"$fixture_dir/inspector-drift.json"
+  if inventory_stable "$fixture_dir/typefinch.json" "$fixture_dir/inspector-drift.json";then
+    echo "Keyboard layout changed mid-QA without invalidating evidence" >&2;exit 1
+  fi
   for change in '.keyboards[0].address="sim:99"' \
     '.keyboards[0].active_keymap="German"' \
     '.keyboards[1].address="sim:01"' \
@@ -232,7 +255,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map, focused-input schema, consented-focus, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -447,6 +470,14 @@ for _ in $(seq 1 30);do
 done
 ((received==1)) ||
   { echo "Focused Wayland shortcut failed to count one typed attempt" >&2;exit 1; }
+# The live keyboard inspector is read-only. Snapshot it again after all
+# compositor shortcuts and reject any hotplug, layout or identity drift.
+./target/debug/typefinch --inspect-keyboards >"$tmp/typefinch-devices-final.json"
+hyprctl -j devices >"$tmp/hyprland-devices-final.json"
+inventory_parity "$tmp/typefinch-devices-final.json" "$tmp/hyprland-devices-final.json" ||
+  { echo "Final Hyprland keyboard inventory parity failed" >&2;exit 1; }
+inventory_stable "$tmp/typefinch-devices.json" "$tmp/typefinch-devices-final.json" ||
+  { echo "Keyboard inventory or active map changed during Hyprland QA" >&2;exit 1; }
 # Opt-in local evidence only. Preflight all targets; never overwrite.
 if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
   out="$TYPEFINCH_QA_OUTPUT_DIR"

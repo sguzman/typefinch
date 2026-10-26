@@ -1017,8 +1017,12 @@ impl Typefinch {
                 // Paste is intentionally disallowed in scored sessions.
                 _ => {}
             }
+            // A Wayland compositor may deliver several key events in the
+            // same frame. Record the first scored attempt *before* the next
+            // event could advance the counter beyond one. This synthetic-only
+            // metadata contains neither keys nor the private reference.
+            let _=crate::qa::write_focused_input_audit(&self.session,&self.session_input_mode);
         }
-        let _=crate::qa::write_focused_input_audit(&self.session,&self.session_input_mode);
     }
     fn reset_custom_editor_history(ctx:&egui::Context) {
         // Importing a new private passage is a document boundary, not a

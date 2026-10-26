@@ -2,6 +2,11 @@
 # Native X11 proof of the experimental local pilot stages using ONLY fixed
 # disposable synthetic input. No participant, real device or efficacy result.
 set -Eeuo pipefail
+qa_arm="${1:-}"
+[[ "$qa_arm" == adaptive || "$qa_arm" == non_adaptive ]] || {
+  echo "Choose a fixed synthetic arm: adaptive or non_adaptive" >&2;exit 2;
+}
+export TYPEFINCH_QA_PILOT_ARM="$qa_arm"
 export LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=x11 XDG_SESSION_TYPE=x11
 tmp="$(mktemp -d)"
 app_pid="" wm_pid=""
@@ -83,6 +88,7 @@ wait_score 1 3 2
 xdotool key --clearmodifiers ctrl+shift+p
 wait_pilot practice
 arm="$(jq -r '.arm' "$TYPEFINCH_QA_PILOT_REPORT")"
+[[ "$arm" == "$qa_arm" ]] || { echo "Synthetic assignment differs from requested test arm" >&2;exit 1; }
 if [[ "$arm" == adaptive ]];then
   passage="b b b b b b b b"
 else

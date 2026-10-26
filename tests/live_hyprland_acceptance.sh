@@ -112,6 +112,16 @@ layer_surfaces_clear(){
       ($ms|length)>0 and
       ([$ms[]|.name] | unique | length)==($ms|length) and
       ($ls|keys|sort)==([$ms[]|.name]|sort) and
+      # Window-only screenshots must occupy exactly ONE physical logical
+      # monitor: no cross-display crop, unaccounted gap or mirrored region.
+      # Reject both rectangles crossing monitor seams and ambiguous overlap.
+      all($ms[]; (.x|integer) and (.y|integer) and
+        (.width|integer) and (.height|integer) and
+        .width>0 and .height>0) and
+      ([$ms[] | select($w.x>=.x and $w.y>=.y and
+        $w.x+$w.w<=.x+.width and $w.y+$w.h<=.y+.height)]|length)==1 and
+      ([$ms[] | select($w.x<.x+.width and $w.x+$w.w>.x and
+        $w.y<.y+.height and $w.y+$w.h>.y)]|length)==1 and
       all($ms[]; . as $mon |
         ($mon.name|type)=="string" and ($mon.name|length)>0 and
         ($mon.x|integer) and ($mon.y|integer) and
@@ -350,6 +360,20 @@ JSON
     "$fixture_dir/layers.json" >"$fixture_dir/layers-disjoint.json"
   layer_surfaces_clear "$fixture_dir/layers-disjoint.json" "$fixture_dir/monitors.json" \
     '18,27 800x600' || { echo "Other-monitor layer incorrectly overlapped" >&2;exit 1; }
+  layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors.json" \
+    '2400,50 500x500' || { echo "Disjoint second-monitor capture refused" >&2;exit 1; }
+  # A compositor-local crop cannot be certified when the Typefinch
+  # rectangle crosses displays or extends outside every known monitor.
+  for badrect in '1800,30 300x400' '4000,30 300x400' '-40,30 100x100';do
+    if layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors.json" "$badrect";then
+      echo "Out-of-bounds or cross-monitor screenshot crop accepted" >&2;exit 1
+    fi
+  done
+  jq '.[1].x=1500' "$fixture_dir/monitors.json" >"$fixture_dir/monitors-overlap.json"
+  if layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors-overlap.json" \
+     '1800,30 100x100';then
+    echo "Ambiguous mirrored/overlapping monitor capture accepted" >&2;exit 1
+  fi
   for change in '.A.levels["3"]=null' 'del(.A.levels)' \
     '.A.levels["2"][0].w="1920"' '.A.levels["2"][0].x=null' \
     'del(.B)';do
@@ -388,7 +412,7 @@ JSON
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry, window/layer-shell occlusion self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry, monitor bounds, window/layer-shell occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -515,6 +539,8 @@ assert_capture_clear(){
 assert_capture_clear
 grim -g "$rect" "$tmp/before.png"
 [[ -s "$tmp/before.png" ]] || exit 1
+# A transient surface/focus transition during capture invalidates
+# the screenshot rather than shipping a stale or unrelated desktop image.
 assert_capture_clear
 # Events target only the Typefinch foreground window.
 send_key(){

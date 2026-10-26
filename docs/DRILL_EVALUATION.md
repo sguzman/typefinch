@@ -80,10 +80,13 @@ delayed retest**. Since the learner types the reference at baseline,
 this is NOT never-seen novel-text transfer; familiarity and retesting
 effects remain possible in both arms. It validates
 identical language, difficulty, duration, input mode, profile and reported
-layout/seat provenance. The delayed stage now uses a *local monotonic
-clock* to require at least one real hour after the immediate retest, while
-the same app process remains running. This does not establish longer-term
-retention after a restart or independent participant attendance.
+layout/seat provenance. A *process-local monotonic clock* requires the
+"immediate" retest to **finish within ten minutes after practice**. Delayed
+retention must finish **between one and 24 real hours after the immediate
+retest** in that same running process. After either deadline the pilot
+cannot proceed, and there is no timestamp reconstruction across restarts.
+These windows are an engineering protocol, not proof of attendance or
+causal learning.
 
 `control_adjusted_transfer` compares two completed, distinct-profile,
 opposite-arm series only when their practice-disjoint reference passage
@@ -135,8 +138,10 @@ drill features are unaffected.
 
 After a valid practice score is saved, the app permits one **immediate
 held-out retest** of the *original* source. After that score is saved, it
-unlocks the **delayed held-out retest** only after at least one real hour on
-the process-local monotonic clock. Quitting the app discards the study.
+unlocks the **delayed held-out retest** only after one real hour and only
+until the 24-hour cutoff on the process-local monotonic clock. The
+immediate retest has a ten-minute completion deadline after practice.
+Quitting the app discards the study.
 Aborting, restarting, editing the source, losing focus, changing profile,
 input mode, or keyboard provenance invalidates the active study. No global
 input capture or device-level keystroke attribution is added.
@@ -152,16 +157,18 @@ errors, profile identifiers, configured layout strings, keyboard addresses,
 timestamps and personal file paths. A discarded/incomplete study has no
 record to export. Data are neither uploaded nor automatically persisted.
 
-The version-2 export additionally reports the full reference-opportunity
-count and `coverage_policy="all_reference_positions_reached"`. The local
-pilot rejects a timed stage if any reference position was never reached,
+The version-3 export additionally reports the full reference-opportunity
+count, `coverage_policy="all_reference_positions_reached"`, predeclared
+immediate/retention windows, and the actual monotonic delayed interval
+(`actual_retention_gap_ms`). The local pilot rejects a timed stage if any
+reference position was never reached,
 although its normal local aggregate score still remains valid. This prevents
 partial passage selection from falsely improving an observed error fraction,
 but also excludes slow/noncompleting participants from completed-pilot
 summaries. Such attrition can bias a study and **must be reported**, not hidden
-or interpreted as improved training efficacy. Previous schema-1 exports do
-not assert full-reference coverage and cannot silently be pooled with
-schema-2 observations.
+or interpreted as improved training efficacy. Previous schema-1 exports do not assert full-reference coverage, and
+schema-2 exports lack the bounded timing window. Neither can silently
+be pooled with schema-3 observations.
 
 The export explicitly marks `causal_claim=false` and
 `control_adjusted=false`. It cannot be treated as a controlled result

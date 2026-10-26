@@ -3,6 +3,29 @@
 use crate::engine::Session;
 use std::{env, fs};
 
+/// This synthetic-only signal drives the native GUI pilot smoke fixture.
+/// Never emit reference/practice text, profile IDs, devices, or a real study.
+/// The two QA environment variables and fixed disposable source must all match.
+pub fn write_synthetic_pilot_audit(held_out:&str,
+    arm:crate::training::Arm,stage:crate::training::TrialStage)->Result<(),String> {
+    if held_out!="aba" || env::var_os("TYPEFINCH_QA_REPORT").is_none() {return Ok(());}
+    let Some(path)=env::var_os("TYPEFINCH_QA_PILOT_REPORT") else{return Ok(());};
+    let arm=match arm {
+        crate::training::Arm::Adaptive=>"adaptive",
+        crate::training::Arm::NonAdaptive=>"non_adaptive",
+    };
+    let stage=match stage {
+        crate::training::TrialStage::Practice=>"practice",
+        crate::training::TrialStage::Immediate=>"immediate",
+        crate::training::TrialStage::Delayed=>"delayed",
+        crate::training::TrialStage::Complete=>"complete",
+    };
+    let bytes=serde_json::to_vec_pretty(&serde_json::json!({
+        "synthetic":true,"source":"fixed-disposable-fixture",
+        "arm":arm,"stage":stage,"causal_claim":false
+    })).map_err(|e|e.to_string())?;
+    fs::write(path,bytes).map_err(|e|e.to_string())
+}
 pub fn write_smoke_report(session: &Session, completed_tests: u32) -> Result<(), String> {
     let Some(path) = env::var_os("TYPEFINCH_QA_REPORT") else { return Ok(()); };
     let score = session.score();

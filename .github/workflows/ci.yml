@@ -29,6 +29,10 @@ jobs:
           done
           git diff --check HEAD
       - name: Native dependencies
+        # Bound package-manager stalls; otherwise a hung mirror blocks all
+        # subsequent main CI under the serial acceptance-workflow policy.
+        # This is a failure deadline, never a success bypass or skip.
+        timeout-minutes: 10
         run: |
           sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends weston x11-xkb-utils libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox xclip lua5.4 lua-dkjson sqlite3 libxml2-utils fonts-noto-core fonts-noto-cjk

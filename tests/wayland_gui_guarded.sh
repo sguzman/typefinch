@@ -16,6 +16,8 @@ weston_pre_score_crash(){
   ! grep -F 'Native JIS physical mismatch' "$log" >/dev/null &&
   ! grep -F 'Native Wayland RTL physical-position scoring failed' "$log" >/dev/null &&
   ! grep -F 'Native Weston wl_keyboard RTL Emulated PASS:' "$log" >/dev/null &&
+  ! grep -F 'Native Weston RTL OS-input XKB group PASS:' "$log" >/dev/null &&
+  ! grep -F 'Native Wayland OS RTL scoring failed' "$log" >/dev/null &&
   ! grep -F 'Native German Wayland physical mismatch' "$log" >/dev/null &&
   ! grep -F 'Native Weston wl_keyboard German RightAlt and ISO 102nd PASS:' "$log" >/dev/null &&
   { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null ||
@@ -75,6 +77,8 @@ if [[ "${1:-}" == --self-test ]];then
     'Native JIS physical mismatch' \
     'Native Wayland RTL physical-position scoring failed' \
     'Native Weston wl_keyboard RTL Emulated PASS:' \
+    'Native Weston RTL OS-input XKB group PASS:' \
+    'Native Wayland OS RTL scoring failed' \
     'Native German Wayland physical mismatch' \
     'Native Weston wl_keyboard German RightAlt and ISO 102nd PASS:';do
     printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
@@ -99,7 +103,7 @@ trap 'rm -f "$log"' EXIT
 # strict no-retry-after-score rule by testing each language in a fresh
 # complete compositor run. Neither score can satisfy the other's gate.
 segments=("")
-if [[ "${1:-}" == --rtl ]];then segments=(ara il);fi
+if [[ "${1:-}" == --rtl ]];then segments=(ara il ara-os il-os);fi
 for segment in "${segments[@]}";do
   passed=0
   for attempt in 1 2 3;do

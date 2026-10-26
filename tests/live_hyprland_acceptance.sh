@@ -81,6 +81,18 @@ if [[ "${1:-}" == --self-test ]];then
   [[ "$(lua_shortcut '' F1 42)" == 'hl.dsp.send_shortcut({ mods = "", key = "F1", window = "pid:42" })' ]] || exit 1
   hypr_mode=lua
   if hypr_focus_pid 0 >/dev/null 2>&1;then echo 'Invalid target PID accepted' >&2;exit 1;fi
+  # Probe succeeds only for the actual no-op dispatcher, not merely an
+  # installed Hyprland version or an available Lua REPL.
+  hyprctl(){
+    if [[ "$*" == "dispatch hl.dsp.no_op()" ]];then printf 'ok\n';return 0;fi
+    printf 'error\n';return 1
+  }
+  probe="$(hyprctl dispatch 'hl.dsp.no_op()')" || exit 1
+  [[ "$probe" == ok ]] || exit 1
+  if hyprctl dispatch 'hl.dsp.focus({ workspace = "3" })' >/dev/null 2>&1;then
+    echo "Fixture falsely allowed non-no-op dispatch" >&2;exit 1
+  fi
+  unset -f hyprctl
   fixture='[{"pid":21,"at":[1,2],"size":[3,4]},{"pid":42,"at":[18,27],"size":[800,600]}]'
   rect="$(jq -nr --argjson rows "$fixture" --argjson pid 42 \
     '$rows | first(.[] | select(.pid==$pid) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])")')"
@@ -145,20 +157,15 @@ for cmd in cargo hyprctl jq grim compare;do
   command -v "$cmd" >/dev/null || { echo "Missing QA dependency: $cmd" >&2;exit 2; }
 done
 [[ -f Cargo.toml && -f rust-toolchain.toml ]] || { echo "Run from Typefinch root" >&2;exit 2; }
-# Read-only capability probe; never test by dispatching an input key to
-# somebody else's foreground window.
+# A no-op dispatcher probes the *active configuration's* Lua dispatch
+# interface. Hyprland 0.55 can run Lua OR legacy configs, independently of
+# compositor version. No keyboard, focus, workspace or settings are changed.
+# A legacy fallback can only focus the disposable app's explicit PID;
+# the script verifies focus again before any QA shortcut.
 hypr_mode=legacy
-if hyprctl repl 'type(hl)' 2>/dev/null | grep -Eq '(^|[[:space:]])table([[:space:]]|$)';then
+if probe="$(hyprctl dispatch 'hl.dsp.no_op()' 2>/dev/null)" &&
+   [[ "$probe" == ok ]];then
   hypr_mode=lua
-else
-  tag="$(hyprctl -j version | jq -r '.tag // empty')"
-  [[ "$tag" =~ ^v?([0-9]+)\.([0-9]+) ]] ||
-    { echo "Cannot determine Hyprland dispatcher generation" >&2;exit 2; }
-  major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
-  if ((10#$major>0 || 10#$minor>=55));then
-    echo "Modern Hyprland Lua dispatcher probe failed; refusing legacy input" >&2
-    exit 2
-  fi
 fi
 tmp="$(mktemp -d)"
 app='' previous='' workspace=''

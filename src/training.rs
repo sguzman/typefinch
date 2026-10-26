@@ -4,6 +4,7 @@
 use crate::{engine::{Language,OpportunityCounts,Score,Session,State,TestMode,WordDifficulty},layouts::Mode};
 use std::time::Duration;
 use unicode_normalization::UnicodeNormalization;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum Stage { Drill, Retest, Compared }
@@ -113,6 +114,29 @@ impl Arm {
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum TrialStage { Practice, Immediate, Delayed, Complete }
 
+/// Generate a *length-matched* local non-adaptive comparator with identical
+/// whitespace boundaries. It does not adapt to observed mistakes, and this
+/// matching alone cannot equalize effort, time, language or cognitive load.
+pub fn neutral_practice(adaptive:&str,held_out:&str)->Option<String> {
+    if adaptive.is_empty() || held_out.is_empty() {return None;}
+    let original=held_out.nfc().collect::<String>();
+    for alphabet in ["asdfjkl;","qwertyuiop","1234567890"] {
+        let mut index=0;
+        let candidate=adaptive.graphemes(true).map(|g|{
+            if g.chars().all(char::is_whitespace) {g.to_owned()}
+            else {
+                let value=alphabet.chars().nth(index%alphabet.len()).unwrap();
+                index+=1;
+                value.to_string()
+            }
+        }).collect::<String>();
+        if !candidate.nfc().collect::<String>().contains(&original) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub struct TransferSample {
     pub opportunities:OpportunityCounts,
@@ -182,6 +206,17 @@ impl ControlledTrial {
             baseline:TransferSample::from_session(baseline)?,
             practiced:None,immediate:None,delayed:None,immediate_at:None,
         })
+    }
+    pub fn practice_source(&self)->&str {&self.practice}
+    pub fn held_out_source(&self)->&str {&self.held_out}
+    pub fn same_context(&self,profile_id:&str,layout:&str,
+        recorded_layout:&str,input:Mode)->bool {
+        self.profile_id==profile_id && self.layout==layout
+            && self.recorded_layout==recorded_layout && self.input==input
+    }
+    pub fn delay_ready(&self)->bool {
+        self.stage==TrialStage::Delayed && self.immediate_at.is_some_and(|time|
+            time.elapsed()>=Duration::from_secs(3600))
     }
     fn valid(&self,session:&Session,source:&str,profile_id:&str,layout:&str,
         recorded_layout:&str,input:Mode)->bool {
@@ -396,6 +431,22 @@ mod tests {
                 }
             }
         }
+    }
+    #[test] fn neutral_control_is_length_and_whitespace_matched_without_error_adaptation() {
+        use unicode_segmentation::UnicodeSegmentation;
+        let adaptive="é q\u{301} q 🙂\nש";
+        let neutral=neutral_practice(adaptive,"é q\u{301} q 🙂\nש").unwrap();
+        assert_eq!(adaptive.graphemes(true).count(),neutral.graphemes(true).count());
+        let a=adaptive.graphemes(true).collect::<Vec<_>>();
+        let n=neutral.graphemes(true).collect::<Vec<_>>();
+        for (source,control) in a.iter().zip(&n) {
+            assert_eq!(source.chars().all(char::is_whitespace),
+                control.chars().all(char::is_whitespace));
+        }
+        assert!(!neutral.contains("é q\u{301} q 🙂\nש"));
+        assert_eq!(neutral_practice("aaa","asdfjkl;"),Some("asd".into()));
+        assert!(neutral_practice("","aaa").is_none());
+        assert!(neutral_practice("aaa","").is_none());
     }
     fn synthetic_custom(reference:&str,typed:&str)->Session {
         let mut session=Session::new_with_custom(0,TestMode::Custom,reference);

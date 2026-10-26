@@ -77,9 +77,10 @@ generator). It rejects the exact practice passage as a held-out source. The
 test sequence is **held-out baseline → different practice passage → same
 held-out immediate retest → same held-out delayed retest**. It validates
 identical language, difficulty, duration, input mode, profile and reported
-layout/seat provenance. The delayed stage requires a *caller-reported* elapsed
-interval of at least one hour; this mechanism **cannot independently attest
-wall-clock retention**.
+layout/seat provenance. The delayed stage now uses a *local monotonic
+clock* to require at least one real hour after the immediate retest, while
+the same app process remains running. This does not establish longer-term
+retention after a restart or independent participant attendance.
 
 `control_adjusted_transfer` compares two completed, distinct-profile,
 opposite-arm series only when their configured context and observed practice
@@ -92,8 +93,8 @@ balanced synthetic random-byte assignments. Missing denominators cannot be
 silently treated as zero.
 
 **Not yet implemented:** an in-app enrollment/consent UI, matched
-non-adaptive passage generation, trusted time-on-task matching, reliable
-real-world retention scheduling, crossover/order controls, preregistered
+non-adaptive passage generation, trusted time-on-task matching, cross-restart
+retention scheduling, crossover/order controls, preregistered
 analysis with uncertainty, real participant recruitment or any evidence of
 better learning. These types are not attached to existing `FollowUp` scores
 and are not exported, persisted or sent to GitHub. Pure unit tests cannot

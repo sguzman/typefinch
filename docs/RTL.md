@@ -6,6 +6,28 @@
 
 **Boundary:** these tests establish the documented synthetic X11 and nested Wayland scenarios; they do not establish arbitrary complex BiDi editing, real Hyprland/focus/IME candidate overlays, or physical-keyboard attribution. T804's broader RTL acceptance remains open.
 
+**Native Wayland RTL physical-position emulation — verified October 26, 2026.**
+[Production CI 40247820451](https://github.com/sguzman/typefinch/actions/runs/40247820451)
+passed **254 Rust tests** and the full native GUI suite. The new
+`tests/rtl_wayland_emulation_smoke.sh` exercised the production egui/winit
+Wayland `wl_keyboard` route under disposable nested Weston with a **US**
+virtual host keymap while Typefinch independently compiled installed Arabic
+(`ara`) and Hebrew (`il`) XKB software-emulation layouts. Each real native
+Wayland fixture scored **4/4** expected Unicode graphemes at 100% accuracy,
+saved exactly one aggregate Custom/Emulated SQLite record with the matching
+layout, and verified that the reference text and source path were absent
+from preferences. The companion JIS native Wayland regression also
+passed **4/4**, with mode/conversion controls unscored.
+
+The new cases use synthetic XTest input passed through the X11 Weston
+parent to a genuine child Wayland surface. They do **not** verify
+connected Arabic/Hebrew hardware, Hyprland seat or physical-device
+identity, Fcitx/IBus composition or candidate selection, the breadth of
+Unicode BiDi editing, or real user skill. The **T804 RTL tests gate
+remains unaccepted at 67%** until that broader acceptance evidence exists.
+
+
+
 
 ## What works in source
 

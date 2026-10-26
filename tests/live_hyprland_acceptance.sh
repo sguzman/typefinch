@@ -40,7 +40,18 @@ inventory_stable(){
     ($after[0] // null) as $last |
     if (($first.rows|type)!="array" or ($last.rows|type)!="array")
     then false
-    else (($first.rows|length)>0 and ($first|canonical)==($last|canonical))
+    else (
+      $first.schema==1 and $last.schema==1 and
+      $first.capture_policy=="inspection-only" and
+      $last.capture_policy=="inspection-only" and
+      $first.input_attribution=="aggregate seat; no per-device key-event attribution" and
+      $last.input_attribution=="aggregate seat; no per-device key-event attribution" and
+      ($first.rows|length)>0 and
+      all(($first.rows + $last.rows)[];(
+        has("key_events")|not) and (has("physical_device")|not) and
+        (has("raw_keys")|not)) and
+      ($first|canonical)==($last|canonical)
+    )
     end
   ' >/dev/null
 }
@@ -187,6 +198,14 @@ if [[ "${1:-}" == --self-test ]];then
   jq '.rows[0].configured_layout="changed"' "$fixture_dir/typefinch.json" >"$fixture_dir/inspector-drift.json"
   if inventory_stable "$fixture_dir/typefinch.json" "$fixture_dir/inspector-drift.json";then
     echo "Keyboard layout changed mid-QA without invalidating evidence" >&2;exit 1
+  fi
+  jq '.capture_policy="global-evdev"' "$fixture_dir/typefinch.json" >"$fixture_dir/unsafe-policy.json"
+  if inventory_stable "$fixture_dir/typefinch.json" "$fixture_dir/unsafe-policy.json";then
+    echo "Unsafe final input capture policy accepted as inspection-only" >&2;exit 1
+  fi
+  jq '.rows[0].physical_device="claimed"' "$fixture_dir/typefinch.json" >"$fixture_dir/unsafe-provenance.json"
+  if inventory_stable "$fixture_dir/typefinch.json" "$fixture_dir/unsafe-provenance.json";then
+    echo "Unverified physical-device field accepted in metadata-only QA" >&2;exit 1
   fi
   for change in '.keyboards[0].address="sim:99"' \
     '.keyboards[0].active_keymap="German"' \

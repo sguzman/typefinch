@@ -535,6 +535,22 @@ fn effective_theme(theme:Theme, portal_dark:Option<bool>)->egui::ThemePreference
         Theme::Dark=>egui::ThemePreference::Dark,
     }
 }
+#[cfg(test)]
+mod system_theme_selection_tests {
+    use super::*;
+    #[test]
+    fn explicit_theme_selection_is_never_overwritten_by_portal_updates(){
+        for portal in [None,Some(false),Some(true)] {
+            assert_eq!(effective_theme(Theme::Light,portal),
+                egui::ThemePreference::Light);
+            assert_eq!(effective_theme(Theme::Dark,portal),
+                egui::ThemePreference::Dark);
+        }
+        assert_eq!(effective_theme(Theme::System,None),egui::ThemePreference::System);
+        assert_eq!(effective_theme(Theme::System,Some(true)),egui::ThemePreference::Dark);
+        assert_eq!(effective_theme(Theme::System,Some(false)),egui::ThemePreference::Light);
+    }
+}
 fn motion_seconds(reduced:bool,normal:f32)->f32 {
     if reduced {0.0} else {normal}
 }

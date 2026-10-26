@@ -155,6 +155,17 @@ fn summarize(records:&[Pilot])->Result<Value,String> {
     if adaptive.is_empty()||neutral.is_empty() {
         return Err("At least one valid aggregate from each randomized arm is required".into());
     }
+    // Do not produce apparent treatment contrasts when real practice doses
+    // are materially different. This conservative eligibility requirement
+    // applies to *all* included exports, not merely their group averages:
+    // equal means can conceal large within-arm imbalances.
+    let opportunities=records[0].practice.opportunities;
+    let longest=records.iter().map(|p|p.practice.elapsed_ms).max().unwrap();
+    let shortest=records.iter().map(|p|p.practice.elapsed_ms).min().unwrap();
+    if records.iter().any(|p|p.practice.opportunities!=opportunities)
+        || longest-shortest>longest/10 {
+        return Err("Unmatched actual practice opportunities or durations; no group contrast produced".into());
+    }
     let a=arm_summary(&adaptive);
     let n=arm_summary(&neutral);
     // Compute contrasts BEFORE consuming either summary as a JSON value.
@@ -292,6 +303,37 @@ mod tests {
         assert!(!symlink_error.contains(&directory.to_string_lossy().to_string()));
         assert!(read_local(&directory).is_err());
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+    #[test] fn no_descriptive_contrast_with_unmatched_or_hidden_practice_dose() {
+        let adaptive=sample("adaptive",4,2,2);
+        let mut unequal_exercise=sample("non_adaptive",4,3,3);
+        unequal_exercise.practice.opportunities=14;
+        assert!(summarize(&[adaptive,unequal_exercise]).is_err());
+
+        let adaptive=sample("adaptive",4,2,2);
+        let mut unequal_time=sample("non_adaptive",4,3,3);
+        unequal_time.practice.elapsed_ms=22_500;
+        assert!(summarize(&[adaptive,unequal_time]).is_err(),
+            "Unbalanced practice time cannot yield a treatment contrast");
+
+        // Equal arm means must not disguise a large spread of individual
+        // doses. Test all records, not only the mean duration per group.
+        let mut c1=sample("adaptive",4,2,2);
+        let mut c2=sample("adaptive",4,2,2);
+        let mut d1=sample("non_adaptive",4,3,3);
+        let mut d2=sample("non_adaptive",4,3,3);
+        c1.practice.elapsed_ms=18_000;
+        c2.practice.elapsed_ms=22_000;
+        d1.practice.elapsed_ms=22_000;
+        d2.practice.elapsed_ms=18_000;
+        assert!(summarize(&[c1,c2,d1,d2]).is_err());
+
+        let mut close=sample("non_adaptive",4,3,3);
+        close.practice.elapsed_ms=22_000;
+        assert!(summarize(&[sample("adaptive",4,2,2),close]).is_ok());
+        let mut edge=sample("non_adaptive",4,3,3);
+        edge.practice.elapsed_ms=22_222;
+        assert!(summarize(&[sample("adaptive",4,2,2),edge]).is_ok());
     }
     #[test] fn raw_passage_field_is_rejected_by_strict_schema() {
         let clean=sample("adaptive",4,2,2);

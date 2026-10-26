@@ -67,6 +67,86 @@ pub fn repository(input:&str)->Result<String,String> {
     }
     Ok(format!("{owner}/{repo}"))
 }
+// The exporter emits a fixed vocabulary of SVG text and geometry only.
+// Reject scripts, remote images, CSS, animation, embedded documents and
+// event handlers even if a caller supplies forged Typefinch aria-labels.
+// No XML parser/new runtime dependencies or network fetching are necessary.
+fn safe_attribute(name:&str,value:&str)->bool {
+    match name {
+        "xmlns"=>value=="http://www.w3.org/2000/svg",
+        "role"=>value=="img",
+        "aria-label"=>matches!(value,"Typefinch profile"|"Typefinch compact profile"),
+        "font-family"=>matches!(value,"sans-serif"|"monospace"),
+        "font-weight"=>value=="700",
+        "fill"|"stroke"=>value=="none"
+            || (value.len()==7 && value.starts_with('#')
+                && value[1..].bytes().all(|b|b.is_ascii_hexdigit())),
+        "x"|"y"|"cx"|"cy"|"r"|"rx"|"ry"|"width"|"height"|
+        "stroke-width"|"font-size"=>!value.is_empty()
+            && value.bytes().all(|b|b.is_ascii_digit() || b==b'.' || b==b'-'),
+        "viewBox"=>!value.is_empty()
+            && value.bytes().all(|b|b.is_ascii_digit() || b==b'.' || b==b'-' || b==b' '),
+        "d"=>!value.is_empty()
+            && value.bytes().all(|b|b.is_ascii_alphabetic()
+                || b.is_ascii_digit() || matches!(b,b' '|b'.'|b'-'|b',')),
+        _=>false,
+    }
+}
+fn static_typefinch_svg(svg:&str)->bool {
+    if svg.len()>64*1024 || !svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
+        || !svg.ends_with("</svg>") {return false;}
+    let mut pieces=svg.split('<');
+    if pieces.next()!=Some(""){return false;}
+    let (mut opened,mut closed,mut in_text,mut saw_text)=(false,false,false,false);
+    for fragment in pieces {
+        let Some((raw,text))=fragment.split_once('>') else{return false;};
+        if closed {return false;}
+        if raw=="/text" {
+            if !in_text {return false;}
+            in_text=false;
+            continue;
+        }
+        if raw=="/svg" {
+            if !opened || in_text || !text.is_empty() {return false;}
+            closed=true;
+            continue;
+        }
+        if in_text {return false;}
+        let self_closing=raw.ends_with('/');
+        let content=raw.strip_suffix('/').unwrap_or(raw).trim_end();
+        let end=content.find(char::is_whitespace).unwrap_or(content.len());
+        let (tag,remaining)=content.split_at(end);
+        if !matches!(tag,"svg"|"rect"|"text"|"ellipse"|"circle"|"path"){return false;}
+        if tag=="svg" {
+            if opened || self_closing {return false;}
+            opened=true;
+        } else {
+            if !opened || self_closing==(tag=="text"){return false;}
+            if tag=="text" {in_text=true;saw_text=true;}
+        }
+        let mut attrs=remaining.trim();
+        let mut unique=std::collections::HashSet::new();
+        while !attrs.is_empty(){
+            let Some(equal)=attrs.find('=') else{return false;};
+            let key=attrs[..equal].trim_end();
+            if key.is_empty() || key.chars().any(char::is_whitespace)
+                || !unique.insert(key) {return false;}
+            let after=attrs[equal+1..].trim_start();
+            let Some(quoted)=after.strip_prefix('"') else{return false;};
+            let Some(end)=quoted.find('"') else{return false;};
+            if !safe_attribute(key,&quoted[..end]) {return false;}
+            attrs=quoted[end+1..].trim_start();
+        }
+        if tag=="svg" && (!content.contains("aria-label=") || !content.contains("viewBox=")){
+            return false;
+        }
+        // The fragment's text belongs to the preceding opening tag. XML
+        // special characters in user-supplied profile labels are escaped
+        // by the existing exporter; raw '<' becomes an unknown tag above.
+        if tag!="text" && !text.trim().is_empty() {return false;}
+    }
+    opened && closed && !in_text && saw_text
+}
 fn owned_card(data:&Value)->Result<(String,Vec<u8>),String> {
     if data.get("type").and_then(Value::as_str)!=Some("file") {
         return Err("Existing GitHub path is not an ordinary file; it will not be overwritten.".into());
@@ -84,10 +164,8 @@ fn owned_card(data:&Value)->Result<(String,Vec<u8>),String> {
     let bytes=STANDARD.decode(encoded).map_err(|_|"Cannot decode remote file; upload refused.")?;
     let current=std::str::from_utf8(&bytes)
         .map_err(|_|"Existing file is not UTF-8 SVG; upload refused.")?;
-    if !current.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
-        || !current.contains("aria-label=\"Typefinch profile\"")
-            && !current.contains("aria-label=\"Typefinch compact profile\"") {
-        return Err("Existing file does not identify as a Typefinch card; refusing overwrite.".into());
+    if !static_typefinch_svg(current) {
+        return Err("Existing file does not identify as a safe Typefinch card; refusing overwrite.".into());
     }
     Ok((sha.to_owned(),bytes))
 }
@@ -97,9 +175,8 @@ fn owned_card(data:&Value)->Result<(String,Vec<u8>),String> {
 pub fn publish_via<A:Api>(api:&A,input:&str,svg:&str,consent:bool)->Result<String,String> {
     if !consent {return Err("Public GitHub publishing requires explicit consent.".into());}
     let repo=repository(input)?;
-    if !svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
-        || !svg.contains("aria-label=\"Typefinch") || svg.contains("<script") {
-        return Err("Only a Typefinch-generated, script-free SVG can be uploaded.".into());
+    if !static_typefinch_svg(svg) {
+        return Err("Only a Typefinch-generated static SVG can be uploaded.".into());
     }
     let repo_endpoint=format!("repos/{repo}");
     let info=api.get(&repo_endpoint).map_err(|_|
@@ -174,7 +251,7 @@ mod tests {
             self.next(path,Some(body))
         }
     }
-    const DEMO:&str="<svg xmlns=\"http://www.w3.org/2000/svg\" aria-label=\"Typefinch compact profile\"></svg>";
+    const DEMO:&str="<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"550\" height=\"145\" viewBox=\"0 0 550 145\" role=\"img\" aria-label=\"Typefinch compact profile\"><text x=\"23\" y=\"31\" fill=\"#FFFFFF\" font-size=\"20\" font-family=\"sans-serif\" font-weight=\"700\">Typefinch</text></svg>";
     fn repo_info()->Value{json!({"permissions":{"push":true},"private":false,"visibility":"public"})}
     fn uploaded()->Value{json!({"content":{"path":"typefinch-profile.svg"}})}
     fn verified_card()->Value{json!({"type":"file","sha":"a".repeat(40),
@@ -188,6 +265,27 @@ mod tests {
         let mock=Mock::new(vec![]);
         assert!(publish_via(&mock,"alice/cards",DEMO,false).unwrap_err().contains("consent"));
         assert!(mock.calls.borrow().is_empty());
+    }
+    #[test] fn uploaded_svg_markup_is_static_allowlisted_and_user_text_is_escaped(){
+        assert!(static_typefinch_svg(DEMO));
+        let safe=DEMO.replace("Typefinch</text>","&lt;script&gt; Typefinch &amp; 你好</text>");
+        assert!(static_typefinch_svg(&safe));
+        for fragment in [
+            "<script>alert(1)</script>",
+            "<foreignObject><body>unsafe</body></foreignObject>",
+            "<image href=\"https://example.test/tracker\"/>",
+            "<rect onload=\"alert(1)\"/>",
+            "<rect style=\"fill:url(https://example.test)\"/>",
+            "<animate attributeName=\"fill\"/>",
+            "<!-- hidden content -->",
+        ] {
+            let payload=DEMO.replace("</svg>",&format!("{fragment}</svg>"));
+            assert!(!static_typefinch_svg(&payload), "unapproved SVG markup");
+            let mock=Mock::new(vec![]);
+            assert!(publish_via(&mock,"alice/cards",&payload,true).is_err());
+            assert!(mock.calls.borrow().is_empty(),"unsafe card must not access GitHub");
+        }
+        assert!(!static_typefinch_svg(&"A".repeat(65*1024)));
     }
     #[test] fn private_internal_or_unverified_repositories_never_receive_public_card(){
         for info in [

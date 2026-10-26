@@ -79,9 +79,9 @@ for layout in "${layouts[@]}";do
   export TYPEFINCH_QA_REPORT="$tmp/$layout/report.json"
   export TYPEFINCH_QA_IMPORT_REPORT="$tmp/$layout/import.json"
   if [[ "$layout" == ara ]];then
-    expected=arabic passage='سلام' keys='s g h l'
+    expected=arabic passage='سلام' keys='s g h l' wrong='a'
   else
-    expected=hebrew passage='שלום' keys='a k u o'
+    expected=hebrew passage='שלום' keys='a k u o' wrong='s'
   fi
   printf '%s' "$passage" >"$tmp/$layout/source.txt"
   start_app
@@ -122,6 +122,15 @@ LUA
   sleep 0.3
   xdotool key --clearmodifiers F2
   sleep 0.3
+  # Prove correction on the actual child Wayland wl_keyboard path, not
+  # just a clean four-key sequence. The wrong physical position must
+  # remain a raw mistake after BackSpace and the completed correct word.
+  xdotool key --clearmodifiers "$wrong"
+  sleep 0.18
+  [[ ! -s "$TYPEFINCH_QA_REPORT" ]] ||
+    { echo "Wrong native Wayland RTL key completed the session" >&2;exit 1; }
+  xdotool key --clearmodifiers BackSpace
+  sleep 0.18
   for key in $keys;do
     xdotool key --clearmodifiers "$key"
     sleep 0.10
@@ -136,17 +145,18 @@ assert(r.synthetic and r.state=="finished" and r.entered==4 and r.correct==4
   and r.accuracy==100,"Native Wayland RTL physical-position scoring failed")
 local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
 local pipe=assert(io.popen(string.format(
-  "sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts FROM sessions'",db),"r"))
+  "sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions'",db),"r"))
 local rows=assert(json.decode(pipe:read("*a")));assert(pipe:close())
 assert(#rows==1 and rows[1].layout==layout and rows[1].input_mode=="Emulated"
   and rows[1].test_mode=="custom" and rows[1].entered==4 and rows[1].correct==4
-  and rows[1].attempts==4,"Native Wayland RTL score provenance mismatch")
+  and rows[1].attempts==5 and rows[1].mistakes==1 and rows[1].corrections==1,
+  "Native Wayland RTL correction or score provenance mismatch")
 local cf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
 local cfg=cf:read("*a");cf:close()
 local sf=assert(io.open(source,"rb"));local target=sf:read("*a");sf:close()
 assert(not cfg:find(target,1,true) and not cfg:find(source,1,true),
   "RTL reference or its path leaked into persistent preferences")
-print("Native Weston wl_keyboard RTL Emulated PASS: "..layout..", 4/4")
+print("Native Weston wl_keyboard RTL Emulated PASS: "..layout..", 4/4 after one corrected mistake")
 LUA
   # Keep the final scored child surface alive through the acceptance
   # verdict. Weston 13 can SIGSEGV during rapid child-client teardown;

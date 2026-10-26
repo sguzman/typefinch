@@ -75,6 +75,17 @@ jq '.immediate.ever_missed=(.immediate.opportunities+1)' "$tmp/b.json" \
 require_refused "$tmp/a.json" "$tmp/impossible.json"
 jq '.app_version="999.0.0"' "$tmp/b.json" >"$tmp/different.json"
 require_refused "$tmp/a.json" "$tmp/different.json"
+jq '.practice.opportunities=14' "$tmp/b.json" >"$tmp/dose-length.json"
+require_refused "$tmp/a.json" "$tmp/dose-length.json"
+jq '.practice.elapsed_ms=25000' "$tmp/b.json" >"$tmp/dose-time.json"
+require_refused "$tmp/a.json" "$tmp/dose-time.json"
+# Exactly the stated 10% boundary remains acceptable with no other
+# records; this is only an engineering dose-matching rule, not efficacy.
+jq '.practice.elapsed_ms=22222' "$tmp/b.json" >"$tmp/dose-near.json"
+./target/debug/typefinch --compare-public-pilots "$tmp/a.json" "$tmp/dose-near.json" \
+  >"$tmp/dose-near-result.json"
+jq -e '.causal_claim==false and .adaptive.n==1 and .non_adaptive.n==1' \
+  "$tmp/dose-near-result.json" >/dev/null
 ln -s "$tmp/b.json" "$tmp/alias.json"
 require_refused "$tmp/a.json" "$tmp/alias.json"
 require_refused "$tmp/a.json" "$tmp/a.json"

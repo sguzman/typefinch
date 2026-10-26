@@ -1916,8 +1916,8 @@ impl Typefinch {
         self.message=match trial.stage {
             TrialStage::Practice=>format!("Pilot: {} practice, local only.",
                 if trial.arm==Arm::Adaptive {"adaptive"} else {"fixed-pattern control"}),
-            TrialStage::Immediate=>"Pilot: held-out immediate retest. No causal claim.".into(),
-            TrialStage::Delayed=>"Pilot: held-out delayed retest. No upload.".into(),
+            TrialStage::Immediate=>"Pilot: immediate retest of the original, already-seen baseline. No causal claim.".into(),
+            TrialStage::Delayed=>"Pilot: delayed retest of the original baseline. No upload.".into(),
             TrialStage::Complete=>"Pilot already complete.".into(),
         };
         self.controlled_consent=false;
@@ -1947,12 +1947,12 @@ impl Typefinch {
             let immediate=trial.immediate;
             let delayed=trial.delayed;
             ui.group(|ui|{
-                ui.strong("Opt-in held-out transfer pilot (local only)");
-                ui.small(format!("Assigned {} practice. No trial export, upload or efficacy claim.",
+                ui.strong("Practice-disjoint retest pilot (local only)");
+                ui.small(format!("Assigned {} practice. No automatic trial export, upload or efficacy claim.",
                     if arm==Arm::Adaptive {"adaptive"} else {"non-adaptive"}));
                 match stage {
                     TrialStage::Practice=>ui.label("Complete the practice passage."),
-                    TrialStage::Immediate=>ui.label("Practice finished. Retest the original held-out passage."),
+                    TrialStage::Immediate=>ui.label("Practice finished. Retest the original baseline (previously seen text)."),
                     TrialStage::Delayed=>ui.label(if ready {
                         "One-hour minimum interval verified; delayed retest available."
                     }else{
@@ -1976,11 +1976,11 @@ impl Typefinch {
                     }
                 }
                 if self.session.state==State::Finished {
-                    if stage==TrialStage::Immediate && ui.button("Start held-out immediate retest").clicked() {
+                    if stage==TrialStage::Immediate && ui.button("Retest original baseline now").clicked() {
                         self.advance_controlled_pilot(ctx);
                     }
                     if stage==TrialStage::Delayed {
-                        if ui.add_enabled(ready,egui::Button::new("Start held-out delayed retest")).clicked() {
+                        if ui.add_enabled(ready,egui::Button::new("Retest original baseline after delay")).clicked() {
                             self.advance_controlled_pilot(ctx);
                         }
                         if !ready {ctx.request_repaint_after(Duration::from_secs(30));}
@@ -1989,7 +1989,7 @@ impl Typefinch {
                 if stage==TrialStage::Complete {
                     if let Some(record)=self.controlled_trial.as_ref()
                         .and_then(ControlledTrial::aggregate_export) {
-                        if ui.button("Copy de-identified pilot aggregates").clicked() {
+                        if ui.button("Copy local aggregate-only pilot results").clicked() {
                             ui.ctx().copy_text(record);
                             self.message="Aggregate-only study summary copied locally. Nothing was uploaded.".into();
                         }
@@ -2007,8 +2007,8 @@ impl Typefinch {
             && (self.session.weak_character_drill().is_some()
                 || self.session.weak_bigram_drill().is_some()) {
             ui.group(|ui|{
-                ui.strong("Optional held-out transfer pilot (experimental)");
-                ui.small("Randomized adaptive/fixed-pattern practice followed by immediate and one-hour delayed retests of the same held-out passage. Not validated research; no trial data saved or uploaded. Ordinary aggregate scores still enter local history.");
+                ui.strong("Optional practice-disjoint retest pilot (experimental)");
+                ui.small("Randomized adaptive/fixed-pattern practice followed by immediate and one-hour delayed retests of the original baseline passage. The text is not novel; test-retest familiarity remains a confound. This is not validated research. Trial details are memory-only; ordinary aggregate scores still enter local history.");
                 ui.checkbox(&mut self.controlled_consent,"I opt in to this local, memory-only pilot");
                 if ui.add_enabled(self.controlled_consent,
                     egui::Button::new("Start randomized transfer pilot")).clicked() {

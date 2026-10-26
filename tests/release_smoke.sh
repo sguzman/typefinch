@@ -86,4 +86,46 @@ for vendor in egui-0.35.0 egui-winit-0.35.0;do
       { echo "Partially installed executable" >&2;exit 1; }
   done
 done
-echo "Versioned Linux packaging, three vendor notices, install/upgrade/rollback and collision tests PASS"
+# Reject a linked installation prefix (or any of its ancestors).
+escape_target="$tmp/install-prefix-external"
+mkdir -p "$escape_target"
+ln -s "$escape_target" "$tmp/prefix-link"
+for candidate in "$tmp/prefix-link" "$tmp/prefix-link/deep/path";do
+  if sh "$root/install.sh" --prefix "$candidate";then
+    echo "Installer followed symlinked prefix ancestor" >&2;exit 1
+  fi
+  [[ ! -e "$escape_target/bin/typefinch" ]] ||
+    { echo "Prefix link redirected an executable write" >&2;exit 1; }
+done
+for candidate in "relative/typefinch" "$tmp/../$(basename "$tmp")/escaped" \
+                 "$tmp/./escaped";do
+  if sh "$root/install.sh" --prefix "$candidate";then
+    echo "Installer accepted ambiguous/relative destination" >&2;exit 1
+  fi
+done
+# Check rollback metadata and .new destinations without overwriting data.
+printf 'never-overwrite\n' >"$escape_target/sentinel"
+for target in "share/typefinch/previous.version" \
+              "bin/typefinch.new" \
+              "bin/typefinch.rollback-new" \
+              "share/typefinch/previous-binary.new";do
+  prefix_guard="$tmp/prefix-guard-$(echo "$target" | tr '/' '-')"
+  mkdir -p "$prefix_guard/$(dirname "$target")"
+  if [[ "$target" == *previous.version ]];then
+    ln -s "$escape_target/sentinel" "$prefix_guard/$target"
+  else
+    printf 'staged sentinel\n' >"$prefix_guard/$target"
+  fi
+  if sh "$root/install.sh" --prefix "$prefix_guard";then
+    echo "Installer accepted occupied staging/symlink metadata" >&2;exit 1
+  fi
+  [[ ! -e "$prefix_guard/bin/typefinch" ]] ||
+    { echo "Staging guard caused partial installation" >&2;exit 1; }
+  if [[ "$target" != *previous.version ]];then
+    [[ "$(cat "$prefix_guard/$target")" == "staged sentinel" ]] ||
+      { echo "Installer overwrote an existing staging file" >&2;exit 1; }
+  fi
+done
+[[ "$(cat "$escape_target/sentinel")" == "never-overwrite" ]] ||
+  { echo "Installer overwrote external rollback target" >&2;exit 1; }
+echo "Versioned Linux packaging, three vendor notices, install/upgrade/rollback and symlink/collision tests PASS"

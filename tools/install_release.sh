@@ -10,8 +10,24 @@ while [ "$#" -gt 0 ]; do
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+# A chosen prefix is an explicit absolute destination, not an arbitrary
+# relative path or a symlink traversal into somebody else's data.
+while [ "${prefix%/}" != "$prefix" ]; do prefix="${prefix%/}"; done
 [ -n "$prefix" ] && [ "$prefix" != "/" ] || { echo "Unsafe prefix" >&2; exit 2; }
-case "$prefix" in *"/../"*|*"//"*) echo "Ambiguous prefix" >&2; exit 2 ;; esac
+case "$prefix" in
+  /*) ;;
+  *) echo "Installation prefix must be absolute" >&2; exit 2 ;;
+esac
+case "$prefix" in
+  *"//"*|*/../*|*/..|*/./*|*/.) echo "Ambiguous prefix" >&2; exit 2 ;;
+esac
+# Check the prefix and *all* existing ancestors, not just managed children.
+ancestor="$prefix"
+while [ "$ancestor" != "/" ]; do
+  [ ! -L "$ancestor" ] ||
+    { echo "Refusing symlinked installation prefix or ancestor" >&2; exit 1; }
+  ancestor=$(dirname -- "$ancestor")
+done
 base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 bin="$prefix/bin"; data="$prefix/share/typefinch"
 exe="$bin/typefinch"; previous="$data/previous-binary"
@@ -39,9 +55,17 @@ for vendor in epaint-0.35.0 egui-0.35.0 egui-winit-0.35.0;do
   done
 done
 mkdir -p "$bin" "$data"
-if [ -L "$exe" ] || [ -L "$marker" ] || [ -L "$previous" ]; then
-  echo "Refusing symlink install targets" >&2; exit 1
-fi
+# previous.version is a writable upgrade/rollback target, too.
+for managed_target in "$exe" "$marker" "$previous" "$prior"; do
+  [ ! -L "$managed_target" ] ||
+    { echo "Refusing symlink install targets" >&2; exit 1; }
+done
+# Do not overwrite occupied temporary installer destinations (including links).
+for staging_target in "$exe.new" "$exe.rollback-new" "$previous.new"; do
+  if [ -e "$staging_target" ] || [ -L "$staging_target" ]; then
+    echo "Refusing occupied temporary installation target" >&2; exit 1
+  fi
+done
 if [ "$rollback" -eq 1 ]; then
   [ -f "$previous" ] && [ -f "$prior" ] || { echo "No prior managed version" >&2; exit 1; }
   install -m 755 "$previous" "$exe.rollback-new"

@@ -148,6 +148,10 @@ assert(not cfg:find(target,1,true) and not cfg:find(source,1,true),
 print("Native Weston wl_keyboard RTL Emulated PASS: "..layout..", 4/4")
 LUA
   stop_app
+  # A compositor failure after a valid 4/4 score is still a failed
+  # per-language acceptance run, never a reason to silently retry.
+  kill -0 "$weston" 2>/dev/null ||
+    { echo "Nested Weston exited after native RTL scoring" >&2;exit 1; }
 done
 if [[ "${1:-both}" == both ]];then
   echo "Native nested Wayland Arabic/Hebrew emulation PASS; no IME or hardware claims"

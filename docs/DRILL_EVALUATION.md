@@ -239,6 +239,46 @@ efficacy evidence. The already published passage is the only source
 with a stable cohort ID; private passages cannot be matched by a hidden
 hash or accidental export.
 
+## Incomplete-study accounting (explicit local opt-in)
+
+The existing experimental pilot exports completed records only; relying
+on them for human research would erase withdrawal and protocol failures
+from the sample. Typefinch now retains a **memory-only** exclusion tally
+if an enrolled randomized pilot is deliberately discarded, loses window
+focus, is manually restarted or fails its input/source protocol.
+Nothing is automatically saved or sent over the network.
+
+For the **known public baseline only**, the app may offer an explicit
+**Copy exclusion tally locally** action after interruption. The JSON
+has schema 1, the published public-cohort ID, app version, assigned arm,
+excluded stage (practice / immediate / delayed), one fixed reason code,
+a false causal-claim flag and the copy-consent declaration. It contains
+no private passage, hashed text, profile name, device ID, error trace,
+timestamps, location or session-history references. An interrupted
+private Custom passage has **no shareable exclusion record**. The tally
+is discarded on app close or when dismissed.
+
+The offline command `typefinch --summarize-pilot-exclusions x.json
+[y.json ...]` summarizes 1–200 explicitly selected local exclusion
+files by arm, stage and reason. Its strict reader rejects symlinks,
+nonregular or oversized files, invalid cohorts, unknown private fields,
+unsafe categories, mixed versions and duplicate inodes/hard links.
+A separate native CI smoke verifies the real compiled binary with
+synthetic files, including negative tests. Completed results continue
+to use `--compare-public-pilots`; no silent mixing of completed and
+excluded JSON types occurs.
+
+**Critical interpretation limit:** deliberately anonymous exclusions
+cannot prove that separate files represent separate people. Byte-identical
+records from genuinely distinct people may occur, so there is no
+cross-file fingerprint or global deduplication. Uncopied, dismissed,
+crashed or closed-app exclusions are missing altogether. The displayed
+counts are **submitted local summaries**, not verified recruitment or
+randomization denominators. Human research must independently
+pre-register enrollment counts, assign authorized participants, account
+for missingness and avoid declaring efficacy based on completed-only
+samples. This instrumentation does not pass T502's efficacy criterion.
+
 ## Proposed empirical acceptance design (not implemented)
 
 A privacy-first evaluation should compare **adaptive targeting** against

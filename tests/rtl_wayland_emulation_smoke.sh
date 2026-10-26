@@ -71,6 +71,15 @@ for _ in $(seq 1 100);do
   sleep 0.1
 done
 [[ -n "$parent" ]] || { echo "No X11-to-Wayland input bridge" >&2;exit 1; }
+# The X11 output window appears before Weston has completed asynchronous
+# compositor and shell initialization. Require a stable *living* compositor
+# before launching a scored client, not merely an early socket/window.
+# A startup crash is still a hard failed attempt for the strict guard.
+sleep 1.2
+kill -0 "$weston" 2>/dev/null || {
+  echo "Nested Weston died before native input stabilization" >&2
+  exit 1
+}
 start_app(){
   ./target/debug/typefinch >"$tmp/$layout/app.log" 2>&1 &
   app=$!

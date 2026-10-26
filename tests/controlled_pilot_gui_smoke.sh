@@ -106,8 +106,17 @@ xdotool type --clearmodifiers --delay 55 aba
 wait_score 3 3 3
 wait_pilot delayed
 # This QA does not fake an hour. The real delayed retest must stay LOCKED.
+# Merely checking the phase label is insufficient: a bug could start an
+# unauthorized fourth typing session without updating the stage report.
+# Attempt exactly that fourth session and require the previous score audit
+# to remain at 3, as well as the final SQLite table length below.
 xdotool key --clearmodifiers ctrl+shift+d
 sleep 0.3
+xdotool key --clearmodifiers F2
+xdotool type --clearmodifiers --delay 55 aba
+sleep 0.4
+jq -e '.synthetic==true and .state=="finished" and
+  .tests==3 and .entered==3 and .correct==3' "$TYPEFINCH_QA_REPORT" >/dev/null
 jq -e '.stage=="delayed" and .causal_claim==false' "$TYPEFINCH_QA_PILOT_REPORT" >/dev/null
 sqlite3 -cmd '.timeout 5000' -json "$XDG_CONFIG_HOME/typefinch/sessions.sqlite3" \
   "SELECT test_mode,input_mode,entered,correct FROM sessions ORDER BY id;" >"$tmp/rows.json"

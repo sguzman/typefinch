@@ -653,8 +653,8 @@ remains open; do not claim real hardware or comprehensive RTL acceptance.
 ## Native Wayland mixed-script OS input and atomic caret QA (October 26, 2026)
 
 [Full CI 40346017191](https://github.com/sguzman/typefinch/actions/runs/40346017191)
-passed **265 Rust tests and the complete graphical suite** after adding a
-the RTL acceptance runner now exercises **five independently
+passed **265 Rust tests and the complete graphical suite**. The RTL
+acceptance runner now exercises **five independently
 isolated Weston compositor cases**: Arabic Emulated, Hebrew Emulated, Arabic
 OS-input, Hebrew OS-input, and a mixed Arabic/Latin/Hebrew OS-input case.
 The Emulated cases each retain their earlier separate four-grapheme,

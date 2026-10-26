@@ -346,6 +346,13 @@ impl ControlledTrial {
             (Duration::from_secs(3600)..=Duration::from_secs(86400)).contains(&elapsed)
         })
     }
+    pub fn immediate_expired(&self)->bool {
+        self.stage==TrialStage::Immediate && !self.immediate_ready()
+    }
+    pub fn delay_expired(&self)->bool {
+        self.stage==TrialStage::Delayed && self.immediate_at.is_some_and(|time|
+            time.elapsed()>Duration::from_secs(86400))
+    }
     fn valid(&self,session:&Session,source:&str,profile_id:&str,layout:&str,
         recorded_layout:&str,input:Mode)->bool {
         session.state==State::Finished && session.mode==TestMode::Custom
@@ -709,6 +716,7 @@ mod tests {
         assert!(t.immediate_ready());
         t.practiced_at=Some(std::time::Instant::now()-Duration::from_secs(601));
         assert!(!t.immediate_ready());
+        assert!(t.immediate_expired());
         assert!(!t.record_immediate(&reference,"a","us","os:unknown",Mode::System));
         assert_eq!(t.stage,TrialStage::Immediate);
         t.practiced_at=Some(std::time::Instant::now());
@@ -717,6 +725,7 @@ mod tests {
         assert!(!t.delay_ready(),"Immediate repeat cannot be delayed retention");
         t.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(86401));
         assert!(!t.delay_ready(),"A 25-hour retention gap is a different study");
+        assert!(t.delay_expired());
         assert!(!t.record_delayed(&reference,"a","us","os:unknown",Mode::System));
         assert_eq!(t.stage,TrialStage::Delayed);
         t.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(7200));

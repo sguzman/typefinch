@@ -63,7 +63,9 @@ impl Pilot {
     fn check(&self)->Result<(),String> {
         let expected=PUBLIC_STUDY_REFERENCE.graphemes(true).count();
         if self.schema!=4 || self.kind!="typefinch-local-held-out-pilot"
-            || self.app_version.is_empty() || self.app_version.len()>80
+            || self.app_version.is_empty() || self.app_version.len()>32
+            || !self.app_version.chars().all(|ch|
+                ch.is_ascii_alphanumeric() || matches!(ch,'.'|'-'|'+'))
             || !matches!(self.randomized_arm.as_str(),"adaptive"|"non_adaptive")
             || !matches!(self.input_mode.as_str(),"os"|"emulated")
             || self.configured_duration_seconds!=0
@@ -230,6 +232,10 @@ mod tests {
         let mut leaked=sample("adaptive",4,2,2);
         leaked.public_reference_cohort=None;
         assert!(summarize(&[leaked,sample("non_adaptive",4,4,4)]).is_err());
+        let mut malicious=sample("adaptive",4,2,2);
+        malicious.app_version="a\\nprivate/path".into();
+        assert!(summarize(&[malicious,sample("non_adaptive",4,4,4)]).is_err(),
+            "Untrusted input metadata may not become echoed private output");
         let mut changed=sample("non_adaptive",4,4,4);
         changed.app_version="0.2.0".into();
         assert!(summarize(&[sample("adaptive",4,2,2),changed]).is_err());
@@ -239,6 +245,21 @@ mod tests {
         let mut timed=sample("adaptive",4,2,2);
         timed.actual_retention_gap_ms=86_400_001;
         assert!(summarize(&[timed,sample("non_adaptive",4,4,4)]).is_err());
+    }
+    #[test] fn local_reader_never_follows_a_symlink_or_reads_a_directory() {
+        use std::os::unix::fs::symlink;
+        let directory=std::env::temp_dir().join(format!("typefinch-pilot-{}",
+            uuid::Uuid::new_v4()));
+        std::fs::create_dir(&directory).unwrap();
+        let file=directory.join("data.json");
+        std::fs::write(&file,br#"{"raw_passage":"private"}"#).unwrap();
+        let link=directory.join("link.json");
+        symlink(&file,&link).unwrap();
+        let symlink_error=read_local(&link).unwrap_err();
+        assert!(!symlink_error.contains("private"));
+        assert!(!symlink_error.contains(&directory.to_string_lossy().to_string()));
+        assert!(read_local(&directory).is_err());
+        std::fs::remove_dir_all(&directory).unwrap();
     }
     #[test] fn raw_passage_field_is_rejected_by_strict_schema() {
         let clean=sample("adaptive",4,2,2);

@@ -34,6 +34,12 @@ The egui upgrade also exposed [upstream RTL glyph-index bug #8576](https://githu
 
 **Scope:** this establishes host-independent German app emulation of the tested physical positions *inside a virtual X11 seat*, not a device-identified keyboard, arbitrary ISO/JIS regional keys, other compositor-specific modifier delivery, a privileged keyboard hook, or live Hyprland acceptance. The broader T305 and hardware gates remain open.
 
+## Native German ISO/AltGr routing through virtual Wayland — verified
+
+[CI 40256665381](https://github.com/sguzman/typefinch/actions/runs/40256665381) passed **256/256 Rust tests** and the full graphical workflow. In `tests/iso_wayland_emulation_smoke.sh`, Typefinch receives physical-position key events through Weston's genuine nested `wl_keyboard` surface while the isolated host X11 keyboard remains US. Its in-app German XKB mapping scored **8/8** ordinary/RightAlt/Shift/ISO graphemes; an incorrect LeftAlt modifier did not create an additional attempt. The resulting SQLite session reports the German Emulated layout and exactly eight scored attempts. A separate first-attempt report contains numeric counts and input mode only, not keys, private reference text, or device addresses. The same CI also passed the native X11 focused-audit regression and **3/3** custom multiline Enter scoring after a startup-readiness guard.
+
+This strengthens the **virtual Wayland** evidence for T305, not physical-keyboard or Hyprland compositor acceptance. T305's physical-device routing gate, T902's live QA, and T404's permission-scoped per-device capture remain open.
+
 ## Multiple keyboards
 
 - **Implemented in source:** read-only `hyprctl -j devices` detects Hyprland inspection rows and reported active keymaps. Other Wayland compositors expose **aggregate `wl_seat` capability metadata and configured XKB keymap group names**, not the active group; genuine X11 sessions use `setxkbmap -query` for a single **configured aggregate seat**. None of these APIs attributes Typefinch typing events to physical keyboards.
@@ -327,8 +333,10 @@ translation acceptance, not physical AltGr input acceptance.
 
 The application does **not** infer Right Alt from egui's generic `alt`
 flag, which may represent Left Alt or AltGr depending on the compositor.
-Reliable physical Right-Alt/AltGr event attribution, scored native in-app
-modifier routing and T303's full Shift/AltGr/dead-key acceptance remain open.
+At the time of this older isolated-XKB experiment, scored RightAlt
+and the T303 modifier gate remained open. They were subsequently accepted
+for virtual X11 input under production egui 0.35 (see the later CI above).
+Connected-device attribution and live Hyprland QA remain open.
 
 ## Four complete English starter ANSI base/Shift layers — accepted
 

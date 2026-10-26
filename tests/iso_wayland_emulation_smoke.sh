@@ -2,8 +2,9 @@
 # T305: German AltGr/ISO 102nd scoring via real nested-Wayland wl_keyboard.
 # Xvfb physical XTest codes pass through Weston X11 to real wl_keyboard.
 # No live Hyprland, local hardware, global keyboard capture or privilege.
-# Run in an isolated Xvfb CI seat. Does NOT certify actual hardware,
-# device-specific identity, Wayland, or production Hyprland support.
+# Host XTest positions traverse a real Weston-native Wayland input path.
+# This cannot certify connected hardware, device-specific identity, or
+# real Hyprland compositor support.
 set -Eeuo pipefail
 export LIBGL_ALWAYS_SOFTWARE=1 WINIT_UNIX_BACKEND=wayland XDG_SESSION_TYPE=wayland
 export WAYLAND_DISPLAY=typefinch-iso-wayland

@@ -1901,6 +1901,11 @@ impl Typefinch {
         self.custom_text=source;
         Self::reset_custom_editor_history(ctx);
         self.rebuild_session();
+        if !trial.can_start_stage(&self.session) {
+            self.controlled_trial=None;
+            self.message="Pilot stopped: the new source, language, difficulty or timing differed from the verified study protocol.".into();
+            return;
+        }
         self.start_test(ctx);
         let identity=&self.prefs.profiles[self.prefs.active_profile].id;
         if self.session.state!=State::Running

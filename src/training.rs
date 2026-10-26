@@ -174,6 +174,7 @@ impl EligiblePilotArms {
         let latin=|text:&str| text.chars().all(|ch| {
             let value=ch as u32;
             ch.is_ascii() || (0x00C0..=0x024F).contains(&value)
+                || (0x0300..=0x036F).contains(&value)
         });
         if !latin(&baseline.target) || !latin(adaptive_source) {return None;}
         let control_source=neutral_practice(adaptive_source,&baseline.target)?;
@@ -610,6 +611,12 @@ mod tests {
         assert!(EligiblePilotArms::prepare(&accented,"f f f f",
             "profile","us","os:unknown",Mode::System).is_some(),
             "Latin-1 accents in a Mexican-Spanish baseline must remain eligible");
+        let mut decomposed=Session::new_with_custom(0,TestMode::Custom,"cafe\u{301}s");
+        decomposed.begin();
+        decomposed.type_text("caxe\u{301}s");
+        assert!(EligiblePilotArms::prepare(&decomposed,"f f f f",
+            "profile","us","os:unknown",Mode::System).is_some(),
+            "Decomposed Spanish accents are still Latin input");
         // Incomplete baselines cannot be eligible for either study arm.
         let unfinished=Session::new_with_custom(0,TestMode::Custom,"aba");
         assert!(EligiblePilotArms::prepare(&unfinished,"b b b",

@@ -152,6 +152,17 @@ errors, profile identifiers, configured layout strings, keyboard addresses,
 timestamps and personal file paths. A discarded/incomplete study has no
 record to export. Data are neither uploaded nor automatically persisted.
 
+The version-2 export additionally reports the full reference-opportunity
+count and `coverage_policy="all_reference_positions_reached"`. The local
+pilot rejects a timed stage if any reference position was never reached,
+although its normal local aggregate score still remains valid. This prevents
+partial passage selection from falsely improving an observed error fraction,
+but also excludes slow/noncompleting participants from completed-pilot
+summaries. Such attrition can bias a study and **must be reported**, not hidden
+or interpreted as improved training efficacy. Previous schema-1 exports do
+not assert full-reference coverage and cannot silently be pooled with
+schema-2 observations.
+
 The export explicitly marks `causal_claim=false` and
 `control_adjusted=false`. It cannot be treated as a controlled result
 without external enrollment, comparable participants and rigorous analysis.

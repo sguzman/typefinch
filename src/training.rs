@@ -128,6 +128,21 @@ impl Arm {
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum TrialStage { Practice, Immediate, Delayed, Complete }
 
+/// Optional, participant-authorized summary of incomplete assigned trials.
+/// No private reference, profile, device, or per-key error is ever exported.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum PilotExclusionReason { ParticipantWithdrew, ProtocolInvalid, FocusLost, ManualRestart }
+impl PilotExclusionReason {
+    fn key(self)->&'static str {
+        match self {
+            Self::ParticipantWithdrew=>"participant_withdrew",
+            Self::ProtocolInvalid=>"protocol_invalid",
+            Self::FocusLost=>"focus_lost",
+            Self::ManualRestart=>"manual_restart",
+        }
+    }
+}
+
 /// Generate a *length-matched* local non-adaptive comparator with identical
 /// whitespace boundaries. It does not adapt to observed mistakes, and this
 /// matching alone cannot equalize effort, time, language or cognitive load.
@@ -284,6 +299,32 @@ impl ControlledTrial {
             practiced:None,immediate:None,delayed:None,
             practiced_at:None,immediate_at:None,retention_gap:None,
         })
+    }
+    /// A voluntary, aggregate-only accounting of a randomized enrollment
+    /// that did NOT produce a complete study result. This is available only
+    /// for the published reference; no private Custom text is fingerprinted.
+    /// The caller may offer the JSON for an explicit local Copy click only.
+    pub fn exclusion_export(&self,reason:PilotExclusionReason)->Option<String> {
+        if self.stage==TrialStage::Complete{return None;}
+        let cohort=public_study_reference_id(&self.held_out,
+            self.language,self.difficulty,self.duration)?;
+        let stage=match self.stage {
+            TrialStage::Practice=>"practice",
+            TrialStage::Immediate=>"immediate",
+            TrialStage::Delayed=>"delayed",
+            TrialStage::Complete=>return None,
+        };
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schema":1,
+            "type":"typefinch-local-pilot-exclusion",
+            "public_reference_cohort":cohort,
+            "app_version":env!("CARGO_PKG_VERSION"),
+            "randomized_arm":if self.arm==Arm::Adaptive {"adaptive"}else{"non_adaptive"},
+            "excluded_stage":stage,
+            "reason":reason.key(),
+            "causal_claim":false,
+            "consent":"explicit local clipboard action; no network publication"
+        })).ok()
     }
     /// Consent-driven clipboard export only. No participant identity,
     /// exact layout name, passages, keyboard IDs, timestamps, or raw errors.
@@ -902,6 +943,40 @@ mod tests {
             control.practiced.unwrap().opportunities.observed);
         assert!(control_adjusted_transfer(&adaptive,&control).is_none(),
             "Numerically matched but different held-out texts are not comparable");
+    }
+    #[test] fn exclusions_are_public_cohort_only_consent_only_and_incomplete_only() {
+        let mut baseline=Session::new_with_custom(0,TestMode::Custom,
+            PUBLIC_STUDY_REFERENCE);
+        baseline.begin();
+        let attempted=PUBLIC_STUDY_REFERENCE.replacen("steady","xteddy",1);
+        baseline.type_text(&attempted);
+        let mut public=ControlledTrial::begin(&baseline,"asdf jkl;",
+            Arm::NonAdaptive,"secret-profile","private-layout",
+            "seat:private",Mode::System).unwrap();
+        let json=public.exclusion_export(PilotExclusionReason::ParticipantWithdrew).unwrap();
+        let result:serde_json::Value=serde_json::from_str(&json).unwrap();
+        assert_eq!(result["schema"],1);
+        assert_eq!(result["public_reference_cohort"],PUBLIC_STUDY_REFERENCE_ID);
+        assert_eq!(result["randomized_arm"],"non_adaptive");
+        assert_eq!(result["excluded_stage"],"practice");
+        assert_eq!(result["reason"],"participant_withdrew");
+        assert_eq!(result["causal_claim"],false);
+        for secret in [PUBLIC_STUDY_REFERENCE,"secret-profile","private-layout","seat:private",
+            "asdf jkl;"] { assert!(!json.contains(secret),"Exclusion leaked private context"); }
+        let practice=synthetic_custom("asdf jkl;","asdf jkl;");
+        assert!(public.record_practice(&practice,"secret-profile","private-layout",
+            "seat:private",Mode::System));
+        let json=public.exclusion_export(PilotExclusionReason::FocusLost).unwrap();
+        let result:serde_json::Value=serde_json::from_str(&json).unwrap();
+        assert_eq!(result["excluded_stage"],"immediate");
+        assert_eq!(result["reason"],"focus_lost");
+        let private=completed_synthetic_arm(Arm::Adaptive,"private",
+            "axab","abab","abab","xyxy");
+        assert!(private.exclusion_export(PilotExclusionReason::ProtocolInvalid).is_none());
+        let private_baseline=synthetic_custom("abab","axab");
+        let incomplete=ControlledTrial::begin(&private_baseline,"xyxy",
+            Arm::Adaptive,"private","us","os:unknown",Mode::System).unwrap();
+        assert!(incomplete.exclusion_export(PilotExclusionReason::ProtocolInvalid).is_none());
     }
     #[test] fn public_study_cohort_id_requires_exact_known_public_source_and_settings() {
         let source=PUBLIC_STUDY_REFERENCE;

@@ -17,6 +17,41 @@ Threats include accidental observation while Typefinch is unfocused, stale permi
 5. **Data minimization.** Only aggregate session statistics may be persisted by default. Do not retain raw keycodes, scan-code sequences, per-key timing traces, hardware addresses, typed phrases, or other applications' keystrokes. Error reports, QA fixtures and exported profile cards must remain free of real input text and private device identifiers.
 6. **Safe failure.** Denial, revocation, unplugging, permission errors, changed keymaps or lost focus immediately revert to the existing native seat-level typing path without silently attributing input to another keyboard. A change mid-session must not upgrade an unknown provenance to a supposedly verified device.
 
+## 2026 compositor capability review: why existing APIs are insufficient
+
+The tempting available interfaces do **not** currently meet the required
+compositor-enforced combination of **focused Typefinch surface + one named
+physical keyboard**:
+
+- [Hyprland input-capture permission](https://wiki.hypr.land/configuring/core/advanced-configuration/permissions/)
+  is explicitly described as access to **all compositor input** (keyboard,
+  pointer and touch), subject to a permission prompt. Consent alone does not
+  reduce its scope to one keyboard or the currently focused Typefinch surface.
+  Do not request this permission as a workaround for missing per-device input.
+- [XDG InputCapture portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.InputCapture.html)
+  delegates activation to the compositor; the standardized trigger is an
+  *edge-of-screen pointer barrier*, not application focus or a selected
+  hardware keyboard. Its libei stream may capture input after activation,
+  but this is **not** proof of per-device attribution or a focused-window
+  grant. Do not equate a portal consent dialog with scoped capture.
+- [Hyprland per-device binds](https://wiki.hypr.land/configuring/core/binds/devices/per-device/)
+  restrict which device can activate a **compositor-wide keybind**. They
+  are not an ordinary GUI's focus-restricted, revocable event subscription.
+  Never install temporary global keybinds to harvest character input,
+  even if filtered by device or guarded by a client-side focus check.
+- [XDG RemoteDesktop portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)
+  authorizes remote **injection** of keyboard/pointer events; it is not
+  a per-device event-provenance reader.
+
+**Implementation decision:** keep `CapturePolicy::InspectionOnly` hard-coded
+and retain the compositor's normal focused `wl_keyboard` or committed-text
+input path. A future backend requires a documented, actually deployed
+compositor capability with enforced scope and truthful device attribution,
+plus explicit consent, revocation, focus loss and multiple-keyboard testing.
+Merely discovering an input-capture global, a portal, a device name or an
+EIS connection must never enable independent scoring. This review is
+architectural evidence, **not** acceptance of T404's backend or hardware test.
+
 ## Acceptance and negative tests before any backend ships
 
 A future implementation needs an explicit permission UX, audited privilege scope, and evidence from the actual target compositor (Hyprland first). Required negative tests: consent absent; Typefinch unfocused; consent revoked; restarted app; device unplugged or replaced; multiple keyboards with different layouts; password input in another application; IME/Compose and AltGr; and no double-scored physical plus committed-text event.

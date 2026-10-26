@@ -645,13 +645,18 @@ mod tests {
         unequal_time.practiced.as_mut().unwrap().elapsed_ms=12_000;
         assert!(control_adjusted_transfer(&a,&unequal_time).is_none(),
             "A paired control cannot hide materially different practice time");
-        // A small nonzero difference is allowed by the explicit 10% rule,
-        // without asserting that efforts were truly equivalent.
+        // Exercise the actual 10% boundary with realistic nonzero timings,
+        // not merely the zero-duration synthetic fast path.
+        let mut timed_adaptive=completed_synthetic_arm(Arm::Adaptive,"time_a",
+            "axab","abab","abab","xyxy");
+        timed_adaptive.practiced.as_mut().unwrap().elapsed_ms=10_000;
         let mut tolerable_time=completed_synthetic_arm(Arm::NonAdaptive,"time_ok",
             "axab","abab","abab","wxyz");
-        a.practiced.unwrap(); // ensure the reference pilot really practiced
-        tolerable_time.practiced.as_mut().unwrap().elapsed_ms=0;
-        assert!(control_adjusted_transfer(&a,&tolerable_time).is_some());
+        tolerable_time.practiced.as_mut().unwrap().elapsed_ms=11_000;
+        assert!(control_adjusted_transfer(&timed_adaptive,&tolerable_time).is_some());
+        tolerable_time.practiced.as_mut().unwrap().elapsed_ms=11_200;
+        assert!(control_adjusted_transfer(&timed_adaptive,&tolerable_time).is_none(),
+            "More than 10% practice-time difference is not a matched dose");
         let mut missing_delayed=completed_synthetic_arm(Arm::NonAdaptive,"c",
             "axab","abab","abab","wxyz");
         missing_delayed.stage=TrialStage::Delayed;

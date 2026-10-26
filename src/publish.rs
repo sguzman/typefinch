@@ -221,7 +221,7 @@ mod tests {
         let stale=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
             Ok(uploaded()),Ok(json!({"type":"file","sha":"b".repeat(40),
                 "encoding":"base64","content":STANDARD.encode(
-                    "<svg xmlns=\\\"http://www.w3.org/2000/svg\\\" aria-label=\\\"Typefinch compact profile\\\"></svg>different")}))]);
+                    format!("{DEMO}different"))}))]);
         assert!(publish_via(&stale,"alice/cards",DEMO,true).unwrap_err()
             .contains("did not match"));
         assert_eq!(stale.calls.borrow().len(),4);

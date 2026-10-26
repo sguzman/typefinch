@@ -49,8 +49,38 @@ window_is_clear(){
     end
   ' >/dev/null
 }
+# Hyprland's Lua API uses structured dispatch expressions; older
+# versions use the legacy dispatcher vocabulary. Only fixed QA arguments.
+lua_focus_pid(){ printf 'hl.dsp.focus({ window = "pid:%s" })' "$1"; }
+lua_focus_workspace(){ printf 'hl.dsp.focus({ workspace = "%s" })' "$1"; }
+lua_shortcut(){
+  printf 'hl.dsp.send_shortcut({ mods = "%s", key = "%s", window = "pid:%s" })' \
+    "$1" "$2" "$3"
+}
+hypr_focus_pid(){
+  [[ "$1" =~ ^[1-9][0-9]*$ ]] || return 2
+  if [[ "$hypr_mode" == lua ]];then
+    hyprctl dispatch "$(lua_focus_pid "$1")"
+  else
+    hyprctl dispatch focuswindow "pid:$1"
+  fi
+}
+hypr_focus_workspace(){
+  [[ "$1" =~ ^[1-9][0-9]*$ ]] || return 2
+  if [[ "$hypr_mode" == lua ]];then
+    hyprctl dispatch "$(lua_focus_workspace "$1")"
+  else
+    hyprctl dispatch workspace "$1"
+  fi
+}
 if [[ "${1:-}" == --self-test ]];then
   command -v jq >/dev/null
+  [[ "$(lua_focus_pid 42)" == 'hl.dsp.focus({ window = "pid:42" })' ]] || exit 1
+  [[ "$(lua_focus_workspace 3)" == 'hl.dsp.focus({ workspace = "3" })' ]] || exit 1
+  [[ "$(lua_shortcut 'CTRL + SHIFT' T 42)" == 'hl.dsp.send_shortcut({ mods = "CTRL + SHIFT", key = "T", window = "pid:42" })' ]] || exit 1
+  [[ "$(lua_shortcut '' F1 42)" == 'hl.dsp.send_shortcut({ mods = "", key = "F1", window = "pid:42" })' ]] || exit 1
+  hypr_mode=lua
+  if hypr_focus_pid 0 >/dev/null 2>&1;then echo 'Invalid target PID accepted' >&2;exit 1;fi
   fixture='[{"pid":21,"at":[1,2],"size":[3,4]},{"pid":42,"at":[18,27],"size":[800,600]}]'
   rect="$(jq -nr --argjson rows "$fixture" --argjson pid 42 \
     '$rows | first(.[] | select(.pid==$pid) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])")')"
@@ -115,6 +145,21 @@ for cmd in cargo hyprctl jq grim compare;do
   command -v "$cmd" >/dev/null || { echo "Missing QA dependency: $cmd" >&2;exit 2; }
 done
 [[ -f Cargo.toml && -f rust-toolchain.toml ]] || { echo "Run from Typefinch root" >&2;exit 2; }
+# Read-only capability probe; never test by dispatching an input key to
+# somebody else's foreground window.
+hypr_mode=legacy
+if hyprctl repl 'type(hl)' 2>/dev/null | grep -Eq '(^|[[:space:]])table([[:space:]]|$)';then
+  hypr_mode=lua
+else
+  tag="$(hyprctl -j version | jq -r '.tag // empty')"
+  [[ "$tag" =~ ^v?([0-9]+)\.([0-9]+) ]] ||
+    { echo "Cannot determine Hyprland dispatcher generation" >&2;exit 2; }
+  major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
+  if ((10#$major>0 || 10#$minor>=55));then
+    echo "Modern Hyprland Lua dispatcher probe failed; refusing legacy input" >&2
+    exit 2
+  fi
+fi
 tmp="$(mktemp -d)"
 app='' previous='' workspace=''
 cleanup(){
@@ -122,9 +167,9 @@ cleanup(){
   set +e
   [[ -z "$app" ]] || { kill "$app" 2>/dev/null; wait "$app" 2>/dev/null; }
   if [[ -n "$previous" && "$previous" != null ]];then
-    hyprctl dispatch focuswindow "pid:$previous" >/dev/null 2>&1
+    hypr_focus_pid "$previous" >/dev/null 2>&1
   elif [[ -n "$workspace" && "$workspace" != null ]];then
-    hyprctl dispatch workspace "$workspace" >/dev/null 2>&1
+    hypr_focus_workspace "$workspace" >/dev/null 2>&1
   fi
   rm -rf -- "$tmp"
   exit "$result"
@@ -165,7 +210,7 @@ for _ in $(seq 1 100);do
   sleep 0.2
 done
 ((found==1)) || { echo "Typefinch did not open in Hyprland" >&2;exit 1; }
-hyprctl dispatch focuswindow "pid:$app" >/dev/null
+hypr_focus_pid "$app" >/dev/null
 for _ in $(seq 1 30);do
   [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] && break
   sleep 0.2
@@ -198,9 +243,19 @@ grim -g "$rect" "$tmp/before.png"
 [[ -s "$tmp/before.png" ]] || exit 1
 # Events target only the Typefinch foreground window.
 send_key(){
+  local mods="$1" key="$2" legacy_mods=''
+  case "$mods:$key" in
+    ':F1'|':F4'|':F10'|'CTRL + SHIFT:T') ;;
+    *) echo "Non-QA shortcut refused" >&2;exit 2 ;;
+  esac
   [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
     { echo "Foreground QA focus lost; refusing input" >&2;exit 1; }
-  hyprctl dispatch sendshortcut "$1, pid:$app" >/dev/null
+  if [[ "$hypr_mode" == lua ]];then
+    hyprctl dispatch "$(lua_shortcut "$mods" "$key" "$app")" >/dev/null
+  else
+    [[ "$mods" != 'CTRL + SHIFT' ]] || legacy_mods='CTRL SHIFT'
+    hyprctl dispatch sendshortcut "$legacy_mods, $key, pid:$app" >/dev/null
+  fi
   sleep 0.45
 }
 snapshot(){
@@ -237,32 +292,32 @@ theme(){
   exit 1
 }
 # F1: actual native Wayland focused help overlay.
-send_key ", F1"
+send_key "" F1
 snapshot help
 pixels="$(pixel_delta before help 2000)"
-send_key ", F1"
+send_key "" F1
 # F4/F10: geometry reports from production app plus window-only captures.
-send_key ", F4"
+send_key "" F4
 geometry "ISO main block" "Typing block"
 snapshot iso
-send_key ", F4"
+send_key "" F4
 geometry "JIS main block" "Typing block"
 snapshot jis
-send_key ", F10"
+send_key "" F10
 geometry "JIS main block" "Function / navigation"
 snapshot navigation
-send_key ", F10"
+send_key "" F10
 geometry "JIS main block" "Numeric keypad"
 snapshot keypad
 # App-owned System → Light → Dark → System, not an OS theme transition.
-send_key "CTRL SHIFT, T"
+send_key "CTRL + SHIFT" T
 theme light
 snapshot light
-send_key "CTRL SHIFT, T"
+send_key "CTRL + SHIFT" T
 theme dark
 snapshot dark
 theme_pixels="$(pixel_delta light dark 2000)"
-send_key "CTRL SHIFT, T"
+send_key "CTRL + SHIFT" T
 theme system
 # Opt-in local evidence only. Preflight all targets; never overwrite.
 if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then

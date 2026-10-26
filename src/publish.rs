@@ -107,6 +107,14 @@ pub fn publish_via<A:Api>(api:&A,input:&str,svg:&str,consent:bool)->Result<Strin
     if info.get("permissions").and_then(|p|p.get("push")).and_then(Value::as_bool)!=Some(true) {
         return Err("Current GitHub CLI credentials cannot confirm write permission; nothing was uploaded.".into());
     }
+    // "Public card" must not silently target a private or organization-
+    // internal repository. Both GitHub's visibility and private fields
+    // must explicitly identify a public repository before any file lookup,
+    // and especially before attempting a write.
+    if info.get("visibility").and_then(Value::as_str)!=Some("public")
+        || info.get("private").and_then(Value::as_bool)!=Some(false) {
+        return Err("The selected GitHub repository is not verified public; nothing was uploaded.".into());
+    }
     let card_endpoint=format!("{repo_endpoint}/contents/{CARD_PATH}");
     let old=match api.get(&card_endpoint) {
         Ok(file)=>Some(owned_card(&file)?.0),
@@ -167,7 +175,7 @@ mod tests {
         }
     }
     const DEMO:&str="<svg xmlns=\"http://www.w3.org/2000/svg\" aria-label=\"Typefinch compact profile\"></svg>";
-    fn repo_info()->Value{json!({"permissions":{"push":true}})}
+    fn repo_info()->Value{json!({"permissions":{"push":true},"private":false,"visibility":"public"})}
     fn uploaded()->Value{json!({"content":{"path":"typefinch-profile.svg"}})}
     fn verified_card()->Value{json!({"type":"file","sha":"a".repeat(40),
         "encoding":"base64","content":STANDARD.encode(DEMO)})}
@@ -180,6 +188,23 @@ mod tests {
         let mock=Mock::new(vec![]);
         assert!(publish_via(&mock,"alice/cards",DEMO,false).unwrap_err().contains("consent"));
         assert!(mock.calls.borrow().is_empty());
+    }
+    #[test] fn private_internal_or_unverified_repositories_never_receive_public_card(){
+        for info in [
+            json!({"permissions":{"push":true},"private":true,"visibility":"private"}),
+            json!({"permissions":{"push":true},"private":false,"visibility":"internal"}),
+            json!({"permissions":{"push":true},"private":false}),
+            json!({"permissions":{"push":true},"visibility":"public"}),
+            json!({"permissions":{"push":true},"private":false,"visibility":"private"}),
+        ]{
+            let mock=Mock::new(vec![Ok(info)]);
+            assert!(publish_via(&mock,"alice/private-cards",DEMO,true).unwrap_err()
+                .contains("not verified public"));
+            let calls=mock.calls.borrow();
+            assert_eq!(calls.len(),1,"nonpublic card must not be looked up or written");
+            assert_eq!(calls[0].0,"repos/alice/private-cards");
+            assert!(calls[0].1.is_none());
+        }
     }
     #[test] fn publishing_new_card_never_handles_tokens_or_other_repository_paths(){
         let mock=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),Ok(uploaded()),Ok(verified_card())]);

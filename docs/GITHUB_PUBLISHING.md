@@ -39,8 +39,12 @@ managed **outside** Typefinch; users must choose to install and authenticate
 the CLI themselves.
 
 A bounded subprocess deadline prevents a hung network/authentication
-helper from hanging the app indefinitely. The publisher verifies the
-selected repository and explicit `permissions.push = true` before writing.
+helper from hanging the app indefinitely. Before any file lookup or write, the
+publisher requires the selected repository's GitHub API metadata to confirm
+both `permissions.push = true` and a **public** repository
+(`private = false`, `visibility = public`). Private, internal and
+indeterminate-visibility repositories are rejected; a successful upload to
+a private repository would not fulfill the public-publishing promise.
 If the destination already contains a file, the publisher requires
 the GitHub file SHA and inspectable base64-encoded text identifying a
 Typefinch SVG; foreign content, a directory, corrupt data or an

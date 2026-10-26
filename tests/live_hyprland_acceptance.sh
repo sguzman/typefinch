@@ -92,6 +92,9 @@ hypr_focus_workspace(){
     hyprctl dispatch workspace "$1"
   fi
 }
+# Do not steal focus from another application during QA cleanup. If the
+# user has deliberately switched away, preserve their active foreground.
+focus_is_ours(){ [[ "$1" =~ ^[1-9][0-9]*$ && "$1" == "$2" ]]; }
 # Atomic no-overwrite publication, including when the source temp tree
 # and explicitly chosen evidence directory are on different filesystems.
 # mktemp creates a private file in the destination's own filesystem;
@@ -117,6 +120,11 @@ if [[ "${1:-}" == --self-test ]];then
   [[ "$(lua_shortcut '' F1 42)" == 'hl.dsp.send_shortcut({ mods = "", key = "F1", window = "pid:42" })' ]] || exit 1
   hypr_mode=lua
   if hypr_focus_pid 0 >/dev/null 2>&1;then echo 'Invalid target PID accepted' >&2;exit 1;fi
+  focus_is_ours 42 42 || exit 1
+  if focus_is_ours 42 21 || focus_is_ours 42 '' || focus_is_ours '' '';then
+    echo 'Other foreground windows were incorrectly marked as QA-owned' >&2
+    exit 1
+  fi
   # Probe succeeds only for the actual no-op dispatcher, not merely an
   # installed Hyprland version or an available Lua REPL.
   hyprctl(){
@@ -210,7 +218,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map, focused-input schema, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map, focused-input schema, consented-focus, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -235,12 +243,21 @@ app='' previous='' workspace=''
 cleanup(){
   result=$?
   set +e
+  local foreground restore=0
+  foreground="$(hyprctl -j activewindow 2>/dev/null | jq -r '.pid // empty' 2>/dev/null)"
   [[ -z "$qa_stage" ]] || rm -f -- "$qa_stage"
   [[ -z "$app" ]] || { kill "$app" 2>/dev/null; wait "$app" 2>/dev/null; }
-  if [[ -n "$previous" && "$previous" != null ]];then
-    hypr_focus_pid "$previous" >/dev/null 2>&1
-  elif [[ -n "$workspace" && "$workspace" != null ]];then
-    hypr_focus_workspace "$workspace" >/dev/null 2>&1
+  # A user may have switched to another window while automated QA was
+  # running. Never seize their new focus when tearing down our own app.
+  if focus_is_ours "$app" "$foreground";then
+    if [[ "$previous" =~ ^[1-9][0-9]*$ ]] &&
+      hypr_focus_pid "$previous" >/dev/null 2>&1 &&
+      [[ "$(hyprctl -j activewindow 2>/dev/null | jq -r '.pid // empty' 2>/dev/null)" == "$previous" ]];then
+      restore=1
+    fi
+    if ((restore==0)) && [[ "$workspace" =~ ^[1-9][0-9]*$ ]];then
+      hypr_focus_workspace "$workspace" >/dev/null 2>&1
+    fi
   fi
   rm -rf -- "$tmp"
   exit "$result"

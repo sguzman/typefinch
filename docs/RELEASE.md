@@ -1,9 +1,12 @@
 # 🚀 Linux development previews
 
-Typefinch is **not yet a validated MVP**. Successful GitHub Actions builds
-publish a versioned `x86_64` Linux preview archive and SHA-256 checksum as
-CI artifacts. These are not signed releases, and X11 CI does not certify live
-Hyprland input or physical keyboard routing.
+Typefinch is **not yet a validated MVP**. Routine GitHub Actions builds
+run Rust and native graphical tests but **do not publish a preview package**.
+A versioned `x86_64` archive and SHA-256 checksum are attached to a workflow
+run only when packaging is explicitly requested with `[package]` in the
+commit message or by manual workflow dispatch, and its package/install checks
+pass. These are unsigned development previews. Virtual X11/Wayland CI does
+not certify live Hyprland input or physical keyboard routing.
 
 GitHub Actions downloads are ZIP containers. Unzip the `typefinch-linux-preview`
 artifact first to obtain the `.tar.gz` archive and matching `.sha256`

@@ -328,6 +328,15 @@ pub fn control_adjusted_transfer(adaptive:&ControlledTrial,
         || adaptive.layout!=neutral.layout || adaptive.recorded_layout!=neutral.recorded_layout
         || adaptive.practiced?.opportunities.observed !=
             neutral.practiced?.opportunities.observed {return None;}
+    // A nominally equal-length exercise is not an equal dose. For an
+    // exploratory matched pair, reject >10% differences in actual measured
+    // practice time. This is a conservative predeclared engineering guard,
+    // not evidence of equivalence in effort or learning.
+    let practice_a=adaptive.practiced?.elapsed_ms;
+    let practice_b=neutral.practiced?.elapsed_ms;
+    if practice_a.abs_diff(practice_b)>practice_a.max(practice_b)/10 {
+        return None;
+    }
     let delta=|before:TransferSample,after:TransferSample| {
         Some(after.opportunities.missed_percent()?-before.opportunities.missed_percent()?)
     };
@@ -631,6 +640,18 @@ mod tests {
         unequal_exposure.practiced.as_mut().unwrap().opportunities.observed+=1;
         assert!(control_adjusted_transfer(&a,&unequal_exposure).is_none(),
             "Different practice opportunities must not be hidden");
+        let mut unequal_time=completed_synthetic_arm(Arm::NonAdaptive,"time",
+            "axab","abab","abab","wxyz");
+        unequal_time.practiced.as_mut().unwrap().elapsed_ms=12_000;
+        assert!(control_adjusted_transfer(&a,&unequal_time).is_none(),
+            "A paired control cannot hide materially different practice time");
+        // A small nonzero difference is allowed by the explicit 10% rule,
+        // without asserting that efforts were truly equivalent.
+        let mut tolerable_time=completed_synthetic_arm(Arm::NonAdaptive,"time_ok",
+            "axab","abab","abab","wxyz");
+        a.practiced.unwrap(); // ensure the reference pilot really practiced
+        tolerable_time.practiced.as_mut().unwrap().elapsed_ms=0;
+        assert!(control_adjusted_transfer(&a,&tolerable_time).is_some());
         let mut missing_delayed=completed_synthetic_arm(Arm::NonAdaptive,"c",
             "axab","abab","abab","wxyz");
         missing_delayed.stage=TrialStage::Delayed;

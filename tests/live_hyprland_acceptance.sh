@@ -27,6 +27,28 @@ inventory_parity(){
     end
   ' >/dev/null
 }
+# Fail closed when a visible same-workspace Hyprland client intersects the
+# Typefinch capture rectangle. This does not detect layer-shell overlays.
+window_is_clear(){
+  jq -en --slurpfile data "$1" --argjson pid "$2" --argjson ws "$3" '
+    ($data[0] // null) as $clients |
+    if ($clients|type)!="array" then false else
+      ([$clients[] | select(.pid==$pid and .mapped==true)]) as $apps |
+      if ($apps|length)!=1 then false else
+        ($apps[0]) as $target |
+        ([$clients[] |
+          select(.pid!=$pid and .mapped==true and .hidden!=true
+            and .workspace.id==$ws and (.at|type)=="array"
+            and (.size|type)=="array" and .size[0]>0 and .size[1]>0) |
+          select(.at[0]<($target.at[0]+$target.size[0])
+            and (.at[0]+.size[0])>$target.at[0]
+            and .at[1]<($target.at[1]+$target.size[1])
+            and (.at[1]+.size[1])>$target.at[1])
+        ]|length)==0
+      end
+    end
+  ' >/dev/null
+}
 if [[ "${1:-}" == --self-test ]];then
   command -v jq >/dev/null
   fixture='[{"pid":21,"at":[1,2],"size":[3,4]},{"pid":42,"at":[18,27],"size":[800,600]}]'
@@ -62,13 +84,28 @@ if [[ "${1:-}" == --self-test ]];then
       exit 1
     fi
   done
+  # Unrelated workspaces cannot obscure Typefinch; same-workspace overlap
+  # must fail even when the native compositor screenshot tool succeeds.
+  printf '%s' '[{"pid":42,"mapped":true,"hidden":false,"workspace":{"id":3},"at":[18,27],"size":[800,600]},{"pid":21,"mapped":true,"hidden":false,"workspace":{"id":4},"at":[25,35],"size":[80,80]}]' >"$fixture_dir/clients.json"
+  window_is_clear "$fixture_dir/clients.json" 42 3 || exit 1
+  jq '.[1].workspace.id=3' "$fixture_dir/clients.json" >"$fixture_dir/occluded.json"
+  if window_is_clear "$fixture_dir/occluded.json" 42 3;then
+    echo "Overlapping GUI accepted as window-only evidence" >&2;exit 1
+  fi
+  jq '.[1].at=[900,900] | .[1].workspace.id=3' \
+    "$fixture_dir/clients.json" >"$fixture_dir/nonoverlap.json"
+  window_is_clear "$fixture_dir/nonoverlap.json" 42 3 || exit 1
+  jq '.[1].pid=42' "$fixture_dir/clients.json" >"$fixture_dir/ambiguous.json"
+  if window_is_clear "$fixture_dir/ambiguous.json" 42 3;then
+    echo "Ambiguous target window accepted for screenshot" >&2;exit 1
+  fi
   wrong='{"schema":1,"capture_policy":"global-evdev","input_attribution":"physical","rows":[{}]}'
   if jq -en --argjson d "$wrong" '$d.capture_policy=="inspection-only"
     and $d.input_attribution=="aggregate seat; no per-device key-event attribution"' >/dev/null;then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA inventory identity/map, schema and rectangle self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map, screenshot-occlusion and rectangle self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -135,11 +172,28 @@ for _ in $(seq 1 30);do
 done
 [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
   { echo "QA window never gained focus" >&2;exit 1; }
-clients="$(hyprctl -j clients)"
-rect="$(jq -nr --argjson rows "$clients" --argjson pid "$app" \
-  '$rows | first(.[] | select(.pid==$pid) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])")')"
+# Use the focused window's own geometry. Never pass other clients'
+# names/titles in an argv argument while resolving the capture rectangle.
+hyprctl -j activewindow >"$tmp/active-window.json"
+rect="$(jq -r --argjson pid "$app" \
+  'select(.pid==$pid) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' \
+  "$tmp/active-window.json")"
 [[ "$rect" =~ ^-?[0-9]+,-?[0-9]+\ [1-9][0-9]*x[1-9][0-9]*$ ]] ||
   { echo "Invalid foreground window geometry" >&2;exit 1; }
+# Refuse screenshots if focus changed or another visible client overlaps.
+# Layer-shell overlays are not in hyprctl clients; evidence remains local.
+assert_capture_clear(){
+  [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
+    { echo "Cannot capture unfocused Typefinch window" >&2;exit 1; }
+  local active_ws
+  active_ws="$(hyprctl -j activeworkspace | jq -r '.id // empty')"
+  [[ "$active_ws" =~ ^-?[0-9]+$ ]] ||
+    { echo "Hyprland workspace identity unavailable" >&2;exit 1; }
+  hyprctl -j clients >"$tmp/clients.json"
+  window_is_clear "$tmp/clients.json" "$app" "$active_ws" ||
+    { echo "Other window overlaps Typefinch; screenshot refused" >&2;exit 1; }
+}
+assert_capture_clear
 grim -g "$rect" "$tmp/before.png"
 [[ -s "$tmp/before.png" ]] || exit 1
 # Events target only the Typefinch foreground window.
@@ -150,6 +204,7 @@ send_key(){
   sleep 0.45
 }
 snapshot(){
+  assert_capture_clear
   grim -g "$rect" "$tmp/$1.png"
   [[ -s "$tmp/$1.png" ]] || { echo "Missing $1 native screenshot" >&2;exit 1; }
 }

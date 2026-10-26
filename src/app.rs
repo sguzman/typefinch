@@ -869,6 +869,9 @@ impl Typefinch {
             if !ok {
                 self.controlled_exclusion=trial.exclusion_export(
                     training::PilotExclusionReason::ProtocolInvalid);
+                let _=crate::qa::write_synthetic_pilot_exclusion_audit(
+                    trial.held_out_source(),trial.arm,trial.stage,
+                    training::PilotExclusionReason::ProtocolInvalid);
                 self.controlled_trial=None;
                 self.message="Local transfer pilot stopped: source, layout or phase mismatch.".into();
             } else {
@@ -899,6 +902,8 @@ impl Typefinch {
     fn abandon_controlled_pilot(&mut self,reason:training::PilotExclusionReason) {
         if let Some(trial)=self.controlled_trial.take() {
             self.controlled_exclusion=trial.exclusion_export(reason);
+            let _=crate::qa::write_synthetic_pilot_exclusion_audit(
+                trial.held_out_source(),trial.arm,trial.stage,reason);
         }
         self.controlled_consent=false;
     }

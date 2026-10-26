@@ -128,4 +128,21 @@ jq -e 'length==3 and
 ! grep -q 'a s d f j k l ;' "$config"
 ! grep -q 'b b b b b b b b' "$config"
 ! grep -q 'aba' "$config"
-echo "Native local held-out pilot PASS: baseline, randomized practice, immediate transfer, one-hour gate locked; no causal or private-data claim"
+# A manual restart must abandon the incomplete randomized study and record
+# the *synthetic-only* phase/reason audit. This must not score another test.
+xdotool key --clearmodifiers F5
+abandoned=0
+for _ in $(seq 1 100);do
+  if jq -e --arg arm "$qa_arm" '
+      .synthetic==true and .source=="fixed-disposable-fixture" and
+      .stage=="abandoned" and .previous_stage=="delayed" and
+      .reason=="manual_restart" and .arm==$arm and .causal_claim==false
+    ' "$TYPEFINCH_QA_PILOT_REPORT" >/dev/null 2>&1;then
+    abandoned=1;break
+  fi
+  sleep 0.12
+done
+((abandoned==1)) || { echo "Native pilot restart did not report study abandonment" >&2;exit 1; }
+sqlite3 -cmd '.timeout 5000' -json "$XDG_CONFIG_HOME/typefinch/sessions.sqlite3" \
+  "SELECT COUNT(*) AS n FROM sessions;" | jq -e '.[0].n==3' >/dev/null
+echo "Native local pilot PASS: both arm workflows, one-hour gate, abandoned trial, aggregate-only audit; no human efficacy claim"

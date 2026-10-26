@@ -94,6 +94,169 @@ impl FollowUp {
     }
 }
 
+
+/// A future opt-in study needs a genuine control condition and a reference
+/// withheld from practice. These are *protocol mechanics*, not human efficacy
+/// evidence; no participant or trial data is persisted by Typefinch.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum Arm { Adaptive, NonAdaptive }
+impl Arm {
+    /// Unbiased assignment from one uniformly random byte. Production callers
+    /// should draw fresh entropy for each enrolled trial, not derive a group
+    /// from profile names, errors or previous performance.
+    pub fn from_random_byte(byte:u8)->Self {
+        if byte&1==0 {Self::Adaptive}else{Self::NonAdaptive}
+    }
+    pub fn random()->Self { Self::from_random_byte(uuid::Uuid::new_v4().as_bytes()[0]) }
+}
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum TrialStage { Practice, Immediate, Delayed, Complete }
+
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub struct TransferSample {
+    pub opportunities:OpportunityCounts,
+    pub corrected_wpm:f64,
+    pub attempts:usize,
+}
+impl TransferSample {
+    fn from_session(session:&Session)->Option<Self> {
+        if session.state!=State::Finished {return None;}
+        let score=session.score();
+        let opportunities=session.opportunity_counts();
+        if score.entered==0 || score.attempts==0 ||
+            opportunities.observed==0 || !score.wpm.is_finite() {return None;}
+        Some(Self {opportunities,corrected_wpm:score.wpm,attempts:score.attempts})
+    }
+}
+/// This self-contained local series still cannot establish causation by itself:
+/// held-out passage difficulty, recruitment, order, and practice dose require
+/// independently verified comparative human evidence.
+pub struct ControlledTrial {
+    pub arm:Arm,
+    pub stage:TrialStage,
+    held_out:String,
+    practice:String,
+    language:Language,
+    difficulty:WordDifficulty,
+    duration:Duration,
+    profile_id:String,
+    layout:String,
+    recorded_layout:String,
+    input:Mode,
+    pub baseline:TransferSample,
+    pub practiced:Option<TransferSample>,
+    pub immediate:Option<TransferSample>,
+    pub delayed:Option<TransferSample>,
+}
+impl ControlledTrial {
+    /// Baseline is an actual finished *held-out* Custom session. Its source
+    /// must differ from the practice text; merely retesting trained text is
+    /// the existing descriptive FollowUp, never a controlled transfer test.
+    #[allow(clippy::too_many_arguments)]
+    pub fn begin(baseline:&Session,practice:&str,arm:Arm,profile_id:&str,
+        layout:&str,recorded_layout:&str,input:Mode)->Option<Self> {
+        if baseline.mode!=TestMode::Custom || baseline.target.is_empty()
+            || practice.is_empty() || baseline.target==practice
+            || profile_id.is_empty() || layout.is_empty() || recorded_layout.is_empty() {
+            return None;
+        }
+        Some(Self {
+            arm,stage:TrialStage::Practice,
+            held_out:baseline.target.clone(),practice:practice.into(),
+            language:baseline.language,difficulty:baseline.difficulty,
+            duration:baseline.duration,profile_id:profile_id.into(),
+            layout:layout.into(),recorded_layout:recorded_layout.into(),input,
+            baseline:TransferSample::from_session(baseline)?,
+            practiced:None,immediate:None,delayed:None,
+        })
+    }
+    fn valid(&self,session:&Session,source:&str,profile_id:&str,layout:&str,
+        recorded_layout:&str,input:Mode)->bool {
+        session.state==State::Finished && session.mode==TestMode::Custom
+            && session.target==source
+            && self.profile_id==profile_id && self.layout==layout
+            && self.recorded_layout==recorded_layout && self.input==input
+            && self.language==session.language && self.difficulty==session.difficulty
+            && self.duration==session.duration
+    }
+    pub fn record_practice(&mut self,session:&Session,profile_id:&str,
+        layout:&str,recorded_layout:&str,input:Mode)->bool {
+        if self.stage!=TrialStage::Practice ||
+            !self.valid(session,&self.practice,profile_id,layout,recorded_layout,input) {
+            return false;
+        }
+        let Some(sample)=TransferSample::from_session(session) else {return false;};
+        self.practiced=Some(sample);
+        self.stage=TrialStage::Immediate;
+        true
+    }
+    pub fn record_immediate(&mut self,session:&Session,profile_id:&str,
+        layout:&str,recorded_layout:&str,input:Mode)->bool {
+        if self.stage!=TrialStage::Immediate || self.practiced.is_none() ||
+            !self.valid(session,&self.held_out,profile_id,layout,recorded_layout,input) {
+            return false;
+        }
+        let Some(sample)=TransferSample::from_session(session) else {return false;};
+        self.immediate=Some(sample);
+        self.stage=TrialStage::Delayed;
+        true
+    }
+    /// Delayed retention requires real wall-clock separation from immediate
+    /// testing, supplied by the caller and checked against a fixed minimum.
+    /// This in-memory method does not claim the delay actually elapsed.
+    pub fn record_delayed(&mut self,session:&Session,after_immediate:Duration,
+        profile_id:&str,layout:&str,recorded_layout:&str,input:Mode)->bool {
+        if self.stage!=TrialStage::Delayed || self.immediate.is_none() ||
+            after_immediate<Duration::from_secs(3600) ||
+            !self.valid(session,&self.held_out,profile_id,layout,recorded_layout,input) {
+            return false;
+        }
+        let Some(sample)=TransferSample::from_session(session) else {return false;};
+        self.delayed=Some(sample);
+        self.stage=TrialStage::Complete;
+        true
+    }
+}
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub struct ControlAdjustedTransfer {
+    /// Difference in immediate missed-opportunity change, in percentage
+    /// points; negative means a larger descriptive reduction for adaptive.
+    pub immediate_missed_pp:f64,
+    pub delayed_missed_pp:f64,
+    pub immediate_wpm:f64,
+    pub delayed_wpm:f64,
+}
+/// Strictly match actual practice opportunities, language, input mode,
+/// layout and duration before comparing two separately completed series.
+/// No confidence interval or efficacy interpretation is available from one
+/// synthetic pair, or from arbitrarily selected human volunteers.
+pub fn control_adjusted_transfer(adaptive:&ControlledTrial,
+    neutral:&ControlledTrial)->Option<ControlAdjustedTransfer> {
+    if adaptive.arm!=Arm::Adaptive || neutral.arm!=Arm::NonAdaptive
+        || adaptive.stage!=TrialStage::Complete || neutral.stage!=TrialStage::Complete
+        || adaptive.profile_id==neutral.profile_id
+        || adaptive.language!=neutral.language || adaptive.difficulty!=neutral.difficulty
+        || adaptive.duration!=neutral.duration || adaptive.input!=neutral.input
+        || adaptive.layout!=neutral.layout || adaptive.recorded_layout!=neutral.recorded_layout
+        || adaptive.practiced?.opportunities.observed !=
+            neutral.practiced?.opportunities.observed {return None;}
+    let delta=|before:TransferSample,after:TransferSample| {
+        Some(after.opportunities.missed_percent()?-before.opportunities.missed_percent()?)
+    };
+    let ad_im=adaptive.immediate?;
+    let co_im=neutral.immediate?;
+    let ad_delay=adaptive.delayed?;
+    let co_delay=neutral.delayed?;
+    Some(ControlAdjustedTransfer {
+        immediate_missed_pp:delta(adaptive.baseline,ad_im)?-delta(neutral.baseline,co_im)?,
+        delayed_missed_pp:delta(adaptive.baseline,ad_delay)?-delta(neutral.baseline,co_delay)?,
+        immediate_wpm:(ad_im.corrected_wpm-adaptive.baseline.corrected_wpm)
+            -(co_im.corrected_wpm-neutral.baseline.corrected_wpm),
+        delayed_wpm:(ad_delay.corrected_wpm-adaptive.baseline.corrected_wpm)
+            -(co_delay.corrected_wpm-neutral.baseline.corrected_wpm),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

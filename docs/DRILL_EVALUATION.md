@@ -92,13 +92,50 @@ input or source context, identical participant identity, unequal exposure and
 balanced synthetic random-byte assignments. Missing denominators cannot be
 silently treated as zero.
 
-**Not yet implemented:** an in-app enrollment/consent UI, matched
-non-adaptive passage generation, trusted time-on-task matching, cross-restart
-retention scheduling, crossover/order controls, preregistered
-analysis with uncertainty, real participant recruitment or any evidence of
-better learning. These types are not attached to existing `FollowUp` scores
-and are not exported, persisted or sent to GitHub. Pure unit tests cannot
-supply the needed comparative human data; **T502 remains unaccepted**.
+**Still missing:** native end-to-end pilot QA, human participant
+recruitment, genuinely comparable time-on-task and effort, cross-restart
+retention scheduling, counterbalanced crossover/order effects, preregistered
+uncertainty-aware analysis, and empirical evidence of learning. This pilot
+remains separate from the ordinary `FollowUp`; its de-identified aggregates
+can be copied locally only after completion and an explicit user click, not
+automatically persisted or sent to GitHub. **T502 remains unaccepted**.
+
+## Implemented local opt-in pilot workflow (not efficacy evidence)
+
+After finishing a Custom passage with observed missed characters, the
+native Typefinch interface now offers a **default-off consent checkbox** and
+a **Start randomized transfer pilot** action. The app chooses an adaptive
+missed-pattern drill or a fixed, non-adaptive comparison with the same
+displayed grapheme and whitespace counts. It does **not** establish equal
+practice time, effort, difficulty, fluency or a controlled population.
+
+After a valid practice score is saved, the app permits one **immediate
+held-out retest** of the *original* source. After that score is saved, it
+unlocks the **delayed held-out retest** only after at least one real hour on
+the process-local monotonic clock. Quitting the app discards the study.
+Aborting, restarting, editing the source, losing focus, changing profile,
+input mode, or keyboard provenance invalidates the active study. No global
+input capture or device-level keystroke attribution is added.
+
+A completed pilot can display aggregate missed-opportunity counts and
+descriptive differences from its own baseline. **Only an explicit Copy
+de-identified pilot aggregates click** copies a JSON document to the local
+clipboard. This includes an arm label, fixed schema and app version, OS
+versus emulated input category, configured duration, and baseline/practice/
+immediate/delayed aggregate opportunities, ever-missed counts, attempts,
+elapsed milliseconds and corrected WPM. It excludes raw text, per-character
+errors, profile identifiers, configured layout strings, keyboard addresses,
+timestamps and personal file paths. A discarded/incomplete study has no
+record to export. Data are neither uploaded nor automatically persisted.
+
+The export explicitly marks `causal_claim=false` and
+`control_adjusted=false`. It cannot be treated as a controlled result
+without external enrollment, comparable participants and rigorous analysis.
+Unit tests verify control-practice length/whitespace matching, randomized
+assignment parity, protocol integrity, delayed measurement gate and
+private-data omission. **Native GUI end-to-end pilot QA and empirical
+comparative human data remain separate acceptance requirements.** No
+change is made to the T502 progress check.
 
 ## Proposed empirical acceptance design (not implemented)
 

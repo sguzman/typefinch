@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full native Wayland GUI acceptance for original and JIS fixtures, with at
+# Full native Wayland GUI acceptance: one fresh compositor per RTL language; at
 # most TWO retries for a verified external Weston pre-score SIGSEGV plus
 # lost Wayland transport. Never retry product/scoring assertion failures.
 set -Eeuo pipefail
@@ -93,29 +93,46 @@ if [[ "${1:-}" == --self-test ]];then
 fi
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
-for attempt in 1 2 3;do
-  if xvfb-run -a -s "-screen 0 1280x900x24" bash "$fixture" >"$log" 2>&1;then
-    cat "$log"
-    if ((attempt>1));then
-      echo "Confirmed external Weston pre-score SIGSEGV recovered on full fresh native acceptance rerun (attempt $attempt)."
+# The RTL fixture previously reused one Weston instance for Arabic, then
+# restarted the child app for Hebrew. Weston 13's X11 backend can SIGSEGV
+# at that app transition after Arabic has already scored 4/4. Preserve the
+# strict no-retry-after-score rule by testing each language in a fresh
+# complete compositor run. Neither score can satisfy the other's gate.
+segments=("")
+if [[ "${1:-}" == --rtl ]];then segments=(ara il);fi
+for segment in "${segments[@]}";do
+  passed=0
+  for attempt in 1 2 3;do
+    if [[ -n "$segment" ]];then
+      if xvfb-run -a -s "-screen 0 1280x900x24" bash "$fixture" "$segment" >"$log" 2>&1;then
+        passed=1
+      fi
+    else
+      if xvfb-run -a -s "-screen 0 1280x900x24" bash "$fixture" >"$log" 2>&1;then
+        passed=1
+      fi
     fi
-    exit 0
-  fi
-  cat "$log" >&2
-  # Weston sometimes segfaults *after* it advertises a socket and
-  # receives the first synthetic keyboard events, but before the first
-  # source-scoring report. Detect the external Weston SIGSEGV, verified
-  # loss of the Wayland connection, and absence of *any* successful scored
-  # session. Do NOT retry failed product assertions, incomplete scores,
-  # or a crash after a successfully completed native typing session.
-  if ((attempt<3)) && weston_pre_score_crash "$log";then
-    echo "Confirmed external Weston SIGSEGV before first verified native typing (attempt $attempt/3). Retrying the entire isolated GUI test; every app assertion remains strict." >&2
-    # Give the previous isolated Xvfb/Weston processes time to relinquish
-    # their display resources before the next clean compositor launch.
-    sleep 0.75
-  else
-    echo "Native Wayland assertion failed or compositor crash outside bootstrap; not retried." >&2
-    exit 1
-  fi
+    if ((passed==1));then
+      cat "$log"
+      if ((attempt>1));then
+        echo "Confirmed external Weston pre-score SIGSEGV recovered on full fresh native acceptance rerun (attempt $attempt)."
+      fi
+      break
+    fi
+    cat "$log" >&2
+    # Only retry a proven *external* Weston SIGSEGV before any scored
+    # native session. Incomplete scores, product assertions, and a crash
+    # after scoring remain non-retriable in each isolated language run.
+    if ((attempt<3)) && weston_pre_score_crash "$log";then
+      echo "Confirmed external Weston SIGSEGV before first verified native typing (attempt $attempt/3). Retrying isolated GUI test; every app assertion remains strict." >&2
+      sleep 0.75
+    else
+      echo "Native Wayland assertion failed or compositor crash outside bootstrap; not retried." >&2
+      exit 1
+    fi
+  done
+  ((passed==1)) || exit 1
 done
-exit 1
+if [[ "${1:-}" == --rtl ]];then
+  echo "Independent Arabic and Hebrew native Weston scoring PASS (one disposable compositor per language)."
+fi

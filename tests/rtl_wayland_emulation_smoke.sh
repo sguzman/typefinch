@@ -63,7 +63,16 @@ stop_app(){
   app=''
   sleep 0.2
 }
-for layout in ara il;do
+# The guarded CI runs each script in a fresh Weston/Xvfb compositor.
+# Direct standalone invocation without an argument preserves the original
+# two-layout developer smoke behavior, but is not the CI acceptance path.
+case "${1:-both}" in
+  ara) layouts=(ara) ;;
+  il) layouts=(il) ;;
+  both) layouts=(ara il) ;;
+  *) echo 'Unsupported native Wayland RTL fixture layout' >&2;exit 2 ;;
+esac
+for layout in "${layouts[@]}";do
   mkdir -p "$tmp/$layout/config"
   export XDG_CONFIG_HOME="$tmp/$layout/config"
   export TYPEFINCH_QA_REPORT="$tmp/$layout/report.json"
@@ -140,4 +149,8 @@ print("Native Weston wl_keyboard RTL Emulated PASS: "..layout..", 4/4")
 LUA
   stop_app
 done
-echo "Native nested Wayland Arabic/Hebrew emulation PASS; no IME or hardware claims"
+if [[ "${1:-both}" == both ]];then
+  echo "Native nested Wayland Arabic/Hebrew emulation PASS; no IME or hardware claims"
+else
+  echo "Native nested Wayland ${1} emulation PASS; no IME or hardware claims"
+fi

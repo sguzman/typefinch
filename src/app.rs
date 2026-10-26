@@ -21,7 +21,8 @@ use crate::{
     xkb::Emulator,
 };
 use eframe::egui::{self, Color32, RichText};
-use std::{sync::mpsc::{self, Receiver, TryRecvError},time::{Duration, Instant}};
+use std::{sync::{mpsc::{self, Receiver, TryRecvError},
+    Arc,atomic::{AtomicBool,Ordering}},time::{Duration, Instant}};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
@@ -571,6 +572,7 @@ pub struct Typefinch {
     last_window_focused:bool,
     device_poll_started:Instant,
     portal_theme_rx:Receiver<Option<bool>>,
+    portal_watcher_enabled:Arc<AtomicBool>,
     portal_dark:Option<bool>,
     pending_device_query:Option<Receiver<Result<Vec<Keyboard>,String>>>,
     device_inventory_fresh:bool,
@@ -633,7 +635,9 @@ impl Typefinch {
         cc.egui_ctx.set_theme(effective_theme(prefs.theme,None));
         // The Linux window toolkit may not report desktop appearance.
         // The bounded, read-only portal worker must never block the GUI.
-        let portal_theme_rx=system_theme::watch(cc.egui_ctx.clone());
+        let portal_watcher_enabled=Arc::new(AtomicBool::new(prefs.theme==Theme::System));
+        let portal_theme_rx=system_theme::watch(
+            cc.egui_ctx.clone(),Arc::clone(&portal_watcher_enabled));
         // Use only installed system Unicode fallbacks, retaining egui's
         // preferred fonts. No glyph assets are bundled or fetched.
         let unicode_fonts=fonts::install(&cc.egui_ctx);
@@ -707,7 +711,8 @@ impl Typefinch {
              training_followup:None,controlled_trial:None,controlled_consent:false,
              controlled_exclusion:None,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(),portal_theme_rx,portal_dark:None,
+               device_poll_started:Instant::now(),portal_theme_rx,
+               portal_watcher_enabled,portal_dark:None,
                pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
                new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
@@ -1704,6 +1709,8 @@ impl Typefinch {
                 ui.selectable_value(&mut self.prefs.theme, Theme::Dark, "Dark");
             });
             if previous != self.prefs.theme {
+                self.portal_watcher_enabled.store(
+                    self.prefs.theme==Theme::System,Ordering::Relaxed);
                 ctx.set_theme(effective_theme(self.prefs.theme,self.portal_dark));
                 self.save();
             }
@@ -3094,6 +3101,8 @@ impl eframe::App for Typefinch {
                 .is_some_and(|modifiers|modifiers.ctrl && modifiers.shift));
         if theme_cycle && self.session.state!=State::Running && !self.settings_read_only {
             self.prefs.theme=next_theme(self.prefs.theme);
+            self.portal_watcher_enabled.store(
+                self.prefs.theme==Theme::System,Ordering::Relaxed);
             ctx.set_theme(effective_theme(self.prefs.theme,self.portal_dark));
             self.save();
         }

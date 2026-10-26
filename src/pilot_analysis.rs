@@ -4,7 +4,8 @@
 use crate::training::{PUBLIC_STUDY_REFERENCE,PUBLIC_STUDY_REFERENCE_ID};
 use serde::Deserialize;
 use serde_json::{json,Value};
-use std::{fs::OpenOptions,io::Read,os::unix::fs::OpenOptionsExt,path::PathBuf};
+use std::{collections::HashSet,fs::OpenOptions,io::Read,
+    os::unix::fs::{MetadataExt,OpenOptionsExt},path::PathBuf};
 use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_FILE_BYTES:u64=32_768;
@@ -86,7 +87,7 @@ impl Pilot {
         Ok(())
     }
 }
-fn read_local(path:&PathBuf)->Result<Pilot,String> {
+fn read_local(path:&PathBuf)->Result<(Pilot,(u64,u64)),String> {
     // A caller must provide every input path. Never follow symlinks, read a
     // directory/device, or print file content/path in diagnostic errors.
     let mut file=OpenOptions::new().read(true)
@@ -96,6 +97,7 @@ fn read_local(path:&PathBuf)->Result<Pilot,String> {
     if !meta.is_file() || meta.len()>MAX_FILE_BYTES {
         return Err("Expected a regular study aggregate file of at most 32 KiB".into());
     }
+    let identity=(meta.dev(),meta.ino());
     let mut data=Vec::new();
     file.take(MAX_FILE_BYTES+1).read_to_end(&mut data)
         .map_err(|_|"Cannot read local study aggregate file")?;
@@ -105,7 +107,7 @@ fn read_local(path:&PathBuf)->Result<Pilot,String> {
     let item: Pilot=serde_json::from_slice(&data)
         .map_err(|_|"Study aggregate is not valid schema-4 JSON")?;
     item.check()?;
-    Ok(item)
+    Ok((item,identity))
 }
 fn mean(values:&mut [f64])->f64 {
     values.sort_by(f64::total_cmp);
@@ -182,7 +184,17 @@ pub fn analyze(paths:&[PathBuf])->Result<Value,String> {
     if !(2..=MAX_RECORDS).contains(&paths.len()){
         return Err("Supply 2 to 200 explicitly selected aggregate files".into());
     }
-    let records=paths.iter().map(read_local).collect::<Result<Vec<_>,_>>()?;
+    let mut identities=HashSet::new();
+    let mut records=Vec::with_capacity(paths.len());
+    for path in paths {
+        let (record,identity)=read_local(path)?;
+        if !identities.insert(identity) {
+            // Reject exact same opened inode, even through a hard link.
+            // Do not print paths, hashes, or participant-level data.
+            return Err("Repeated input file; each aggregate may be supplied only once".into());
+        }
+        records.push(record);
+    }
     summarize(&records)
 }
 #[cfg(test)]

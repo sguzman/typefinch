@@ -3,7 +3,8 @@
 //! egui/winit may not supply a Linux system theme; this is an optional
 //! asynchronous fallback, not a replacement for explicit Light/Dark choices.
 use eframe::egui;
-use std::sync::mpsc::{self,Receiver};
+use std::sync::{mpsc::{self,Receiver},
+    Arc,atomic::{AtomicBool,Ordering}};
 
 pub fn preference(portal_dark:Option<bool>)->egui::ThemePreference {
     match portal_dark {
@@ -13,7 +14,7 @@ pub fn preference(portal_dark:Option<bool>)->egui::ThemePreference {
     }
 }
 
-pub fn watch(ctx:egui::Context)->Receiver<Option<bool>> {
+pub fn watch(ctx:egui::Context,enabled:Arc<AtomicBool>)->Receiver<Option<bool>> {
     let (tx,rx)=mpsc::channel();
     #[cfg(target_os="linux")]
     {
@@ -21,6 +22,13 @@ pub fn watch(ctx:egui::Context)->Receiver<Option<bool>> {
             .spawn(move || {
                 let mut previous:Option<Option<bool>>=None;
                 loop {
+                    // No D-Bus polling when the user has explicitly pinned
+                    // Light or Dark: those modes must have zero portal work.
+                    if !enabled.load(Ordering::Relaxed) {
+                        previous=None;
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        continue;
+                    }
                     let next=read_portal();
                     // Only emit when the semantic answer changes. A missing
                     // portal reverts to egui's default, never a stale choice.
@@ -35,7 +43,7 @@ pub fn watch(ctx:egui::Context)->Receiver<Option<bool>> {
     }
     #[cfg(not(target_os="linux"))]
     {
-        let _=(tx,ctx);
+        let _=(tx,ctx,enabled);
     }
     rx
 }

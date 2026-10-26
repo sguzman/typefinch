@@ -2010,7 +2010,7 @@ impl Typefinch {
                 || self.session.weak_bigram_drill().is_some()) {
             ui.group(|ui|{
                 ui.strong("Optional practice-disjoint retest pilot (experimental)");
-                ui.small("Randomized adaptive/fixed-pattern practice followed by immediate and one-hour delayed retests of the original baseline passage. The text is not novel; test-retest familiarity remains a confound. This is not validated research. Trial details are memory-only; ordinary aggregate scores still enter local history.");
+                ui.small("Randomized adaptive/fixed-pattern practice, then immediate and one-hour delayed retests of the original baseline. This is not novel-text transfer or validated research. Every pilot phase must reach the entire reference; a timed cutoff with untouched positions ends the pilot. Ordinary aggregate scores still enter local history; pilot details remain memory-only.");
                 ui.checkbox(&mut self.controlled_consent,"I opt in to this local, memory-only pilot");
                 if ui.add_enabled(self.controlled_consent,
                     egui::Button::new("Start randomized transfer pilot")).clicked() {

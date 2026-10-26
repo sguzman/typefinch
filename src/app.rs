@@ -1860,6 +1860,9 @@ impl Typefinch {
     /// Explicitly opt-in, private, one-process transfer pilot; arm assignment
     /// does not imply efficacy or equal training effort.
     fn start_controlled_pilot(&mut self,ctx:&egui::Context) {
+        self.start_controlled_pilot_with_arm(ctx,Arm::random());
+    }
+    fn start_controlled_pilot_with_arm(&mut self,ctx:&egui::Context,arm:Arm) {
         if !self.controlled_consent || self.settings_read_only
             || self.session.state!=State::Finished || self.session.mode!=TestMode::Custom
             || self.training_followup.is_some() || self.controlled_trial.is_some() {
@@ -1867,7 +1870,6 @@ impl Typefinch {
         }
         let Some(adaptive)=self.session.weak_character_drill()
             .or_else(||self.session.weak_bigram_drill()) else {return;};
-        let arm=Arm::random();
         let practice=match arm {
             Arm::Adaptive=>adaptive,
             Arm::NonAdaptive=>match training::neutral_practice(&adaptive,&self.session.target) {
@@ -3084,7 +3086,13 @@ impl eframe::App for Typefinch {
                 && self.controlled_trial.is_none()
                 && synthetic_pilot_key(egui::Key::P) {
                 self.controlled_consent=true;
-                self.start_controlled_pilot(ctx);
+                // Inject both arms deterministically for disposable CI only.
+                // Production UI always uses a fresh random assignment.
+                match std::env::var("TYPEFINCH_QA_PILOT_ARM").as_deref() {
+                    Ok("adaptive")=>self.start_controlled_pilot_with_arm(ctx,Arm::Adaptive),
+                    Ok("non_adaptive")=>self.start_controlled_pilot_with_arm(ctx,Arm::NonAdaptive),
+                    _=>self.start_controlled_pilot(ctx),
+                }
             } else if self.controlled_trial.as_ref().is_some_and(|t|
                 t.held_out_source()=="aba") {
                 if self.controlled_trial.as_ref().is_some_and(|t|

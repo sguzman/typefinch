@@ -3091,6 +3091,8 @@ impl eframe::App for Typefinch {
             self.portal_dark=answer;
             if self.prefs.theme==Theme::System {
                 ctx.set_theme(effective_theme(Theme::System,answer));
+                let _=crate::qa::write_system_theme_audit(
+                    answer,ctx.style().visuals.dark_mode);
             }
         }
         self.poll_keyboard_hotplug(ctx,focused);

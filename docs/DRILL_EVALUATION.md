@@ -213,9 +213,13 @@ version and input-mode category, complete reached-position counts, valid
 non-negative finite numeric fields, reported retention within the agreed
 window and both randomized arms represented. It rejects unknown JSON
 fields (including raw passages), mismatched cohorts, partial/older exports,
-symbolic links, devices, directories and oversized inputs. A file is
-read only through an explicit pathname; no network access or automatic
+symbolic links, devices, directories, oversized inputs and repeated
+file identities (including hard-linked aliases of the same inode). A file
+is read only through an explicit pathname; no network access or automatic
 discovery is performed. Error messages do not echo private paths or data.
+Distinct files could nevertheless originate from the SAME participant or
+repeated submission; source-file identity deduplication does not prove
+human independence.
 
 The JSON result contains only **arm counts, mean baseline error rates,
 mean immediate/delayed changes, practice opportunities/timing and

@@ -170,6 +170,10 @@ LUA
   xdotool windowfocus "$parent" 2>/dev/null || true
   xdotool key --clearmodifiers F11
   sleep 0.35
+  # F11 focuses the existing path field; select its previous filename
+  # rather than appending the new import path to it.
+  xdotool key --clearmodifiers ctrl+a
+  sleep 0.1
   xdotool type --clearmodifiers --delay 22 "$tmp/$layout/multiline.txt"
   xdotool key --clearmodifiers Return
   sleep 0.6

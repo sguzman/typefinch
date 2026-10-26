@@ -157,8 +157,28 @@ errors, profile identifiers, configured layout strings, keyboard addresses,
 timestamps and personal file paths. A discarded/incomplete study has no
 record to export. Data are neither uploaded nor automatically persisted.
 
-The version-3 export additionally reports the full reference-opportunity
-count, `coverage_policy="all_reference_positions_reached"`, predeclared
+The version-4 export adds an optional, exact public reference cohort ID.
+Clicking **Load public study baseline** in the native typing UI loads the
+published `typefinch.en.standard.unlimited.v1` reference and fixes
+English, Standard difficulty, Custom mode and unlimited test duration
+locally. Participants may decline or type their own passages as before.
+No pilot enrollment or transmission occurs when the public source is
+loaded. The same ordinary baseline errors and explicit per-pilot opt-in
+criteria still apply.
+
+Only byte-exact matches to this **already public** reference under the
+specified settings produce the `public_reference_cohort` identifier.
+All other passages export `null`: Typefinch deliberately does **not** hash,
+fingerprint, pseudonymize or otherwise leak private Custom passages through
+a stable identifier, since even cryptographic hashes of short private texts
+are susceptible to dictionary attacks. The reference itself remains absent
+from the JSON and no keyboard address/profile ID is exported. A shared
+cohort proves only common public source/settings, **not** comparable keyboard
+layout, representative participant recruitment, equal training dose,
+independent trials, randomization balance, or causal efficacy.
+
+The version-4 export retains the full reference-opportunity count,
+`coverage_policy="all_reference_positions_reached"`, predeclared
 immediate/retention windows, and the actual monotonic delayed interval
 (`actual_retention_gap_ms`). The local pilot rejects a timed stage if any
 reference position was never reached,
@@ -166,9 +186,12 @@ although its normal local aggregate score still remains valid. This prevents
 partial passage selection from falsely improving an observed error fraction,
 but also excludes slow/noncompleting participants from completed-pilot
 summaries. Such attrition can bias a study and **must be reported**, not hidden
-or interpreted as improved training efficacy. Previous schema-1 exports do not assert full-reference coverage, and
-schema-2 exports lack the bounded timing window. Neither can silently
-be pooled with schema-3 observations.
+or interpreted as improved training efficacy. Previous schema-1 exports do not assert full-reference coverage;
+schema-2 lacks the bounded timing window; schema-3 cannot establish a
+common public reference cohort. Do not silently pool their measurements
+with schema-4 observations. Even schema-4 alone does not establish real
+comparative efficacy, and private-passage results cannot be matched
+without separately authorized contextual evidence.
 
 The export explicitly marks `causal_claim=false` and
 `control_adjusted=false`. It cannot be treated as a controlled result

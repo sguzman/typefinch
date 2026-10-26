@@ -9,6 +9,7 @@ mod devices;
 mod wayland_seat;
 mod engine;
 mod training;
+mod pilot_analysis;
 mod history;
 mod export;
 mod fonts;
@@ -27,7 +28,7 @@ use std::path::PathBuf;
 
 #[derive(Debug,PartialEq,Eq)]
 enum LaunchIntent {Gui,Version,Help,InspectKeyboards,ProbeWaylandSeats,ProbeWaylandXkbSeats,VerifyBackup(PathBuf,PathBuf),
-    StageBackup(PathBuf,PathBuf,PathBuf),Invalid}
+    StageBackup(PathBuf,PathBuf,PathBuf),ComparePublicPilots(Vec<PathBuf>),Invalid}
 fn intent(args:&[String])->LaunchIntent {
     match args {
         []=>LaunchIntent::Gui,
@@ -40,6 +41,11 @@ fn intent(args:&[String])->LaunchIntent {
             LaunchIntent::VerifyBackup(PathBuf::from(settings),PathBuf::from(database)),
         [flag,settings,database,destination] if flag=="--restore-backup-to-new-dir"=>
             LaunchIntent::StageBackup(PathBuf::from(settings),PathBuf::from(database),PathBuf::from(destination)),
+        [flag,first,second,others @ ..] if flag=="--compare-public-pilots"=>{
+            let mut paths=vec![PathBuf::from(first.as_str()),PathBuf::from(second.as_str())];
+            paths.extend(others.iter().map(|x|PathBuf::from(x.as_str())));
+            LaunchIntent::ComparePublicPilots(paths)
+        },
         _=>LaunchIntent::Invalid,
     }
 }
@@ -107,8 +113,10 @@ fn main() -> eframe::Result {
             println!("Usage: typefinch [--version|--help|--inspect-keyboards]");
             println!("       typefinch --verify-backup SETTINGS.json SESSIONS.sqlite3");
             println!("       typefinch --restore-backup-to-new-dir SETTINGS.json SESSIONS.sqlite3 NEW_DIRECTORY");
+            println!("       typefinch --compare-public-pilots EXPORT1.json EXPORT2.json [EXPORT3.json ...]");
             println!("Keyboard inspection prints read-only JSON: seats/layout metadata, never key events or physical input attribution.");
             println!("Backup verification is read-only and never restores or replaces user data.");
+            println!("Public pilot comparison reads only explicit local schema-4 public-cohort aggregate exports; results are descriptive, never causal.");
             println!("GUI shortcuts: F1 guide · F2 focus · F3 layout layer · F4 geometry · F5 start · F6 SVG · F7 JSON · F8 backup · F9 PNG · F10 reference keys · F11 / Ctrl+O custom file import · Ctrl+E custom source editor · F12 goals import · Shift+F12 goals export · Ctrl+N focus new profile · Ctrl+Shift+T cycle theme · Ctrl+Shift+K practice missed keys · Ctrl+Shift+R retest original");
             return Ok(());
         },
@@ -129,6 +137,16 @@ fn main() -> eframe::Result {
                     summary.profiles,summary.sessions),
                 Err(problem)=>{
                     eprintln!("Restore staging refused: {problem}");
+                    std::process::exit(2);
+                }
+            }
+            return Ok(());
+        },
+        LaunchIntent::ComparePublicPilots(paths)=>{
+            match pilot_analysis::analyze(&paths) {
+                Ok(report)=>println!("{report}"),
+                Err(problem)=>{
+                    eprintln!("Local pilot comparison refused: {problem}");
                     std::process::exit(2);
                 }
             }
@@ -198,5 +216,8 @@ mod cli_tests {
         assert_eq!(intent(&["--restore-backup-to-new-dir".into(),"a".into(),"b".into(),"c".into()]),
             LaunchIntent::StageBackup(PathBuf::from("a"),PathBuf::from("b"),PathBuf::from("c")));
         assert_eq!(intent(&["--restore-backup-to-new-dir".into(),"a".into(),"b".into()]),LaunchIntent::Invalid);
+        assert_eq!(intent(&["--compare-public-pilots".into(),"a.json".into(),"b.json".into()]),
+            LaunchIntent::ComparePublicPilots(vec![PathBuf::from("a.json"),PathBuf::from("b.json")]));
+        assert_eq!(intent(&["--compare-public-pilots".into(),"a.json".into()]),LaunchIntent::Invalid);
     }
 }

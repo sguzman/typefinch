@@ -266,6 +266,24 @@ mod tests {
         assert!(publish_via(&mock,"alice/cards",DEMO,false).unwrap_err().contains("consent"));
         assert!(mock.calls.borrow().is_empty());
     }
+    #[test] fn all_real_exported_card_styles_remain_safe_to_publish(){
+        use crate::{export,preferences::{CardTheme,CardFont,CardTemplate,Profile}};
+        let profile=Profile {name:"<script> & שָׁלוֹם 🐦".into(),..Profile::default()};
+        for theme in CardTheme::ALL {
+            for font in CardFont::ALL {
+                for template in CardTemplate::ALL {
+                    let svg=export::card_with_template(&profile,
+                        "de(neo) & <layout>",theme,font,template);
+                    assert!(static_typefinch_svg(&svg),
+                        "Actual locally generated SVG must satisfy public-card safety rules");
+                    let remote=json!({"type":"file","sha":"a".repeat(40),
+                        "encoding":"base64","content":STANDARD.encode(svg.as_bytes())});
+                    assert_eq!(owned_card(&remote).unwrap().1,svg.as_bytes(),
+                        "Valid preexisting Typefinch card must remain updateable");
+                }
+            }
+        }
+    }
     #[test] fn uploaded_svg_markup_is_static_allowlisted_and_user_text_is_escaped(){
         assert!(static_typefinch_svg(DEMO));
         let safe=DEMO.replace("Typefinch</text>","&lt;script&gt; Typefinch &amp; 你好</text>");

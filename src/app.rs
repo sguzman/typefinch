@@ -915,6 +915,10 @@ impl Typefinch {
         self.session = Session::new_with_settings(duration, self.prefs.test_mode, input, self.prefs.language, self.prefs.word_difficulty);
     }
     fn start_test(&mut self, ctx: &egui::Context) {
+        // Consent applies only to the just-finished baseline. A manual new
+        // run or restart must not inherit the checkbox from an earlier test;
+        // explicit pilot stage transitions also clear this one-shot flag.
+        self.controlled_consent=false;
         // Ordinary manual restarts abandon a pilot; stage transitions restore it.
         self.controlled_trial=None;
         // Results from an earlier finished follow-up never decorate the

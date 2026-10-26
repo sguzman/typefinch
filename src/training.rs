@@ -97,6 +97,20 @@ impl FollowUp {
 }
 
 
+/// A public, stable passage is essential if independently volunteered
+/// aggregate exports are ever to be checked for common reference context.
+/// Private Custom passages deliberately receive NO digest or stable ID:
+/// even a SHA-256 digest of a short phrase leaks it via dictionary lookup.
+pub const PUBLIC_STUDY_REFERENCE_ID:&str="typefinch.en.standard.unlimited.v1";
+pub const PUBLIC_STUDY_REFERENCE:&str=
+    "steady fingers follow quiet letters across a bright keyboard while practice builds a patient rhythm";
+pub fn public_study_reference_id(source:&str,language:Language,
+    difficulty:WordDifficulty,duration:Duration)->Option<&'static str> {
+    (source==PUBLIC_STUDY_REFERENCE
+        && language==Language::English && difficulty==WordDifficulty::Standard
+        && duration.is_zero()).then_some(PUBLIC_STUDY_REFERENCE_ID)
+}
+
 /// A future opt-in study needs a genuine control condition and a reference
 /// withheld from practice. These are *protocol mechanics*, not human efficacy
 /// evidence; no participant or trial data is persisted by Typefinch.
@@ -289,7 +303,11 @@ impl ControlledTrial {
         let record=serde_json::json!({
             // Schema 2 requires full reached-position coverage in every
             // measured phase. Schema 1 exports must not be treated as equal.
-            "schema":3,
+            // Schema 4 adds an exact public-passage cohort identifier.
+            // Never hash, fingerprint or expose private Custom references.
+            "schema":4,
+            "public_reference_cohort":public_study_reference_id(
+                &self.held_out,self.language,self.difficulty,self.duration),
             "type":"typefinch-local-held-out-pilot",
             "immediate_deadline_seconds":600,
             "retention_window_seconds":[3600,86400],
@@ -732,7 +750,7 @@ mod tests {
         assert!(t.delay_ready());
         assert!(t.record_delayed(&reference,"a","us","os:unknown",Mode::System));
         let json:serde_json::Value=serde_json::from_str(&t.aggregate_export().unwrap()).unwrap();
-        assert_eq!(json["schema"],3);
+        assert_eq!(json["schema"],4);
         assert!(json["actual_retention_gap_ms"].as_u64().unwrap()>=7_200_000);
         assert_eq!(t.stage,TrialStage::Complete);
     }
@@ -850,7 +868,7 @@ mod tests {
             "private_profile","axab","abab","abab","private_practice");
         let raw=completed.aggregate_export().unwrap();
         let record:serde_json::Value=serde_json::from_str(&raw).unwrap();
-        assert_eq!(record["schema"],3);
+        assert_eq!(record["schema"],4);
         assert_eq!(record["immediate_deadline_seconds"],600);
         assert_eq!(record["retention_window_seconds"],serde_json::json!([3600,86400]));
         assert!(record["actual_retention_gap_ms"].as_u64().unwrap()>=3_600_000);
@@ -884,6 +902,64 @@ mod tests {
             control.practiced.unwrap().opportunities.observed);
         assert!(control_adjusted_transfer(&adaptive,&control).is_none(),
             "Numerically matched but different held-out texts are not comparable");
+    }
+    #[test] fn public_study_cohort_id_requires_exact_known_public_source_and_settings() {
+        let source=PUBLIC_STUDY_REFERENCE;
+        assert_eq!(public_study_reference_id(source,Language::English,
+            WordDifficulty::Standard,Duration::ZERO),Some(PUBLIC_STUDY_REFERENCE_ID));
+        let reference=Session::new_with_settings(0,TestMode::Custom,source,
+            Language::English,WordDifficulty::Standard);
+        assert_eq!(reference.target,source,
+            "Public reference must survive the actual Custom normalization byte-for-byte");
+        for other in [
+            "steady fingers follow quiet letters across a bright keyboard while practice builds a patient rhythm!",
+            "steady fingers follow quiet letters across a bright keyboard while practice builds a patient rhyth",
+            "aba",
+            "",
+        ] {
+            assert!(public_study_reference_id(other,Language::English,
+                WordDifficulty::Standard,Duration::ZERO).is_none());
+        }
+        assert!(public_study_reference_id(source,Language::MexicanSpanish,
+            WordDifficulty::Standard,Duration::ZERO).is_none());
+        assert!(public_study_reference_id(source,Language::English,
+            WordDifficulty::Easy,Duration::ZERO).is_none());
+        assert!(public_study_reference_id(source,Language::English,
+            WordDifficulty::Standard,Duration::from_secs(60)).is_none());
+
+        let mut baseline=Session::new_with_settings(0,TestMode::Custom,source,
+            Language::English,WordDifficulty::Standard);
+        baseline.begin();
+        let mut attempted=source.to_owned();
+        attempted.replace_range(0..1,"x");
+        baseline.type_text(&attempted);
+        assert_eq!(baseline.state,State::Finished);
+        let mut pilot=ControlledTrial::begin(&baseline,"a s d f j k l ;",
+            Arm::NonAdaptive,"private-profile","us","os:unknown",Mode::System).unwrap();
+        let practice=Session::new_with_custom(0,TestMode::Custom,"a s d f j k l ;");
+        let mut practice=practice;
+        practice.begin();
+        let source=practice.target.clone();practice.type_text(&source);
+        assert!(pilot.record_practice(&practice,"private-profile","us","os:unknown",Mode::System));
+        let mut repeated=Session::new_with_settings(0,TestMode::Custom,
+            PUBLIC_STUDY_REFERENCE,Language::English,WordDifficulty::Standard);
+        repeated.begin();
+        repeated.type_text(PUBLIC_STUDY_REFERENCE);
+        assert!(pilot.record_immediate(&repeated,"private-profile","us","os:unknown",Mode::System));
+        pilot.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(3600));
+        assert!(pilot.record_delayed(&repeated,"private-profile","us","os:unknown",Mode::System));
+        let exported=pilot.aggregate_export().unwrap();
+        let record:serde_json::Value=serde_json::from_str(&exported).unwrap();
+        assert_eq!(record["schema"],4);
+        assert_eq!(record["public_reference_cohort"],PUBLIC_STUDY_REFERENCE_ID);
+        assert!(!exported.contains(PUBLIC_STUDY_REFERENCE));
+        assert!(!exported.contains("private-profile"));
+        let private=completed_synthetic_arm(Arm::Adaptive,"private-profile",
+            "axab","abab","abab","xyxy").aggregate_export().unwrap();
+        let record:serde_json::Value=serde_json::from_str(&private).unwrap();
+        assert!(record["public_reference_cohort"].is_null(),
+            "No hash or pseudo-identifier may be generated for private text");
+        assert!(!private.contains("abab"));
     }
     #[test] fn invalid_controlled_pair_never_makes_unsupported_comparison() {
         let a=completed_synthetic_arm(Arm::Adaptive,"a","axab","abab","abab","xyxy");

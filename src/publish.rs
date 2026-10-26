@@ -344,7 +344,7 @@ mod tests {
         let stale=Mock::new(vec![Ok(repo_info()),Err(ApiFailure::NotFound),
             Ok(uploaded()),Ok(json!({"type":"file","sha":"b".repeat(40),
                 "encoding":"base64","content":STANDARD.encode(
-                    format!("{DEMO}different"))}))]);
+                    DEMO.replace(">Typefinch</text>",">Changed</text>"))}))]);
         assert!(publish_via(&stale,"alice/cards",DEMO,true).unwrap_err()
             .contains("did not match"));
         assert_eq!(stale.calls.borrow().len(),4);

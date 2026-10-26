@@ -83,4 +83,10 @@ require_refused "$tmp/a.json" "$tmp/a.json"
 require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a.json"
 ln "$tmp/a.json" "$tmp/a-hardlink.json"
 require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a-hardlink.json"
+cp "$tmp/a.json" "$tmp/a-copy.json"
+require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a-copy.json"
+# Even harmless differences in JSON spacing, field order, or line breaks
+# cannot make identical aggregate contents count as an independent trial.
+jq -cS '.' "$tmp/a.json" >"$tmp/a-reformatted.json"
+require_refused "$tmp/a.json" "$tmp/b.json" "$tmp/a-reformatted.json"
 echo "Offline public pilot analyzer PASS: descriptive two-arm output, strict malformed/private/symlink rejection; synthetic records only"

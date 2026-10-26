@@ -60,6 +60,13 @@ jobs:
           test "$code" -eq 2
       - name: Validate private Hyprland evidence receipts and reject tampering
         run: bash tests/hyprland_evidence_bundle_selftest.sh
+      - name: Ensure Codex live desktop launcher denies unattended CI
+        run: |
+          set +e
+          env -u TYPEFINCH_QA_CONSENT bash tests/run_live_hyprland_codex_qa.sh
+          code=$?
+          set -e
+          test "$code" -eq 2
       - name: Assert tracked dependency resolution
         run: |
           git ls-files --error-unmatch Cargo.lock

@@ -285,8 +285,12 @@ impl ControlledTrial {
             "elapsed_ms":sample.elapsed_ms
         });
         let record=serde_json::json!({
-            "schema":1,
+            // Schema 2 requires full reached-position coverage in every
+            // measured phase. Schema 1 exports must not be treated as equal.
+            "schema":2,
             "type":"typefinch-local-held-out-pilot",
+            "reference_opportunities":grapheme_count_for_trial(&self.held_out),
+            "coverage_policy":"all_reference_positions_reached",
             "app_version":env!("CARGO_PKG_VERSION"),
             "randomized_arm":if self.arm==Arm::Adaptive {"adaptive"}else{"non_adaptive"},
             "input_mode":if self.input==Mode::System {"os"}else{"emulated"},
@@ -792,7 +796,9 @@ mod tests {
             "private_profile","axab","abab","abab","private_practice");
         let raw=completed.aggregate_export().unwrap();
         let record:serde_json::Value=serde_json::from_str(&raw).unwrap();
-        assert_eq!(record["schema"],1);
+        assert_eq!(record["schema"],2);
+        assert_eq!(record["reference_opportunities"],4);
+        assert_eq!(record["coverage_policy"],"all_reference_positions_reached");
         assert_eq!(record["causal_claim"],false);
         assert_eq!(record["control_adjusted"],false);
         assert_eq!(record["randomized_arm"],"adaptive");

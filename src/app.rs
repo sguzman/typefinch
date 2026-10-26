@@ -195,6 +195,11 @@ fn limited_ime_preedit(text:&str)->String {
         if visible.len()+grapheme.len()>MAX_IME_PREEDIT_BYTES {break;}
         visible.push_str(grapheme);
     }
+    // A single combining-mark cluster can exceed the entire byte budget.
+    // Empty preview previously meant "no active IME" to Backspace/Escape,
+    // letting those keys edit/cancel Typefinch while a candidate was alive.
+    // Keep a bounded, non-sensitive indicator until Preedit("")/Commit/Disabled.
+    if !text.is_empty() && visible.is_empty(){visible.push('…');}
     visible
 }
 fn score_system_committed_event(session:&mut Session,preedit:&mut String,
@@ -214,8 +219,12 @@ fn score_system_committed_event(session:&mut Session,preedit:&mut String,
                 false
             } else {session.type_text(text);true}
         },
-        egui::Event::Text(text) if !text.is_empty()
+        egui::Event::Text(text) if preedit.is_empty()
+            && !text.is_empty()
             && text.len()<=crate::engine::MAX_SCORABLE_COMMIT_BYTES=>{
+            // Composing candidates belong to the IME, even if its backend
+            // also emits a provisional plain Text event mid-composition.
+            // Only an explicit Commit scores while preedit remains active.
             session.type_text(text);
             true
         },
@@ -244,18 +253,23 @@ fn score_system_frame_event(session:&mut Session,preedit:&mut String,
         _=>None,
     };
     if let Some((is_ime,text))=committed {
-        if !text.is_empty() {
-            if dedup.last.as_ref().is_some_and(|(previous_ime,previous)|
-                *previous_ime!=is_ime && previous==text) {
-                dedup.last=None;
-                if is_ime {preedit.clear();}
-                return false;
-            }
-            // Never copy unbounded compositor text into an auxiliary cache.
-            dedup.last=(text.len()<=16_384).then(||(is_ime,text.to_owned()));
+        if !text.is_empty() && dedup.last.as_ref().is_some_and(|(previous_ime,previous)|
+            *previous_ime!=is_ime && previous==text) {
+            dedup.last=None;
+            if is_ime {preedit.clear();}
+            return false;
         }
     }
-    score_system_committed_event(session,preedit,event)
+    let scored=score_system_committed_event(session,preedit,event);
+    if let Some((is_ime,text))=committed {
+        // Deduplicate only a text event that was ACTUALLY scored. A
+        // provisional Text during IME preedit must not suppress the
+        // subsequent real Commit of the same candidate.
+        dedup.last=if scored && text.len()<=16_384 {
+            Some((is_ime,text.to_owned()))
+        }else{None};
+    }
+    scored
 }
 fn synthetic_qa_duration(value:Option<&str>)->u64 {
     let requested=value.and_then(|v|v.parse::<u64>().ok()).unwrap_or(2);
@@ -3376,6 +3390,49 @@ mod palette_tests {
             assert_eq!(s.attempts,2);
             assert_eq!(s.score().correct,2);
         }
+    }
+    #[test] fn provisional_text_during_ime_preedit_cannot_score_or_steal_real_commit(){
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"你你");
+        s.begin();
+        let mut preedit=String::new();
+        let mut guard=SystemFrameCommitDedup::default();
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Ime(synthetic_preedit("ni".into()))));
+        assert_eq!(preedit,"ni");
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("你".into())),
+            "A provisional Text while the IME owns composition is not committed input");
+        assert_eq!(s.attempts,0);
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Ime(egui::ImeEvent::Commit("你".into()))),
+            "The REAL commit must not be deduplicated against rejected provisional Text");
+        assert!(preedit.is_empty());
+        assert!(!score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("你".into())),
+            "A duplicate platform Text after the committed candidate scores only once");
+        assert_eq!(s.attempts,1);
+        assert!(score_system_frame_event(&mut s,&mut preedit,&mut guard,
+            &egui::Event::Text("你".into())),
+            "An independent post-commit Text event remains scoreable");
+        assert_eq!(s.typed,"你你");
+        assert_eq!(s.score().correct,2);
+    }
+    #[test] fn oversized_single_grapheme_preedit_keeps_ime_navigation_ownership(){
+        let huge=format!("e{}", "\u{301}".repeat(MAX_IME_PREEDIT_BYTES+1));
+        let preview=limited_ime_preedit(&huge);
+        assert_eq!(preview,"…","Nonempty but unrenderable composition stays nonempty");
+        assert!(preview.len()<=MAX_IME_PREEDIT_BYTES);
+        let mut s=Session::new_with_custom(0,TestMode::Custom,"a");
+        s.begin();
+        let mut active=preview;
+        assert!(ime_owns_navigation(Mode::System,&mut active,egui::Key::Backspace));
+        assert!(!active.is_empty());
+        assert_eq!(s.attempts,0);
+        assert!(ime_owns_navigation(Mode::System,&mut active,egui::Key::Escape));
+        assert!(active.is_empty());
+        assert!(!ime_owns_navigation(Mode::System,&mut active,egui::Key::Backspace));
+        assert!(limited_ime_preedit("").is_empty(),
+            "An explicitly ended composition releases candidate ownership");
     }
     #[test] fn ime_commits_score_once_while_noncommitted_events_do_not() {
         let mut session=Session::new_with_custom(0,TestMode::Custom,"你好世界");

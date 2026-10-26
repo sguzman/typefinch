@@ -3,6 +3,7 @@
 //! Never persist a source passage, character-level errors or this trial.
 use crate::{engine::{Language,OpportunityCounts,Score,Session,State,TestMode,WordDifficulty},layouts::Mode};
 use std::time::Duration;
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum Stage { Drill, Retest, Compared }
@@ -159,13 +160,22 @@ impl ControlledTrial {
     pub fn begin(baseline:&Session,practice:&str,arm:Arm,profile_id:&str,
         layout:&str,recorded_layout:&str,input:Mode)->Option<Self> {
         if baseline.mode!=TestMode::Custom || baseline.target.is_empty()
-            || practice.is_empty() || baseline.target==practice
+            || practice.is_empty()
             || profile_id.is_empty() || layout.is_empty() || recorded_layout.is_empty() {
             return None;
         }
+        // Use the real Custom-mode normalization before deciding whether the
+        // supposedly withheld passage was exposed during practice. Reject
+        // canonically equivalent Unicode and a practice text containing the
+        // entire held-out passage (including a normalization-equivalent copy).
+        let normalized=Session::new_with_settings(baseline.duration.as_secs(),
+            TestMode::Custom,practice,baseline.language,baseline.difficulty);
+        let withheld=baseline.target.nfc().collect::<String>();
+        let exposed=normalized.target.nfc().collect::<String>();
+        if exposed.is_empty() || exposed.contains(&withheld) {return None;}
         Some(Self {
             arm,stage:TrialStage::Practice,
-            held_out:baseline.target.clone(),practice:practice.into(),
+            held_out:baseline.target.clone(),practice:normalized.target,
             language:baseline.language,difficulty:baseline.difficulty,
             duration:baseline.duration,profile_id:profile_id.into(),
             layout:layout.into(),recorded_layout:recorded_layout.into(),input,
@@ -409,6 +419,17 @@ mod tests {
         let baseline=synthetic_custom("abab","axab");
         assert!(ControlledTrial::begin(&baseline,"abab",Arm::Adaptive,
             "a","us","os:unknown",Mode::System).is_none());
+        assert!(ControlledTrial::begin(&baseline,"xxababyy",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).is_none(),
+            "A full held-out passage embedded in practice is not withheld");
+        let unicode=synthetic_custom("é","é");
+        assert!(ControlledTrial::begin(&unicode,"e\\u{301}",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).is_none(),
+            "Canonical Unicode equivalents must never count as separate texts");
+        let normalized_practice=ControlledTrial::begin(&baseline,"x   y",
+            Arm::NonAdaptive,"a","us","os:unknown",Mode::System).unwrap();
+        assert_eq!(normalized_practice.practice,"x y",
+            "Practice reference uses exactly the normalized native Custom source");
         let mut trial=ControlledTrial::begin(&baseline,"xyxy",Arm::Adaptive,
             "a","us","os:unknown",Mode::System).unwrap();
         let practiced=synthetic_custom("xyxy","xyxy");

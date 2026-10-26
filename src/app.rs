@@ -2299,6 +2299,20 @@ impl Typefinch {
     fn show_test(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(RichText::new("Typing test").size(24.0).strong());
         ui.horizontal_wrapped(|ui| {
+            if self.session.state != State::Running && !self.settings_read_only
+                && ui.button("Load public study baseline")
+                    .on_hover_text("Replaces the in-memory Custom source with a published, versioned reference. Sets English / Standard / untimed. No passage or participant data is uploaded.")
+                    .clicked() {
+                self.prefs.test_mode=TestMode::Custom;
+                self.prefs.language=Language::English;
+                self.prefs.word_difficulty=WordDifficulty::Standard;
+                self.prefs.duration_seconds=0;
+                self.custom_text=training::PUBLIC_STUDY_REFERENCE.to_owned();
+                Self::reset_custom_editor_history(ctx);
+                self.rebuild_session();
+                self.save();
+                self.message="Public study passage loaded locally. Type naturally; any optional comparative pilot requires fresh opt-in and observed errors.".into();
+            }
             let name = if self.session.state == State::Running { "Restart test" } else { "Start test" };
             if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() {

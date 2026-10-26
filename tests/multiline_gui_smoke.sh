@@ -17,6 +17,15 @@ mkdir -p "$tmp/config"
 export XDG_CONFIG_HOME="$tmp/config"
 export TYPEFINCH_QA_REPORT="$tmp/result.json"
 printf 'a\nb' > "$tmp/source.txt"
+# xvfb-run may export DISPLAY before its X server is accepting
+# connections. Validate the actual protocol before launching production
+# winit; an XOpenDisplayFailed at this point says nothing about typing.
+ready=0
+for _ in $(seq 1 60);do
+  if xdotool getdisplaygeometry >/dev/null 2>&1;then ready=1;break;fi
+  sleep 0.1
+done
+((ready==1)) || { echo 'Xvfb never accepted X11 client connections' >&2;exit 1; }
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm_pid=$!
 ./target/debug/typefinch >"$tmp/app.log" 2>&1 &
@@ -25,7 +34,11 @@ window=""
 for _ in $(seq 1 200);do
   window="$(xdotool search --onlyvisible --name 'Typefinch' 2>/dev/null | head -n 1 || true)"
   [[ -z "$window" ]] || break
-  kill -0 "$app_pid" 2>/dev/null || { echo 'Native multiline app exited' >&2;exit 1; }
+  kill -0 "$app_pid" 2>/dev/null || {
+    echo 'Native multiline app exited before mapping its X11 window' >&2
+    [[ ! -s "$tmp/wm.log" ]] || tail -n 30 "$tmp/wm.log" >&2
+    exit 1
+  }
   sleep 0.25
 done
 [[ -n "$window" ]] || { echo 'No native multiline window' >&2;exit 1; }

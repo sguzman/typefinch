@@ -16,6 +16,7 @@ use crate::{
     publish,
     registry::{self, InstalledLayout},
     rtl_shaping,
+    system_theme,
     training::{self,Arm,ControlledTrial,FollowUp,Stage,TrialStage},
     xkb::Emulator,
 };
@@ -526,6 +527,13 @@ fn next_theme(theme:Theme)->Theme {
     match theme {Theme::System=>Theme::Light,Theme::Light=>Theme::Dark,
         Theme::Dark=>Theme::System}
 }
+fn effective_theme(theme:Theme, portal_dark:Option<bool>)->egui::ThemePreference {
+    match theme {
+        Theme::System=>system_theme::preference(portal_dark),
+        Theme::Light=>egui::ThemePreference::Light,
+        Theme::Dark=>egui::ThemePreference::Dark,
+    }
+}
 fn motion_seconds(reduced:bool,normal:f32)->f32 {
     if reduced {0.0} else {normal}
 }
@@ -562,6 +570,8 @@ pub struct Typefinch {
     device_index: usize,
     last_window_focused:bool,
     device_poll_started:Instant,
+    portal_theme_rx:Receiver<Option<bool>>,
+    portal_dark:Option<bool>,
     pending_device_query:Option<Receiver<Result<Vec<Keyboard>,String>>>,
     device_inventory_fresh:bool,
     pending_device_obsolete:bool,
@@ -620,11 +630,10 @@ impl Typefinch {
             prefs.duration_seconds=synthetic_qa_duration(
                 std::env::var("TYPEFINCH_QA_DURATION_SECONDS").ok().as_deref());
         }
-        cc.egui_ctx.set_theme(match prefs.theme {
-            Theme::System => egui::ThemePreference::System,
-            Theme::Light => egui::ThemePreference::Light,
-            Theme::Dark => egui::ThemePreference::Dark,
-        });
+        cc.egui_ctx.set_theme(effective_theme(prefs.theme,None));
+        // The Linux window toolkit may not report desktop appearance.
+        // The bounded, read-only portal worker must never block the GUI.
+        let portal_theme_rx=system_theme::watch(cc.egui_ctx.clone());
         // Use only installed system Unicode fallbacks, retaining egui's
         // preferred fonts. No glyph assets are bundled or fetched.
         let unicode_fonts=fonts::install(&cc.egui_ctx);
@@ -698,7 +707,8 @@ impl Typefinch {
              training_followup:None,controlled_trial:None,controlled_consent:false,
              controlled_exclusion:None,
                device_index: 0, last_window_focused:true,
-               device_poll_started:Instant::now(), pending_device_query,
+               device_poll_started:Instant::now(),portal_theme_rx,portal_dark:None,
+               pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
                new_profile: String::new(), custom_text: String::new(), custom_import_path:String::new(), goal_import_path:String::new(), backup_settings_path:String::new(),
             backup_check_result:String::new(),
@@ -1694,11 +1704,7 @@ impl Typefinch {
                 ui.selectable_value(&mut self.prefs.theme, Theme::Dark, "Dark");
             });
             if previous != self.prefs.theme {
-                ctx.set_theme(match self.prefs.theme {
-                    Theme::System=>egui::ThemePreference::System,
-                    Theme::Light=>egui::ThemePreference::Light,
-                    Theme::Dark=>egui::ThemePreference::Dark,
-                });
+                ctx.set_theme(effective_theme(self.prefs.theme,self.portal_dark));
                 self.save();
             }
             let was_reduced=self.prefs.reduce_motion;
@@ -3072,6 +3078,14 @@ impl eframe::App for Typefinch {
                 self.message="Session layout attribution set to unknown after focus loss; no physical keyboard is inferred.".into();
             }
         }
+        // Portal updates only affect System. Explicit Light/Dark overrides
+        // are never changed. A missing portal restores egui's fallback.
+        while let Ok(answer)=self.portal_theme_rx.try_recv() {
+            self.portal_dark=answer;
+            if self.prefs.theme==Theme::System {
+                ctx.set_theme(effective_theme(Theme::System,answer));
+            }
+        }
         self.poll_keyboard_hotplug(ctx,focused);
         self.poll_publish_result();
         self.last_window_focused=focused;
@@ -3080,11 +3094,7 @@ impl eframe::App for Typefinch {
                 .is_some_and(|modifiers|modifiers.ctrl && modifiers.shift));
         if theme_cycle && self.session.state!=State::Running && !self.settings_read_only {
             self.prefs.theme=next_theme(self.prefs.theme);
-            ctx.set_theme(match self.prefs.theme {
-                Theme::System=>egui::ThemePreference::System,
-                Theme::Light=>egui::ThemePreference::Light,
-                Theme::Dark=>egui::ThemePreference::Dark,
-            });
+            ctx.set_theme(effective_theme(self.prefs.theme,self.portal_dark));
             self.save();
         }
         let f12=ctx.input(|i|pressed_key_modifiers(&i.events,egui::Key::F12));

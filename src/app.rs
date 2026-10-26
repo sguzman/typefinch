@@ -552,6 +552,7 @@ pub struct Typefinch {
     training_followup:Option<FollowUp>,
     controlled_trial:Option<ControlledTrial>,
     controlled_consent:bool,
+    controlled_exclusion:Option<String>,
     earned_badges: Vec<achievements::Achievement>,
     all_history:Vec<Record>,
     history_only_matching: bool,
@@ -695,6 +696,7 @@ impl Typefinch {
              emulated_right_alt_held:false, emulated_left_alt_held:false, installed_layouts, layout_search: String::new(), layout_draft:None, layout_import_path:String::new(), history, history_only_matching: false, history_metric: history::HistoryMetric::CorrectedWpm,
             earned_badges, all_history, completed_lessons, keyboards, device_error,
              training_followup:None,controlled_trial:None,controlled_consent:false,
+             controlled_exclusion:None,
                device_index: 0, last_window_focused:true,
                device_poll_started:Instant::now(), pending_device_query,
                device_inventory_fresh:false, pending_device_obsolete:false,
@@ -865,6 +867,8 @@ impl Typefinch {
                 TrialStage::Complete=>false,
             };
             if !ok {
+                self.controlled_exclusion=trial.exclusion_export(
+                    training::PilotExclusionReason::ProtocolInvalid);
                 self.controlled_trial=None;
                 self.message="Local transfer pilot stopped: source, layout or phase mismatch.".into();
             } else {
@@ -890,12 +894,19 @@ impl Typefinch {
             }
         }
     }
+    /// Discard any in-flight study while keeping only an explicitly
+    /// copyable, anonymous public-cohort attrition tally in process memory.
+    fn abandon_controlled_pilot(&mut self,reason:training::PilotExclusionReason) {
+        if let Some(trial)=self.controlled_trial.take() {
+            self.controlled_exclusion=trial.exclusion_export(reason);
+        }
+        self.controlled_consent=false;
+    }
     fn rebuild_session(&mut self) {
         // A new source, preference or profile invalidates an in-memory trial.
         // The explicit retest path temporarily takes and restores it.
         self.training_followup=None;
-        self.controlled_trial=None;
-        self.controlled_consent=false;
+        self.abandon_controlled_pilot(training::PilotExclusionReason::ManualRestart);
         self.ime_preedit.clear();
         // Textures and their cache signatures can contain pixels/strings from
         // a previously loaded private passage. Discard them when the source
@@ -920,7 +931,7 @@ impl Typefinch {
         // explicit pilot stage transitions also clear this one-shot flag.
         self.controlled_consent=false;
         // Ordinary manual restarts abandon a pilot; stage transitions restore it.
-        self.controlled_trial=None;
+        self.abandon_controlled_pilot(training::PilotExclusionReason::ManualRestart);
         // Results from an earlier finished follow-up never decorate the
         // next independent test.
         if self.training_followup.as_ref().is_some_and(|t|t.stage==Stage::Compared) {
@@ -949,7 +960,7 @@ impl Typefinch {
         if !ctx.input(|i| i.focused) {
             // A window losing focus must not collect invisible typing events.
             self.session.state = State::Ready;
-            self.controlled_trial=None;
+            self.abandon_controlled_pilot(training::PilotExclusionReason::FocusLost);
             self.ime_preedit.clear();
             self.emulated_right_alt_held=false;
             self.emulated_left_alt_held=false;
@@ -988,7 +999,7 @@ impl Typefinch {
                 egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                     if !ime_owns_navigation(self.mode,&mut self.ime_preedit,egui::Key::Escape) {
                         self.session.state = State::Ready;
-                        self.controlled_trial=None;
+                        self.abandon_controlled_pilot(training::PilotExclusionReason::ParticipantWithdrew);
                         self.ime_preedit.clear();
                         if let Some(compose) = self.composition.as_mut() { compose.reset(); }
                     }
@@ -2010,9 +2021,21 @@ impl Typefinch {
                     }
                 }
                 if ui.button("Discard local pilot").clicked() {
-                    self.controlled_trial=None;
-                    self.controlled_consent=false;
-                    self.message="Pilot discarded. Existing ordinary local aggregate scores unchanged.".into();
+                    self.abandon_controlled_pilot(
+                        training::PilotExclusionReason::ParticipantWithdrew);
+                    self.message="Pilot discarded. Ordinary local scores unchanged. A public-cohort exclusion tally may be copied or dismissed.".into();
+                }
+            });
+        }else if let Some(summary)=self.controlled_exclusion.clone() {
+            ui.group(|ui|{
+                ui.strong("Optional public-study exclusion tally");
+                ui.small("An incomplete randomized enrollment can be counted as attrition, not as an improvement. The fixed summary contains only public cohort, assigned arm, stage and reason; no private passage, keyboard ID, profile or timestamps. Nothing is saved or uploaded.");
+                if ui.button("Copy exclusion tally locally").clicked() {
+                    ui.ctx().copy_text(summary);
+                    self.message="Exclusion tally copied locally by request. No network publication.".into();
+                }
+                if ui.button("Dismiss exclusion tally").clicked() {
+                    self.controlled_exclusion=None;
                 }
             });
         }else if !self.settings_read_only && self.session.state==State::Finished
@@ -2317,7 +2340,8 @@ impl Typefinch {
             if ui.add_enabled(!self.session.target.is_empty(), egui::Button::new(name)).clicked() { self.start_test(ctx); }
             if self.session.state == State::Running && ui.button("Stop").clicked() {
                 self.session.state=State::Ready;
-                self.controlled_trial=None;
+                self.abandon_controlled_pilot(
+                    training::PilotExclusionReason::ParticipantWithdrew);
             }
             if self.session.state == State::Finished {
                 // Do not silently replace the original baseline with a

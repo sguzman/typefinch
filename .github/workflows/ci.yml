@@ -34,8 +34,15 @@ jobs:
         # This is a failure deadline, never a success bypass or skip.
         timeout-minutes: 10
         run: |
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends weston x11-xkb-utils libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox xclip lua5.4 lua-dkjson sqlite3 libxml2-utils fonts-noto-core fonts-noto-cjk
+          # The hosted Azure archive mirror stalled for ten minutes on the
+          # 61 MB signed Ubuntu Noto CJK package (Actions 40253477104).
+          # On ephemeral Ubuntu runners only, prefer Ubuntu's canonical
+          # archive mirror. Keep apt's signed index/package verification.
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends weston x11-xkb-utils libxkbcommon-dev libwayland-dev libgl1-mesa-dev libegl1-mesa-dev pkg-config xvfb xdotool imagemagick mesa-utils openbox xclip lua5.4 lua-dkjson sqlite3 libxml2-utils fonts-noto-core fonts-noto-cjk
       - name: Verify acceptance ledger
         run: lua5.4 tools/roadmap.lua --check
       - name: Audit brand swatch and semantic accent contrast

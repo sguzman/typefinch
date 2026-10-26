@@ -608,3 +608,44 @@ Shift+click. This remains evidence for the specified virtual X11
 and nested Wayland behavior, **not** full native Hyprland RTL/IME
 acceptance. T804 stays **67%** and overall acceptance as reported in the current roadmap until
 the broader remaining gates can genuinely be verified.
+
+## Native Wayland ordinary OS-input Arabic/Hebrew scoring (October 26, 2026)
+
+[Full CI 40340041814](https://github.com/sguzman/typefinch/actions/runs/40340041814)
+passed **264 Rust tests and the complete graphical suite**, including
+the strict RTL Wayland acceptance runner. Four independent Xvfb/Weston
+compositor processes were required rather than restarting clients after
+a completed session.
+
+| Input path | Arabic | Hebrew |
+|---|---|---|
+| Native Wayland physical-position **software emulation** | 4/4 after one corrected error; separate 5/5 hard-Newline passage | 4/4 after one corrected error; separate 5/5 hard-Newline passage |
+| Native Wayland compositor-translated **OS input** | 4/4 after one corrected error | 4/4 after one corrected error |
+
+The new **OS-input** case runs the actual Wayland child with software
+emulation disabled. It first loads a disposable custom reference under the
+X11 parent's US keyboard map, then applies the target Arabic or Hebrew
+XKB map to the disposable Xvfb parent and uses numeric physical X11
+keycodes through the nested Weston keyboard seat. The Weston keyboard
+configuration is explicit for each separate language process. Each
+result must be a real finished typing session, retain one mistake and
+one correction across five attempts, and persist **OS** input-mode
+provenance in isolated SQLite. The source and import path must not
+appear in preferences. These checks do not replace the independent
+**Emulated** scores or the hard-Newline regressions.
+
+**Failures remain visible:** CI
+[40337331095](https://github.com/sguzman/typefinch/actions/runs/40337331095)
+failed because an unconfigured Weston instance did not deliver expected
+OS-mode text. CI
+[40338576636](https://github.com/sguzman/typefinch/actions/runs/40338576636)
+still failed with an explicit Weston keymap and Alt+Shift alone. The
+guarded runner correctly declined to retry these app-scoring failures.
+The accepted configuration additionally changed the isolated parent X11
+layout and sent physical keycodes. No production keymap was changed.
+
+**Acceptance boundary:** This tests ordinary compositor-translated RTL input
+on a nested virtual Wayland seat, not physical Hyprland keyboards, scoped
+per-device capture, Fcitx/IBus candidate overlays, arbitrary mixed-direction
+editing or full accessibility integration. T804's broad RTL test gate
+remains open; do not claim real hardware or comprehensive RTL acceptance.

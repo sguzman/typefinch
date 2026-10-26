@@ -66,8 +66,9 @@ inventory_stable(){
     end
   ' >/dev/null
 }
-# Fail closed when a visible same-workspace Hyprland client intersects the
-# Typefinch capture rectangle. This does not detect layer-shell overlays.
+# A pinned client remains visible across workspace changes, so it must
+# be included in overlap checks even when its stored workspace differs.
+# Layer-shell occlusion is checked separately below.
 window_is_clear(){
   jq -en --slurpfile data "$1" --argjson pid "$2" --argjson ws "$3" '
     def valid_rect:
@@ -81,8 +82,10 @@ window_is_clear(){
       if ($apps|length)!=1 then false else
         ($apps[0]) as $target |
         ([$clients[] | select(.pid!=$pid and .mapped==true and .hidden!=true
-          and .workspace.id==$ws)]) as $others |
-        ($target.workspace.id==$ws and ($target|valid_rect) and
+          and (.workspace.id==$ws or .pinned==true))]) as $others |
+        ($target.workspace.id==$ws and
+         (all($clients[]; .pinned==null or (.pinned|type)=="boolean")) and
+         ($target|valid_rect) and
          (all($others[];valid_rect)) and
          ([$others[] | select(
             .at[0]<($target.at[0]+$target.size[0]) and
@@ -307,6 +310,16 @@ if [[ "${1:-}" == --self-test ]];then
   # must fail even when the native compositor screenshot tool succeeds.
   printf '%s' '[{"pid":42,"mapped":true,"hidden":false,"workspace":{"id":3},"at":[18,27],"size":[800,600]},{"pid":21,"mapped":true,"hidden":false,"workspace":{"id":4},"at":[25,35],"size":[80,80]}]' >"$fixture_dir/clients.json"
   window_is_clear "$fixture_dir/clients.json" 42 3 || exit 1
+  # A pinned client is visible in every workspace, including when its
+  # stored workspace identity does not match the current one.
+  jq '.[1].pinned=true' "$fixture_dir/clients.json" >"$fixture_dir/pinned.json"
+  if window_is_clear "$fixture_dir/pinned.json" 42 3;then
+    echo "Pinned cross-workspace client obscured Typefinch screenshot" >&2;exit 1
+  fi
+  jq '.[1].pinned="true"' "$fixture_dir/clients.json" >"$fixture_dir/ambiguous-pin.json"
+  if window_is_clear "$fixture_dir/ambiguous-pin.json" 42 3;then
+    echo "Invalid pinned-window visibility status accepted" >&2;exit 1
+  fi
   jq '.[1].workspace.id=3' "$fixture_dir/clients.json" >"$fixture_dir/occluded.json"
   if window_is_clear "$fixture_dir/occluded.json" 42 3;then
     echo "Overlapping GUI accepted as window-only evidence" >&2;exit 1

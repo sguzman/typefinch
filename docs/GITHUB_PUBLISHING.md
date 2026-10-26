@@ -49,11 +49,17 @@ replacement so GitHub can reject concurrent changes. The app never forces
 the ref, broadens the target, or deletes files. Offline/authentication
 errors fail closed and do not silently queue a future upload.
 
-The UI reports an error if the GitHub response does not prove that the
-fixed SVG path was updated. If the request reached GitHub but the response
-was lost, the outcome might be ambiguous; check the repository before
-retrying. Typefinch must never claim a definite failure if a remote
-operation could have completed.
+The UI requires **both** a successful GitHub Contents API PUT receipt
+for the fixed path and a fresh read-back of that same path. The read-back
+must contain an inspectable Typefinch SVG whose decoded bytes match the exact
+generated card. A filename-only receipt, an unreadable remote response, or
+a different public card is **not** reported as successful publication.
+
+If GitHub accepted the write but the subsequent verification fails because
+of caching, network loss, a changed file or any other reason, the result is
+**uncertain**, not a definite failed upload. The message asks the user to
+inspect the repository before trying again. The extra read-back uses only
+the already authorized fixed repository path and never updates another file.
 
 ## Verification and limitations
 
@@ -61,6 +67,9 @@ Unit tests use a fake GitHub API with no credentials and no network, covering
 missing consent, invalid repository inputs, permission refusal, new and
 existing cards, existing unrelated files, missing or corrupt remote data,
 upload failures, mismatch response paths and SHA-bearing replacement.
+They also test successful byte-exact read-back, unavailable verification,
+a stale/different card and invalid post-upload metadata without any
+live GitHub account, credentials or network requests.
 
 Native CI validates app compilation and guarded UI lifecycle. The
 public **synthetic** README example is separately tested via headless

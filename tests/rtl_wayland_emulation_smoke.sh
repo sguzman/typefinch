@@ -29,6 +29,11 @@ unset HYPRLAND_INSTANCE_SIGNATURE WAYLAND_SOCKET
 setxkbmap -layout us -model pc105
 openbox --sm-disable >"$tmp/wm.log" 2>&1 &
 wm=$!
+# Use independent Weston XKB groups: US for keyboard-only path import,
+# then the target RTL group for ordinary OS Wayland key translation.
+case "${1:-both}" in il) native_group=il ;; *) native_group=ara ;; esac
+export XKB_DEFAULT_LAYOUT="us,$native_group"
+export XKB_DEFAULT_OPTIONS="grp:alt_shift_toggle"
 weston --backend=x11-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" \
   --no-config --idle-time=0 --width=1024 --height=768 \
   --log="$tmp/weston.log" >"$tmp/weston-out.log" 2>&1 &
@@ -221,6 +226,66 @@ assert(not prefs:find(content,1,true) and not prefs:find(source,1,true),
   "RTL multiline source or local path leaked into persistent preferences")
 print("Native RTL Wayland multiline Enter PASS: "..layout..", 5/5; two isolated scores")
 LUA
+  # Also exercise compositor-translated *OS* input, not just software
+  # emulation. This still uses a virtual seat, never a physical keyboard.
+  if [[ "${1:-both}" == "$layout" ]];then
+    stop_app
+    unset TYPEFINCH_QA_XKB_COMPOSE
+    rm -f -- "$TYPEFINCH_QA_REPORT" "$TYPEFINCH_QA_IMPORT_REPORT"
+    start_app
+    xdotool windowfocus "$parent" 2>/dev/null || true
+    xdotool key --clearmodifiers F11
+    sleep 0.35
+    xdotool type --clearmodifiers --delay 25 "$tmp/$layout/source.txt"
+    xdotool key --clearmodifiers Return
+    sleep 0.55
+    lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"OS Wayland RTL import missing")
+local r=assert(json.decode(f:read("*a")));f:close()
+assert(r.synthetic and r.state=="custom-import" and r.script==arg[2]
+  and r.graphemes==4,"OS Wayland RTL import did not load the correct passage")
+LUA
+    # Alt+Shift changes the nested compositor XKB group. The app remains
+    # in OS mode and never uses Typefinch's key-position emulator.
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    sleep 0.35
+    xdotool key --clearmodifiers F5
+    sleep 0.30
+    xdotool key --clearmodifiers F2
+    sleep 0.25
+    xdotool key --clearmodifiers "$wrong"
+    sleep 0.16
+    xdotool key --clearmodifiers BackSpace
+    sleep 0.15
+    for key in $keys;do
+      xdotool key --clearmodifiers "$key"
+      sleep 0.12
+    done
+    sleep 0.85
+    lua5.4 - "$TYPEFINCH_QA_REPORT" "$layout" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Native RTL Wayland OS score missing")
+local r=assert(json.decode(f:read("*a")));f:close()
+assert(r.synthetic and r.state=="finished" and r.entered==4
+  and r.correct==4 and r.accuracy==100,
+  "Real Weston XKB group did not score RTL committed text in OS mode")
+local db=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local cmd=string.format(
+  "sqlite3 -json %q 'SELECT layout,input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions ORDER BY id'",db)
+local pipe=assert(io.popen(cmd,"r"))
+local rows=assert(json.decode(pipe:read("*a")));assert(pipe:close())
+assert(#rows==3 and rows[3].input_mode=="OS" and rows[3].test_mode=="custom"
+  and rows[3].entered==4 and rows[3].correct==4
+  and rows[3].attempts==5 and rows[3].mistakes==1
+  and rows[3].corrections==1,
+  "Native Wayland OS RTL provenance or correction counts invalid")
+assert(rows[1].input_mode=="Emulated" and rows[2].input_mode=="Emulated",
+  "Prior independent emulated session provenance was corrupted")
+print("Native Weston RTL OS-input XKB group PASS: "..layout..
+  ", 4/4 after corrected mistake; separate Wayland seat provenance")
+LUA
+  fi
   # Keep the final scored child surface alive through the acceptance
   # verdict. Weston 13 can SIGSEGV during rapid child-client teardown;
   # cleanup owns the orderly final app/compositor shutdown. Only a

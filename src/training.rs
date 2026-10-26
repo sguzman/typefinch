@@ -166,6 +166,16 @@ pub struct EligiblePilotArms {
 impl EligiblePilotArms {
     pub fn prepare(baseline:&Session,adaptive_source:&str,profile_id:&str,
         layout:&str,recorded_layout:&str,input:Mode)->Option<Self> {
+        // This pilot's fixed control alphabet is Latin QWERTY. Offering
+        // Arabic, Hebrew, CJK, emoji or mixed-script sessions would compare
+        // fundamentally different input methods and key availability.
+        // Other Typefinch modes remain fully Unicode-capable; only this
+        // experimental comparator is narrowed until matched controls exist.
+        let latin=|text:&str| text.chars().all(|ch| {
+            let value=ch as u32;
+            ch.is_ascii() || (0x00C0..=0x024F).contains(&value)
+        });
+        if !latin(&baseline.target) || !latin(adaptive_source) {return None;}
         let control_source=neutral_practice(adaptive_source,&baseline.target)?;
         let adaptive=ControlledTrial::begin(baseline,adaptive_source,Arm::Adaptive,
             profile_id,layout,recorded_layout,input)?;
@@ -570,6 +580,20 @@ mod tests {
             "profile","us","os:unknown",Mode::System).is_none());
         assert!(EligiblePilotArms::prepare(&short,"b b b",
             "profile","us","os:unknown",Mode::System).is_none());
+        // The current fixed Latin QWERTY control cannot be a comparable
+        // Arabic/Hebrew/CJK/emoji intervention. Deny only this pilot.
+        let mut rtl=Session::new_with_custom(0,TestMode::Custom,"سَلَام שָׁלוֹם");
+        rtl.begin();
+        rtl.type_text("xَلَام שָׁלוֹם");
+        assert_eq!(rtl.state,State::Finished);
+        assert!(EligiblePilotArms::prepare(&rtl,"س س س",
+            "profile","us","os:unknown",Mode::System).is_none());
+        let mut accented=Session::new_with_custom(0,TestMode::Custom,"cafés");
+        accented.begin();
+        accented.type_text("caxés");
+        assert!(EligiblePilotArms::prepare(&accented,"f f f f",
+            "profile","us","os:unknown",Mode::System).is_some(),
+            "Latin-1 accents in a Mexican-Spanish baseline must remain eligible");
         // Incomplete baselines cannot be eligible for either study arm.
         let unfinished=Session::new_with_custom(0,TestMode::Custom,"aba");
         assert!(EligiblePilotArms::prepare(&unfinished,"b b b",

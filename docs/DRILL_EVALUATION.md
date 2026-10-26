@@ -73,9 +73,12 @@ The new in-memory `src/training.rs::ControlledTrial` state machine provides
 part of the previously proposed evaluation infrastructure. It distinguishes
 **adaptive** versus **non-adaptive** arms, with an equal-probability assignment
 from a fresh random byte (`Arm::random()` uses the existing OS-backed UUID
-generator). It rejects the exact practice passage as a held-out source. The
-test sequence is **held-out baseline → different practice passage → same
-held-out immediate retest → same held-out delayed retest**. It validates
+generator). It rejects exposing the complete original reference inside
+the practice passage. The sequence is **practice-disjoint baseline →
+different practice passage → same-baseline immediate retest → same-baseline
+delayed retest**. Since the learner types the reference at baseline,
+this is NOT never-seen novel-text transfer; familiarity and retesting
+effects remain possible in both arms. It validates
 identical language, difficulty, duration, input mode, profile and reported
 layout/seat provenance. The delayed stage now uses a *local monotonic
 clock* to require at least one real hour after the immediate retest, while
@@ -83,17 +86,22 @@ the same app process remains running. This does not establish longer-term
 retention after a restart or independent participant attendance.
 
 `control_adjusted_transfer` compares two completed, distinct-profile,
-opposite-arm series only when their configured context and observed practice
-opportunity counts match. It produces descriptive control-adjusted changes
-in held-out missed-reference-opportunity percentage points and corrected WPM.
+opposite-arm series only when their practice-disjoint reference passage
+matches canonically, configured context matches, and observed practice
+opportunity counts match. Their actual measured practice time must differ
+by no more than 10% of the longer observed duration. This conservative
+engineering matching heuristic is not evidence of equal effort. It
+produces descriptive control-adjusted differences in repeated-baseline
+missed-reference-opportunity percentage points and corrected WPM.
 Tests include an exactly null difference, an unfavorable adaptive difference,
 premature retests, repeated submissions, missing retention, inconsistent
 input or source context, identical participant identity, unequal exposure and
 balanced synthetic random-byte assignments. Missing denominators cannot be
 silently treated as zero.
 
-**Still missing:** native end-to-end pilot QA, human participant
-recruitment, genuinely comparable time-on-task and effort, cross-restart
+**Still missing:** real human participant
+recruitment, controlled time-on-task and effort equivalence, novel-reference
+transfer, cross-restart
 retention scheduling, counterbalanced crossover/order effects, preregistered
 uncertainty-aware analysis, and empirical evidence of learning. This pilot
 remains separate from the ordinary `FollowUp`; its de-identified aggregates

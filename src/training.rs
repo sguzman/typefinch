@@ -234,9 +234,10 @@ pub struct ControlledTrial {
     pub practiced:Option<TransferSample>,
     pub immediate:Option<TransferSample>,
     pub delayed:Option<TransferSample>,
-    // Local monotonic time, never persisted or represented as a timestamp.
-    // An app restart invalidates the incomplete trial.
+    // Local monotonic timings only: a restart invalidates the pilot.
+    practiced_at:Option<std::time::Instant>,
     immediate_at:Option<std::time::Instant>,
+    retention_gap:Option<Duration>,
 }
 impl ControlledTrial {
     /// Baseline is an actual finished *held-out* Custom session. Its source
@@ -266,7 +267,8 @@ impl ControlledTrial {
             duration:baseline.duration,profile_id:profile_id.into(),
             layout:layout.into(),recorded_layout:recorded_layout.into(),input,
             baseline:TransferSample::from_session(baseline)?,
-            practiced:None,immediate:None,delayed:None,immediate_at:None,
+            practiced:None,immediate:None,delayed:None,
+            practiced_at:None,immediate_at:None,retention_gap:None,
         })
     }
     /// Consent-driven clipboard export only. No participant identity,
@@ -287,8 +289,11 @@ impl ControlledTrial {
         let record=serde_json::json!({
             // Schema 2 requires full reached-position coverage in every
             // measured phase. Schema 1 exports must not be treated as equal.
-            "schema":2,
+            "schema":3,
             "type":"typefinch-local-held-out-pilot",
+            "immediate_deadline_seconds":600,
+            "retention_window_seconds":[3600,86400],
+            "actual_retention_gap_ms":u64::try_from(self.retention_gap?.as_millis()).ok()?,
             "reference_opportunities":grapheme_count_for_trial(&self.held_out),
             "coverage_policy":"all_reference_positions_reached",
             "app_version":env!("CARGO_PKG_VERSION"),
@@ -327,9 +332,19 @@ impl ControlledTrial {
         self.profile_id==profile_id && self.layout==layout
             && self.recorded_layout==recorded_layout && self.input==input
     }
+    /// A retest completed within ten real monotonic minutes of finishing
+    /// practice is labeled "immediate". Waiting longer invalidates the pilot.
+    pub fn immediate_ready(&self)->bool {
+        self.stage==TrialStage::Immediate && self.practiced_at.is_some_and(|time|
+            time.elapsed()<=Duration::from_secs(600))
+    }
+    /// Delayed retention must be measured between 1 and 24 real hours after
+    /// immediate testing. No wall-clock UTC timestamps or OS sleep estimates.
     pub fn delay_ready(&self)->bool {
-        self.stage==TrialStage::Delayed && self.immediate_at.is_some_and(|time|
-            time.elapsed()>=Duration::from_secs(3600))
+        self.stage==TrialStage::Delayed && self.immediate_at.is_some_and(|time| {
+            let elapsed=time.elapsed();
+            (Duration::from_secs(3600)..=Duration::from_secs(86400)).contains(&elapsed)
+        })
     }
     fn valid(&self,session:&Session,source:&str,profile_id:&str,layout:&str,
         recorded_layout:&str,input:Mode)->bool {
@@ -348,12 +363,14 @@ impl ControlledTrial {
         }
         let Some(sample)=TransferSample::from_session(session) else {return false;};
         self.practiced=Some(sample);
+        self.practiced_at=Some(std::time::Instant::now());
         self.stage=TrialStage::Immediate;
         true
     }
     pub fn record_immediate(&mut self,session:&Session,profile_id:&str,
         layout:&str,recorded_layout:&str,input:Mode)->bool {
         if self.stage!=TrialStage::Immediate || self.practiced.is_none() ||
+            !self.immediate_ready() ||
             !self.valid(session,&self.held_out,profile_id,layout,recorded_layout,input) {
             return false;
         }
@@ -369,12 +386,12 @@ impl ControlledTrial {
     pub fn record_delayed(&mut self,session:&Session,
         profile_id:&str,layout:&str,recorded_layout:&str,input:Mode)->bool {
         if self.stage!=TrialStage::Delayed || self.immediate.is_none() ||
-            !self.immediate_at.is_some_and(|time|
-                time.elapsed()>=Duration::from_secs(3600)) ||
+            !self.delay_ready() ||
             !self.valid(session,&self.held_out,profile_id,layout,recorded_layout,input) {
             return false;
         }
         let Some(sample)=TransferSample::from_session(session) else {return false;};
+        self.retention_gap=self.immediate_at.map(|time|time.elapsed());
         self.delayed=Some(sample);
         self.stage=TrialStage::Complete;
         true
@@ -682,6 +699,34 @@ mod tests {
         assert!(!study.record_practice(&practice,"a","us","os:unknown",Mode::System));
         assert_eq!(study.stage,TrialStage::Practice);
     }
+    #[test] fn immediate_and_retention_windows_reject_late_observations() {
+        let baseline=synthetic_custom("abab","axab");
+        let mut t=ControlledTrial::begin(&baseline,"xyxy",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).unwrap();
+        let practice=synthetic_custom("xyxy","xyxy");
+        let reference=synthetic_custom("abab","abab");
+        assert!(t.record_practice(&practice,"a","us","os:unknown",Mode::System));
+        assert!(t.immediate_ready());
+        t.practiced_at=Some(std::time::Instant::now()-Duration::from_secs(601));
+        assert!(!t.immediate_ready());
+        assert!(!t.record_immediate(&reference,"a","us","os:unknown",Mode::System));
+        assert_eq!(t.stage,TrialStage::Immediate);
+        t.practiced_at=Some(std::time::Instant::now());
+        assert!(t.record_immediate(&reference,"a","us","os:unknown",Mode::System));
+        assert_eq!(t.stage,TrialStage::Delayed);
+        assert!(!t.delay_ready(),"Immediate repeat cannot be delayed retention");
+        t.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(86401));
+        assert!(!t.delay_ready(),"A 25-hour retention gap is a different study");
+        assert!(!t.record_delayed(&reference,"a","us","os:unknown",Mode::System));
+        assert_eq!(t.stage,TrialStage::Delayed);
+        t.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(7200));
+        assert!(t.delay_ready());
+        assert!(t.record_delayed(&reference,"a","us","os:unknown",Mode::System));
+        let json:serde_json::Value=serde_json::from_str(&t.aggregate_export().unwrap()).unwrap();
+        assert_eq!(json["schema"],3);
+        assert!(json["actual_retention_gap_ms"].as_u64().unwrap()>=7_200_000);
+        assert_eq!(t.stage,TrialStage::Complete);
+    }
     #[test] fn native_pilot_preflight_rejects_wrong_phase_source_and_settings() {
         let baseline=synthetic_custom("abab","axab");
         let mut t=ControlledTrial::begin(&baseline,"xyxy",Arm::Adaptive,
@@ -796,7 +841,10 @@ mod tests {
             "private_profile","axab","abab","abab","private_practice");
         let raw=completed.aggregate_export().unwrap();
         let record:serde_json::Value=serde_json::from_str(&raw).unwrap();
-        assert_eq!(record["schema"],2);
+        assert_eq!(record["schema"],3);
+        assert_eq!(record["immediate_deadline_seconds"],600);
+        assert_eq!(record["retention_window_seconds"],serde_json::json!([3600,86400]));
+        assert!(record["actual_retention_gap_ms"].as_u64().unwrap()>=3_600_000);
         assert_eq!(record["reference_opportunities"],4);
         assert_eq!(record["coverage_policy"],"all_reference_positions_reached");
         assert_eq!(record["causal_claim"],false);

@@ -1972,6 +1972,15 @@ impl Typefinch {
                         if !ready {ctx.request_repaint_after(Duration::from_secs(30));}
                     }
                 }
+                if stage==TrialStage::Complete {
+                    if let Some(record)=self.controlled_trial.as_ref()
+                        .and_then(ControlledTrial::aggregate_export) {
+                        if ui.button("Copy de-identified pilot aggregates").clicked() {
+                            ui.ctx().copy_text(record);
+                            self.message="Aggregate-only study summary copied locally. Nothing was uploaded.".into();
+                        }
+                    }
+                }
                 if ui.button("Discard local pilot").clicked() {
                     self.controlled_trial=None;
                     self.controlled_consent=false;

@@ -27,7 +27,7 @@ The app exports this style of self-contained, script-free SVG together with Mark
 
 ## Progress and development
 
-**Acceptance-based overall progress:** `█████████░ 91%` (91.07% unrounded) across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`).
+**Acceptance-based overall progress:** `█████████░ 91%` (91.07% unrounded) across 41 atomic tasks. The checks, associated evidence and progress bars are recorded in [docs/progress.json](docs/progress.json) and presented as [milestones, phases and tasks](docs/ROADMAP.md). Unverified features stay below 100%. The ledger and roadmap are validated with Lua (`lua5.4 tools/roadmap.lua --check`). To compare an earlier ledger snapshot with the current version, use `lua5.4 tools/roadmap.lua --delta PREVIOUS_PROGRESS.json`; it prints **unrounded overall percentage-point deltas** (two decimals) and every incomplete or changed task's exact delta, refusing changed acceptance criteria. The read-only delta tool does not award checks.
 
 **Typing speed definitions:** English and Mexican Spanish use five correct Unicode grapheme clusters per standardized WPM unit. Corrected CPM displays finalized graphemes per minute for IME-oriented practice; it does not measure IME keystrokes or cross-language proficiency. Raw attempt rate is diagnostic and not interchangeable with corrected WPM; comparison records remain partitioned by language and test mode. [Full scoring specification](docs/SCORING.md).
 

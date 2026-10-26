@@ -226,6 +226,17 @@ happen to be identical, while different records could still come from the
 SAME participant or repeated submission. Neither deduplication method
 proves human independence, enrollment validity, or real-world efficacy.
 
+The comparator now **refuses to produce arm contrasts** unless
+every included record contains the same number of observed practice
+opportunities AND all actual practice times differ by no more than 10%
+of the longest measured practice duration. It checks individual records,
+not just arm means (which could conceal imbalance). This is deliberately
+conservative: more heterogeneous real experiments will be rejected
+rather than silently compared, and matching these two quantities does
+NOT prove equal effort, difficulty, keyboard layout, or recruitment.
+The compiled-binary CI fixture checks mismatched exercise length,
+unmatched time and the accepted 10% boundary.
+
 The JSON result contains only **arm counts, mean baseline error rates,
 mean immediate/delayed changes, practice opportunities/timing and
 difference-of-means summaries**. It explicitly sets `causal_claim=false`;

@@ -382,6 +382,103 @@ mod tests {
             }
         }
     }
+    fn synthetic_custom(reference:&str,typed:&str)->Session {
+        let mut session=Session::new_with_custom(0,TestMode::Custom,reference);
+        session.begin();
+        session.type_text(typed);
+        assert_eq!(session.state,State::Finished);
+        session
+    }
+    #[test] fn controlled_assignment_uses_both_uniform_random_parities() {
+        let mut adaptive=0;
+        let mut neutral=0;
+        for sample in 0..=u8::MAX {
+            match Arm::from_random_byte(sample) {
+                Arm::Adaptive=>adaptive+=1,
+                Arm::NonAdaptive=>neutral+=1,
+            }
+        }
+        assert_eq!((adaptive,neutral),(128,128));
+    }
+    #[test] fn transfer_requires_different_held_out_text_and_actual_practice() {
+        let baseline=synthetic_custom("abab","axab");
+        assert!(ControlledTrial::begin(&baseline,"abab",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).is_none());
+        let mut trial=ControlledTrial::begin(&baseline,"xyxy",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).unwrap();
+        let practiced=synthetic_custom("xyxy","xyxy");
+        let immediate=synthetic_custom("abab","abab");
+        assert!(!trial.record_immediate(&immediate,"a","us","os:unknown",Mode::System),
+            "Retest before intervention cannot count as transfer");
+        assert!(!trial.record_practice(&immediate,"a","us","os:unknown",Mode::System),
+            "Replaying the held-out passage cannot pass as practice");
+        assert!(!trial.record_practice(&practiced,"a","de","os:unknown",Mode::System),
+            "Practice with changed layout cannot advance the trial");
+        assert!(trial.record_practice(&practiced,"a","us","os:unknown",Mode::System));
+        assert_eq!(trial.stage,TrialStage::Immediate);
+        assert!(!trial.record_practice(&practiced,"a","us","os:unknown",Mode::System));
+        assert!(!trial.record_immediate(&immediate,"b","us","os:unknown",Mode::System));
+        assert!(!trial.record_immediate(&immediate,"a","us","os:changed",Mode::System));
+        assert!(!trial.record_immediate(&immediate,"a","us","os:unknown",Mode::Emulated));
+        assert!(trial.record_immediate(&immediate,"a","us","os:unknown",Mode::System));
+        assert_eq!(trial.stage,TrialStage::Delayed);
+        assert!(!trial.record_delayed(&immediate,Duration::from_secs(3599),
+            "a","us","os:unknown",Mode::System),
+            "A too-early check cannot be recorded as delayed retention");
+        assert!(trial.record_delayed(&immediate,Duration::from_secs(3600),
+            "a","us","os:unknown",Mode::System));
+        assert_eq!(trial.stage,TrialStage::Complete);
+        assert!(!trial.record_delayed(&immediate,Duration::from_secs(7200),
+            "a","us","os:unknown",Mode::System),
+            "A second delayed observation must not silently overwrite the first");
+        assert_eq!(trial.baseline.opportunities,OpportunityCounts{observed:4,missed:1});
+        assert_eq!(trial.immediate.unwrap().opportunities.missed,0);
+    }
+    fn completed_synthetic_arm(arm:Arm,profile:&str,initial:&str,
+        immediate:&str,delayed:&str,practice:&str)->ControlledTrial {
+        let base=synthetic_custom("abab",initial);
+        let mut trial=ControlledTrial::begin(&base,practice,arm,profile,
+            "us","os:unknown",Mode::System).unwrap();
+        let drill=synthetic_custom(practice,practice);
+        let instant=synthetic_custom("abab",immediate);
+        let later=synthetic_custom("abab",delayed);
+        assert!(trial.record_practice(&drill,profile,"us","os:unknown",Mode::System));
+        assert!(trial.record_immediate(&instant,profile,"us","os:unknown",Mode::System));
+        assert!(trial.record_delayed(&later,Duration::from_secs(3600),profile,
+            "us","os:unknown",Mode::System));
+        trial
+    }
+    #[test] fn controlled_contrast_reports_zero_and_unfavorable_outcomes() {
+        let a=completed_synthetic_arm(Arm::Adaptive,"a","axab","abab","abab","xyxy");
+        let n=completed_synthetic_arm(Arm::NonAdaptive,"b","axab","abab","abab","wxyz");
+        let result=control_adjusted_transfer(&a,&n).unwrap();
+        assert_eq!(result.immediate_missed_pp,0.0);
+        assert_eq!(result.delayed_missed_pp,0.0);
+        assert!(result.immediate_wpm.is_finite());
+        let bad=completed_synthetic_arm(Arm::Adaptive,"c","axab","axab","axab","xyxy");
+        let better_control=control_adjusted_transfer(&bad,&n).unwrap();
+        assert_eq!(better_control.immediate_missed_pp,25.0);
+        assert_eq!(better_control.delayed_missed_pp,25.0);
+        assert!(control_adjusted_transfer(&n,&a).is_none(),
+            "Arm labels must not be swapped or inferred from performance");
+    }
+    #[test] fn invalid_controlled_pair_never_makes_unsupported_comparison() {
+        let a=completed_synthetic_arm(Arm::Adaptive,"a","axab","abab","abab","xyxy");
+        let same_identity=completed_synthetic_arm(Arm::NonAdaptive,"a",
+            "axab","abab","abab","wxyz");
+        assert!(control_adjusted_transfer(&a,&same_identity).is_none(),
+            "One participant is not an independent control participant");
+        let mut unequal_exposure=completed_synthetic_arm(Arm::NonAdaptive,"b",
+            "axab","abab","abab","wxyz");
+        unequal_exposure.practiced.as_mut().unwrap().opportunities.observed+=1;
+        assert!(control_adjusted_transfer(&a,&unequal_exposure).is_none(),
+            "Different practice opportunities must not be hidden");
+        let mut missing_delayed=completed_synthetic_arm(Arm::NonAdaptive,"c",
+            "axab","abab","abab","wxyz");
+        missing_delayed.stage=TrialStage::Delayed;
+        missing_delayed.delayed=None;
+        assert!(control_adjusted_transfer(&a,&missing_delayed).is_none());
+    }
     #[test] fn unequal_attempt_counts_are_disclosed_not_hidden(){
         let x=Comparison{baseline_accuracy:80.0,retest_accuracy:90.0,
             baseline_wpm:30.0,retest_wpm:25.0,baseline_attempts:30,retest_attempts:50,

@@ -14,6 +14,8 @@ weston_pre_score_crash(){
   ! grep -F 'Native Weston wl_keyboard Japanese RO/YEN Base/Shift PASS:' "$log" >/dev/null &&
   ! grep -F 'Native Weston wl_keyboard did not deliver the complete test' "$log" >/dev/null &&
   ! grep -F 'Native JIS physical mismatch' "$log" >/dev/null &&
+  ! grep -F 'Native Wayland RTL physical-position scoring failed' "$log" >/dev/null &&
+  ! grep -F 'Native Weston wl_keyboard RTL Emulated PASS:' "$log" >/dev/null &&
   { grep -F 'Typefinch exited before native Wayland keyboard input' "$log" >/dev/null ||
     grep -F 'Nested Weston died before native input stabilization' "$log" >/dev/null ||
     { grep -F 'Connection reset by peer' "$log" >/dev/null &&
@@ -26,6 +28,7 @@ weston_pre_score_crash(){
 fixture=tests/wayland_gui_smoke.sh
 case "${1:-}" in
   --jis) fixture=tests/jis_wayland_emulation_smoke.sh ;;
+  --rtl) fixture=tests/rtl_wayland_emulation_smoke.sh ;;
   --self-test|'') ;;
   *) echo "Unsupported native Wayland fixture" >&2; exit 2 ;;
 esac
@@ -51,7 +54,9 @@ if [[ "${1:-}" == --self-test ]];then
     'Nested Weston real Wayland wl_keyboard PASS:' \
     'Native Weston wl_keyboard Japanese RO/YEN Base/Shift PASS:' \
     'Native Weston wl_keyboard did not deliver the complete test' \
-    'Native JIS physical mismatch';do
+    'Native JIS physical mismatch' \
+    'Native Wayland RTL physical-position scoring failed' \
+    'Native Weston wl_keyboard RTL Emulated PASS:';do
     printf '%s\n' 'Segmentation fault weston --backend=x11-backend.so' \
       'Connection reset by peer' 'No scored native Wayland typing result' \
       "$counterexample" >"$file"

@@ -93,6 +93,43 @@ window_is_clear(){
     end
   ' >/dev/null
 }
+# The regular-client check cannot see layer-shell notifications, panels,
+# password prompts or overlays. Hyprland 0.55 reports monitor-local layer
+# geometry through 'hyprctl -j layers'; only the top/overlay levels can
+# obscure normal windows. Fail closed if monitor mapping/geometry is
+# absent or ambiguous. No layer namespace, address or PID is published.
+layer_surfaces_clear(){
+  jq -en --slurpfile layers "$1" --slurpfile monitors "$2" --arg rect "$3" '
+    def integer: type=="number" and floor==.;
+    ($rect | capture("^(?<x>-?[0-9]+),(?<y>-?[0-9]+) (?<w>[1-9][0-9]*)x(?<h>[1-9][0-9]*)$")
+      | map_values(tonumber)) as $w |
+    ($layers[0]) as $ls | ($monitors[0]) as $ms |
+    if ($ls|type)!="object" or ($ms|type)!="array" then false
+    else
+      ($ms|length)>0 and
+      ([$ms[]|.name] | unique | length)==($ms|length) and
+      ($ls|keys|sort)==([$ms[]|.name]|sort) and
+      all($ms[]; . as $mon |
+        ($mon.name|type)=="string" and ($mon.name|length)>0 and
+        ($mon.x|integer) and ($mon.y|integer) and
+        ($mon.width|integer) and ($mon.height|integer) and
+        $mon.width>0 and $mon.height>0 and
+        ($ls[$mon.name].levels|type)=="object" and
+        all(["2","3"][]; . as $lvl |
+          ($ls[$mon.name].levels[$lvl]|type)=="array" and
+          all($ls[$mon.name].levels[$lvl][];
+            (.x|integer) and (.y|integer) and
+            (.w|integer) and (.h|integer) and .w>0 and .h>0 and
+            (.x+$mon.x >= $w.x+$w.w or
+             .x+$mon.x+.w <= $w.x or
+             .y+$mon.y >= $w.y+$w.h or
+             .y+$mon.y+.h <= $w.y)
+          )
+        )
+      )
+    end
+  ' >/dev/null
+}
 # Require the current focused surface to retain the same on-screen
 # rectangle and workspace as the screenshot captured at startup. A moved or
 # resized window must never yield stale window-only screenshot evidence.
@@ -277,6 +314,44 @@ if [[ "${1:-}" == --self-test ]];then
   jq '.[1].at=[900,900] | .[1].workspace.id=3' \
     "$fixture_dir/clients.json" >"$fixture_dir/nonoverlap.json"
   window_is_clear "$fixture_dir/nonoverlap.json" 42 3 || exit 1
+  # Layer-shell is absent from 'hyprctl clients'; a notification above
+  # Typefinch must invalidate screenshots. Monitor-local coordinates on a
+  # second display must be translated to compositor-global coordinates.
+  cat >"$fixture_dir/monitors.json" <<'JSON'
+[{"name":"A","x":0,"y":0,"width":1920,"height":1080},
+ {"name":"B","x":1920,"y":0,"width":1920,"height":1080}]
+JSON
+  cat >"$fixture_dir/layers.json" <<'JSON'
+{"A":{"levels":{"0":[],"1":[],"2":[{"x":0,"y":0,"w":1920,"h":20}],"3":[]}},
+ "B":{"levels":{"0":[],"1":[],"2":[],"3":[{"x":0,"y":100,"w":320,"h":200}]}}}
+JSON
+  layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors.json" \
+    '18,27 800x600' || { echo "Non-overlapping panel rejected" >&2; exit 1; }
+  jq '.A.levels["3"]=[{"x":180,"y":90,"w":120,"h":100}]' \
+    "$fixture_dir/layers.json" >"$fixture_dir/layers-overlap.json"
+  if layer_surfaces_clear "$fixture_dir/layers-overlap.json" "$fixture_dir/monitors.json" \
+       '18,27 800x600';then
+    echo "Layer-shell overlay on Typefinch accepted for screenshot" >&2;exit 1
+  fi
+  jq '.B.levels["3"]=[{"x":0,"y":100,"w":320,"h":200}]' \
+    "$fixture_dir/layers.json" >"$fixture_dir/layers-disjoint.json"
+  layer_surfaces_clear "$fixture_dir/layers-disjoint.json" "$fixture_dir/monitors.json" \
+    '18,27 800x600' || { echo "Other-monitor layer incorrectly overlapped" >&2;exit 1; }
+  for change in '.A.levels["3"]=null' 'del(.A.levels)' \
+    '.A.levels["2"][0].w="1920"' '.A.levels["2"][0].x=null' \
+    'del(.B)';do
+    jq "$change" "$fixture_dir/layers.json" >"$fixture_dir/layers-unsafe.json"
+    if layer_surfaces_clear "$fixture_dir/layers-unsafe.json" "$fixture_dir/monitors.json" \
+         '18,27 800x600';then
+      echo "Ambiguous layer-shell geometry passed screenshot guard" >&2;exit 1
+    fi
+  done
+  jq '.[0].x=null' "$fixture_dir/monitors.json" >"$fixture_dir/monitors-unsafe.json"
+  if layer_surfaces_clear "$fixture_dir/layers.json" "$fixture_dir/monitors-unsafe.json" \
+       '18,27 800x600';then
+    echo "Missing monitor origin passed layer-shell guard" >&2;exit 1
+  fi
+
   jq '.[1].workspace.id=3 | .[1].at=null' \
     "$fixture_dir/clients.json" >"$fixture_dir/uninspectable.json"
   if window_is_clear "$fixture_dir/uninspectable.json" 42 3;then
@@ -300,7 +375,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry, window/layer-shell occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -418,6 +493,11 @@ assert_capture_clear(){
   hyprctl -j clients >"$tmp/clients.json"
   window_is_clear "$tmp/clients.json" "$app" "$active_ws" ||
     { echo "Other window overlaps Typefinch; screenshot refused" >&2;exit 1; }
+  hyprctl -j layers >"$tmp/layers.json" &&
+    hyprctl -j monitors >"$tmp/monitors.json" ||
+    { echo "Compositor layer/monitor inventory unavailable" >&2;exit 1; }
+  layer_surfaces_clear "$tmp/layers.json" "$tmp/monitors.json" "$rect" ||
+    { echo "Layer-shell overlay or ambiguous compositor geometry; screenshot refused" >&2;exit 1; }
 }
 assert_capture_clear
 grim -g "$rect" "$tmp/before.png"

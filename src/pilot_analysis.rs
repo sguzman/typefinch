@@ -149,6 +149,11 @@ fn summarize(records:&[Pilot])->Result<Value,String> {
     }
     let a=arm_summary(&adaptive);
     let n=arm_summary(&neutral);
+    // Compute contrasts BEFORE consuming either summary as a JSON value.
+    let immediate_missed=difference(&a,&n,"immediate_change_pp");
+    let delayed_missed=difference(&a,&n,"delayed_change_pp");
+    let immediate_wpm=difference(&a,&n,"immediate_wpm_change");
+    let delayed_wpm=difference(&a,&n,"delayed_wpm_change");
     Ok(json!({
         "schema":1,
         "type":"typefinch-local-descriptive-cohort-comparison",
@@ -159,10 +164,10 @@ fn summarize(records:&[Pilot])->Result<Value,String> {
         "total_exported_records":records.len(),
         "adaptive":a,
         "non_adaptive":n,
-        "difference_of_mean_immediate_missed_change_pp":difference(&a,&n,"immediate_change_pp"),
-        "difference_of_mean_delayed_missed_change_pp":difference(&a,&n,"delayed_change_pp"),
-        "difference_of_mean_immediate_wpm_change":difference(&a,&n,"immediate_wpm_change"),
-        "difference_of_mean_delayed_wpm_change":difference(&a,&n,"delayed_wpm_change"),
+        "difference_of_mean_immediate_missed_change_pp":immediate_missed,
+        "difference_of_mean_delayed_missed_change_pp":delayed_missed,
+        "difference_of_mean_immediate_wpm_change":immediate_wpm,
+        "difference_of_mean_delayed_wpm_change":delayed_wpm,
         "descriptive_only":true,
         "causal_claim":false,
         "warnings":[

@@ -202,6 +202,34 @@ private-data omission. **Native GUI end-to-end pilot QA and empirical
 comparative human data remain separate acceptance requirements.** No
 change is made to the T502 progress check.
 
+## Read-only public-cohort comparison (descriptive only)
+
+The built-in offline CLI accepts **only explicitly selected local aggregate
+exports**, never profile directories or a live settings/database connection:
+`typefinch --compare-public-pilots arm-a.json arm-b.json [more.json ...]`.
+It requires 2–200 schema-4 records with the exact published
+`typefinch.en.standard.unlimited.v1` reference cohort, matching app
+version and input-mode category, complete reached-position counts, valid
+non-negative finite numeric fields, reported retention within the agreed
+window and both randomized arms represented. It rejects unknown JSON
+fields (including raw passages), mismatched cohorts, partial/older exports,
+symbolic links, devices, directories and oversized inputs. A file is
+read only through an explicit pathname; no network access or automatic
+discovery is performed. Error messages do not echo private paths or data.
+
+The JSON result contains only **arm counts, mean baseline error rates,
+mean immediate/delayed changes, practice opportunities/timing and
+difference-of-means summaries**. It explicitly sets `causal_claim=false`;
+confidence intervals, significance tests and claims of better human
+training are deliberately absent. If participants had different
+layouts, repeated enrollments, differential noncompletion or biased
+recruitment, these local outputs cannot independently detect or repair
+that. Without permissioned, independently vetted human enrollment data,
+neither the comparison CLI nor the public challenge constitutes T502
+efficacy evidence. The already published passage is the only source
+with a stable cohort ID; private passages cannot be matched by a hidden
+hash or accidental export.
+
 ## Proposed empirical acceptance design (not implemented)
 
 A privacy-first evaluation should compare **adaptive targeting** against

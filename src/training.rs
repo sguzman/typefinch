@@ -142,6 +142,7 @@ pub struct TransferSample {
     pub opportunities:OpportunityCounts,
     pub corrected_wpm:f64,
     pub attempts:usize,
+    pub elapsed_ms:u64,
 }
 impl TransferSample {
     fn from_session(session:&Session)->Option<Self> {
@@ -150,7 +151,8 @@ impl TransferSample {
         let opportunities=session.opportunity_counts();
         if score.entered==0 || score.attempts==0 ||
             opportunities.observed==0 || !score.wpm.is_finite() {return None;}
-        Some(Self {opportunities,corrected_wpm:score.wpm,attempts:score.attempts})
+        Some(Self {opportunities,corrected_wpm:score.wpm,attempts:score.attempts,
+            elapsed_ms:u64::try_from(score.elapsed.as_millis()).ok()?})
     }
 }
 /// This self-contained local series still cannot establish causation by itself:
@@ -206,6 +208,38 @@ impl ControlledTrial {
             baseline:TransferSample::from_session(baseline)?,
             practiced:None,immediate:None,delayed:None,immediate_at:None,
         })
+    }
+    /// Consent-driven clipboard export only. No participant identity,
+    /// exact layout name, passages, keyboard IDs, timestamps, or raw errors.
+    /// An incomplete or abandoned pilot has no summary to export.
+    pub fn aggregate_export(&self)->Option<String> {
+        if self.stage!=TrialStage::Complete {return None;}
+        let practiced=self.practiced?;
+        let immediate=self.immediate?;
+        let delayed=self.delayed?;
+        let summarize=|sample:TransferSample| serde_json::json!({
+            "opportunities":sample.opportunities.observed,
+            "ever_missed":sample.opportunities.missed,
+            "corrected_wpm":sample.corrected_wpm,
+            "attempts":sample.attempts,
+            "elapsed_ms":sample.elapsed_ms
+        });
+        let record=serde_json::json!({
+            "schema":1,
+            "type":"typefinch-local-held-out-pilot",
+            "app_version":env!("CARGO_PKG_VERSION"),
+            "randomized_arm":if self.arm==Arm::Adaptive {"adaptive"}else{"non_adaptive"},
+            "input_mode":if self.input==Mode::System {"os"}else{"emulated"},
+            "configured_duration_seconds":self.duration.as_secs(),
+            "baseline":summarize(self.baseline),
+            "practice":summarize(practiced),
+            "immediate":summarize(immediate),
+            "delayed":summarize(delayed),
+            "control_adjusted":false,
+            "causal_claim":false,
+            "consent":"explicit local clipboard action; no network publication"
+        });
+        serde_json::to_string_pretty(&record).ok()
     }
     pub fn practice_source(&self)->&str {&self.practice}
     pub fn held_out_source(&self)->&str {&self.held_out}
@@ -542,6 +576,27 @@ mod tests {
         assert_eq!(better_control.delayed_missed_pp,25.0);
         assert!(control_adjusted_transfer(&n,&a).is_none(),
             "Arm labels must not be swapped or inferred from performance");
+    }
+    #[test] fn aggregate_export_is_opt_in_complete_only_and_excludes_text_identity() {
+        let incomplete=synthetic_custom("abab","axab");
+        let p=ControlledTrial::begin(&incomplete,"xyxy",Arm::Adaptive,
+            "very_private_profile","my-private-layout","private-seat",Mode::System).unwrap();
+        assert!(p.aggregate_export().is_none());
+        let completed=completed_synthetic_arm(Arm::Adaptive,
+            "private_profile","axab","abab","abab","private_practice");
+        let raw=completed.aggregate_export().unwrap();
+        let record:serde_json::Value=serde_json::from_str(&raw).unwrap();
+        assert_eq!(record["schema"],1);
+        assert_eq!(record["causal_claim"],false);
+        assert_eq!(record["control_adjusted"],false);
+        assert_eq!(record["randomized_arm"],"adaptive");
+        assert_eq!(record["baseline"]["opportunities"],4);
+        assert_eq!(record["baseline"]["ever_missed"],1);
+        assert_eq!(record["delayed"]["ever_missed"],0);
+        for text in ["private_profile","private_practice","abab","axab","os:unknown",
+            "my-private-layout","private-seat"] {
+            assert!(!raw.contains(text),"Private source leaked into de-identified export");
+        }
     }
     #[test] fn invalid_controlled_pair_never_makes_unsupported_comparison() {
         let a=completed_synthetic_arm(Arm::Adaptive,"a","axab","abab","abab","xyxy");

@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # Explicitly opted-in local QA, never CI-run against a real desktop.
 set -Eeuo pipefail
+# Only capture or send QA shortcuts while the compositor reports an
+# unlocked session. A focused Typefinch window can remain mapped behind a
+# lock screen; window/overlap checks alone do not rule out lock overlays.
+# Hyprland 0.55's read-only 'hyprctl -j locked' returns {"locked":bool}.
+# Unsupported, malformed, unavailable or ambiguous results fail CLOSED.
+session_is_unlocked(){
+  # Slurp exactly one JSON document; ordinary jq -e could accept a second
+  # "unlocked" object after an earlier contradictory locked record.
+  jq -es 'length == 1 and (.[0] | type) == "object" and .[0].locked == false' \
+    "$1" >/dev/null 2>&1
+}
 # Compare the read-only inventory itself, not only its count.
 inventory_parity(){
   jq -en --slurpfile own "$1" --slurpfile host "$2" '
@@ -188,6 +199,21 @@ if [[ "${1:-}" == --self-test ]];then
   # Equal-count mismatches must not certify read-only device parity.
   fixture_dir="$(mktemp -d)"
   trap 'rm -rf -- "$fixture_dir"' EXIT
+  # Session lock state is a hard safety gate, not a screenshot hint.
+  printf '%s' '{"locked":false}' >"$fixture_dir/unlocked.json"
+  session_is_unlocked "$fixture_dir/unlocked.json" || {
+    echo "Unlocked compositor status rejected" >&2;exit 1;
+  }
+  for payload in '{"locked":true}' '{}' '{"locked":"false"}' 'null' '[]' 'not-json';do
+    printf '%s' "$payload" >"$fixture_dir/unsafe-lock.json"
+    if session_is_unlocked "$fixture_dir/unsafe-lock.json";then
+      echo "Unsafe/ambiguous lock status enabled desktop capture" >&2;exit 1
+    fi
+  done
+  printf '%s\n' '{"locked":true}' '{"locked":false}' >"$fixture_dir/unsafe-lock.json"
+  if session_is_unlocked "$fixture_dir/unsafe-lock.json";then
+    echo "Multiple contradictory compositor lock records accepted" >&2;exit 1
+  fi
   printf '%s' "$inventory" >"$fixture_dir/hyprland.json"
   printf '%s' "$inspection" >"$fixture_dir/typefinch.json"
   inventory_parity "$fixture_dir/typefinch.json" "$fixture_dir/hyprland.json" || exit 1
@@ -274,7 +300,7 @@ if [[ "${1:-}" == --self-test ]];then
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
+  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry and screenshot-occlusion self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -296,6 +322,12 @@ if probe="$(hyprctl dispatch 'hl.dsp.no_op()' 2>/dev/null)" &&
 fi
 tmp="$(mktemp -d)"
 app='' previous='' workspace=''
+assert_session_unlocked(){
+  hyprctl -j locked >"$tmp/session-lock.json" ||
+    { echo "Hyprland lock state unavailable; refusing QA input/capture" >&2;exit 1; }
+  session_is_unlocked "$tmp/session-lock.json" ||
+    { echo "Locked or ambiguous desktop state; refusing QA input/capture" >&2;exit 1; }
+}
 cleanup(){
   result=$?
   set +e
@@ -373,6 +405,7 @@ rect="$(jq -r --argjson pid "$app" \
 # Refuse screenshots if focus changed or another visible client overlaps.
 # Layer-shell overlays are not in hyprctl clients; evidence remains local.
 assert_capture_clear(){
+  assert_session_unlocked
   hyprctl -j activewindow >"$tmp/current-window.json"
   [[ "$(jq -r '.pid // empty' "$tmp/current-window.json")" == "$app" ]] ||
     { echo "Cannot capture unfocused Typefinch window" >&2;exit 1; }
@@ -397,6 +430,7 @@ send_key(){
     ':F1'|':F4'|':F10'|':F5'|':F2'|':A'|'CTRL + SHIFT:T') ;;
     *) echo "Non-QA shortcut refused" >&2;exit 2 ;;
   esac
+  assert_session_unlocked
   [[ "$(hyprctl -j activewindow | jq -r '.pid // empty')" == "$app" ]] ||
     { echo "Foreground QA focus lost; refusing input" >&2;exit 1; }
   if [[ "$hypr_mode" == lua ]];then
@@ -507,6 +541,8 @@ if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
        ! -L "$out/typefinch-hyprland-$name.png" ]] ||
       { echo "Refusing to overwrite existing QA evidence" >&2;exit 1; }
   done
+  # No local screenshot files may be published after a lock transition.
+  assert_session_unlocked
   for name in help iso jis navigation keypad light dark;do
     publish_evidence "$tmp/$name.png" "$out/typefinch-hyprland-$name.png" "$out" ||
       { echo "Cannot atomically publish local QA evidence without replacing a file" >&2;exit 1; }

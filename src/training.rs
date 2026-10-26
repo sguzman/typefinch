@@ -181,8 +181,16 @@ impl EligiblePilotArms {
             profile_id,layout,recorded_layout,input)?;
         let non_adaptive=ControlledTrial::begin(baseline,&control_source,
             Arm::NonAdaptive,profile_id,layout,recorded_layout,input)?;
+        let original=adaptive.practice_source().graphemes(true).collect::<Vec<_>>();
+        let control=non_adaptive.practice_source().graphemes(true).collect::<Vec<_>>();
         if adaptive.practice_source().nfc().collect::<String>()
-            ==non_adaptive.practice_source().nfc().collect::<String>() {
+            ==non_adaptive.practice_source().nfc().collect::<String>()
+            || original.len()!=control.len()
+            || !original.iter().zip(&control).all(|(a,b)| {
+                a.chars().all(char::is_whitespace)==b.chars().all(char::is_whitespace)
+            }) {
+            // Equal raw source length is insufficient if Custom-mode
+            // normalization changed the actual reference opportunities.
             return None;
         }
         Some(Self {adaptive,non_adaptive})
@@ -568,6 +576,14 @@ mod tests {
         assert_eq!(right.arm,Arm::NonAdaptive);
         assert_eq!(right.practice_source(),"a s d f j k l ;");
         assert_eq!(left.held_out_source(),right.held_out_source());
+        let a=left.practice_source().graphemes(true).collect::<Vec<_>>();
+        let b=right.practice_source().graphemes(true).collect::<Vec<_>>();
+        assert_eq!(a.len(),b.len(),"Both actual Custom practice targets are equally long");
+        assert!(a.iter().zip(b).all(|(a,b)|
+            a.chars().all(char::is_whitespace)==
+                b.chars().all(char::is_whitespace)),
+            "Both arm references share the same post-normalization spacing");
+
         // The control alone could be eligible, but a single-character
         // adaptive source necessarily includes the complete reference.
         // Reject the WHOLE trial rather than skew assignment toward control.

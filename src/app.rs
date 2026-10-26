@@ -1860,9 +1860,12 @@ impl Typefinch {
     /// Explicitly opt-in, private, one-process transfer pilot; arm assignment
     /// does not imply efficacy or equal training effort.
     fn start_controlled_pilot(&mut self,ctx:&egui::Context) {
-        self.start_controlled_pilot_with_arm(ctx,Arm::random());
+        self.start_controlled_pilot_with_arm(ctx,None);
     }
-    fn start_controlled_pilot_with_arm(&mut self,ctx:&egui::Context,arm:Arm) {
+    /// Synthetic QA may choose an arm explicitly, but real enrollment
+    /// randomizes only AFTER both candidate passages are eligible.
+    fn start_controlled_pilot_with_arm(&mut self,ctx:&egui::Context,
+        synthetic_arm:Option<Arm>) {
         if !self.controlled_consent || self.settings_read_only
             || self.session.state!=State::Finished || self.session.mode!=TestMode::Custom
             || self.training_followup.is_some() || self.controlled_trial.is_some() {
@@ -1870,22 +1873,17 @@ impl Typefinch {
         }
         let Some(adaptive)=self.session.weak_character_drill()
             .or_else(||self.session.weak_bigram_drill()) else {return;};
-        let practice=match arm {
-            Arm::Adaptive=>adaptive,
-            Arm::NonAdaptive=>match training::neutral_practice(&adaptive,&self.session.target) {
-                Some(source)=>source,
-                None=>{
-                    self.message="Cannot construct a disjoint non-adaptive practice passage.".into();
-                    return;
-                }
-            },
-        };
         let identity=&self.prefs.profiles[self.prefs.active_profile].id;
-        let Some(trial)=ControlledTrial::begin(&self.session,&practice,arm,identity,
-            &self.prefs.layout,&self.session_layout,self.mode) else {
-            self.message="Pilot rejected overlapping passages or an invalid baseline.".into();
+        let Some(eligible)=training::EligiblePilotArms::prepare(
+            &self.session,&adaptive,identity,&self.prefs.layout,
+            &self.session_layout,self.mode) else {
+            self.message="Local pilot ineligible: adaptive and control passages must both be valid, distinct from the baseline and each other.".into();
+            self.controlled_consent=false;
             return;
         };
+        let arm=synthetic_arm.unwrap_or_else(Arm::random);
+        let trial=eligible.assign(arm);
+        let practice=trial.practice_source().to_owned();
         self.start_controlled_stage(trial,practice,ctx);
     }
     fn start_controlled_stage(&mut self,trial:ControlledTrial,source:String,
@@ -3094,8 +3092,8 @@ impl eframe::App for Typefinch {
                 // Inject both arms deterministically for disposable CI only.
                 // Production UI always uses a fresh random assignment.
                 match std::env::var("TYPEFINCH_QA_PILOT_ARM").as_deref() {
-                    Ok("adaptive")=>self.start_controlled_pilot_with_arm(ctx,Arm::Adaptive),
-                    Ok("non_adaptive")=>self.start_controlled_pilot_with_arm(ctx,Arm::NonAdaptive),
+                    Ok("adaptive")=>self.start_controlled_pilot_with_arm(ctx,Some(Arm::Adaptive)),
+                    Ok("non_adaptive")=>self.start_controlled_pilot_with_arm(ctx,Some(Arm::NonAdaptive)),
                     _=>self.start_controlled_pilot(ctx),
                 }
             } else if self.controlled_trial.as_ref().is_some_and(|t|

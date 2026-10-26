@@ -32,17 +32,50 @@ fn focused_input_payload(session:&Session,input_mode:&str)->serde_json::Value {
         "entered":session.score().entered,
     })
 }
+/// On every later GUI frame with exactly one attempted key, leave the
+/// first evidence immutable. create_new also rejects a preexisting symlink.
+fn write_focused_input_once(path:&std::path::Path,bytes:&[u8])->Result<(),String>{
+    use std::io::{ErrorKind,Write};
+    let mut file=match fs::OpenOptions::new().write(true).create_new(true).open(path){
+        Ok(file)=>file,
+        Err(error) if error.kind()==ErrorKind::AlreadyExists=>return Ok(()),
+        Err(error)=>return Err(error.to_string()),
+    };
+    file.write_all(bytes).map_err(|e|e.to_string())
+}
 pub fn write_focused_input_audit(session:&Session,input_mode:&str)->Result<(),String>{
     if env::var_os("TYPEFINCH_QA_REPORT").is_none()
         || session.state!=crate::engine::State::Running
         || session.attempts!=1 {return Ok(());}
     let Some(path)=env::var_os("TYPEFINCH_QA_INPUT_REPORT") else{return Ok(());};
     let data=focused_input_payload(session,input_mode);
-    fs::write(path,serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?)
-        .map_err(|e|e.to_string())
+    let bytes=serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?;
+    write_focused_input_once(std::path::Path::new(&path),&bytes)
 }
 #[cfg(test)]
 mod focused_input_tests {
+    #[test] fn first_audit_is_immutable_and_preexisting_symlink_is_untouched(){
+        use super::write_focused_input_once;
+        let dir=std::env::temp_dir().join(format!("typefinch-focus-{}",uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).expect("isolated private QA fixture");
+        let report=dir.join("report.json");
+        write_focused_input_once(&report,b"first").unwrap();
+        write_focused_input_once(&report,b"second").unwrap();
+        assert_eq!(std::fs::read(&report).unwrap(),b"first");
+        #[cfg(unix)]{
+            use std::os::unix::fs::symlink;
+            let target=dir.join("target.json");
+            let link=dir.join("link.json");
+            std::fs::write(&target,b"keep").unwrap();
+            symlink(&target,&link).unwrap();
+            write_focused_input_once(&link,b"change").unwrap();
+            assert_eq!(std::fs::read(&target).unwrap(),b"keep");
+            std::fs::remove_file(link).unwrap();
+            std::fs::remove_file(target).unwrap();
+        }
+        std::fs::remove_file(report).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
     #[test] fn audit_contains_only_aggregates_not_private_source_or_keystroke(){
         use crate::engine::{Session,TestMode};
         let mut session=Session::new_with_custom(15,TestMode::Custom,"SECRET-QA-REFERENCE");

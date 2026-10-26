@@ -137,6 +137,9 @@ pub fn neutral_practice(adaptive:&str,held_out:&str)->Option<String> {
     None
 }
 
+fn grapheme_count_for_trial(text:&str)->usize {
+    text.graphemes(true).count()
+}
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub struct TransferSample {
     pub opportunities:OpportunityCounts,
@@ -149,8 +152,14 @@ impl TransferSample {
         if session.state!=State::Finished {return None;}
         let score=session.score();
         let opportunities=session.opportunity_counts();
-        if score.entered==0 || score.attempts==0 ||
-            opportunities.observed==0 || !score.wpm.is_finite() {return None;}
+        // Study measurements require coverage of EVERY reference position.
+        // A timed run that reaches only an easy/fast subset must not appear
+        // to improve error rate merely by avoiding later difficult material.
+        // This restriction applies only to this opt-in pilot, never to normal
+        // timed scores or their aggregate history.
+        let full=grapheme_count_for_trial(&session.target);
+        if full==0 || score.entered==0 || score.attempts==0 ||
+            opportunities.observed!=full || !score.wpm.is_finite() {return None;}
         Some(Self {opportunities,corrected_wpm:score.wpm,attempts:score.attempts,
             elapsed_ms:u64::try_from(score.elapsed.as_millis()).ok()?})
     }
@@ -639,6 +648,35 @@ mod tests {
             }
         }
         assert_eq!((adaptive,neutral),(128,128));
+    }
+    #[test] fn timed_partial_reference_cannot_enter_pilot_measurements() {
+        let mut partial=Session::new_with_custom(60,TestMode::Custom,"abcdef");
+        partial.begin();
+        partial.type_text("abc");
+        // A timed cutoff is a valid ordinary score, not a completed pilot
+        // denominator. Stop before the reference is fully traversed.
+        partial.state=State::Finished;
+        assert_eq!(partial.opportunity_counts().observed,3);
+        assert_eq!(grapheme_count_for_trial(&partial.target),6);
+        assert!(TransferSample::from_session(&partial).is_none());
+        assert!(ControlledTrial::begin(&partial,"x x x",Arm::Adaptive,
+            "a","us","os:unknown",Mode::System).is_none());
+        let complete=synthetic_custom("abcdef","abxdef");
+        assert_eq!(complete.opportunity_counts().observed,6);
+        assert!(TransferSample::from_session(&complete).is_some());
+        let mut study=ControlledTrial::begin(&complete,"x x x",
+            Arm::Adaptive,"a","us","os:unknown",Mode::System).unwrap();
+        assert!(!study.record_practice(&partial,"a","us","os:unknown",Mode::System),
+            "Wrong and incomplete phase may never progress");
+        // All six practice positions need an actual opportunity, including
+        // spaces. A prematurely terminated otherwise-matching practice is
+        // refused even when session.state is Finished.
+        let mut practice=Session::new_with_custom(0,TestMode::Custom,"x x x");
+        practice.begin();
+        practice.type_text("x x");
+        practice.state=State::Finished;
+        assert!(!study.record_practice(&practice,"a","us","os:unknown",Mode::System));
+        assert_eq!(study.stage,TrialStage::Practice);
     }
     #[test] fn native_pilot_preflight_rejects_wrong_phase_source_and_settings() {
         let baseline=synthetic_custom("abab","axab");

@@ -33,12 +33,17 @@ wm=$!
 # An explicit Weston keyboard config is required; environment defaults
 # are not a reliable X11-backend keymap configuration.
 native_os_case=""
-case "${1:-both}" in ara-os) native_os_case=ara ;; il-os) native_os_case=il ;; esac
+case "${1:-both}" in ara-os) native_os_case=ara ;; il-os) native_os_case=il ;; mixed-os) native_os_case=mixed ;; esac
 weston_options=(--no-config)
 if [[ -n "$native_os_case" ]];then
   unset TYPEFINCH_QA_XKB_COMPOSE
-  printf '[keyboard]\nkeymap_layout=us,%s\nkeymap_options=grp:alt_shift_toggle\n' \
-    "$native_os_case" >"$tmp/weston.ini"
+  if [[ "$native_os_case" == mixed ]];then
+    keymap_groups=us,ara,il
+  else
+    keymap_groups="us,$native_os_case"
+  fi
+  printf '[keyboard]\nkeymap_layout=%s\nkeymap_options=grp:alt_shift_toggle\n' \
+    "$keymap_groups" >"$tmp/weston.ini"
   weston_options=(--config="$tmp/weston.ini")
 fi
 weston --backend=x11-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" \
@@ -83,6 +88,7 @@ case "${1:-both}" in
   il) layouts=(il) ;;
   ara-os) layouts=(ara) ;;
   il-os) layouts=(il) ;;
+  mixed-os) layouts=(mixed) ;;
   both) layouts=(ara il) ;;
   *) echo 'Unsupported native Wayland RTL fixture layout' >&2;exit 2 ;;
 esac
@@ -92,7 +98,9 @@ for layout in "${layouts[@]}";do
   export XDG_CONFIG_HOME="$tmp/$layout/config"
   export TYPEFINCH_QA_REPORT="$tmp/$layout/report.json"
   export TYPEFINCH_QA_IMPORT_REPORT="$tmp/$layout/import.json"
-  if [[ "$layout" == ara ]];then
+  if [[ "$layout" == mixed ]];then
+    expected=mixed passage='سلام abc שלום' keys='' wrong=''
+  elif [[ "$layout" == ara ]];then
     expected=arabic passage='سلام' keys='s g h l' wrong='a'
   else
     expected=hebrew passage='שלום' keys='a k u o' wrong='s'
@@ -114,7 +122,7 @@ for layout in "${layouts[@]}";do
 local json=require("dkjson")
 local path,layout=assert(arg[1]),assert(arg[2])
 local f=assert(io.open(path,"rb"));local p=assert(json.decode(f:read("*a")));f:close()
-p.layout=layout
+p.layout=layout=="mixed" and "us" or layout
 local out=assert(io.open(path,"wb"))
 assert(out:write(json.encode(p,{indent=true})));assert(out:close())
 LUA
@@ -124,13 +132,91 @@ LUA
   xdotool type --clearmodifiers --delay 22 "$tmp/$layout/source.txt"
   xdotool key --clearmodifiers Return
   sleep 0.6
-  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" <<'LUA'
+  lua5.4 - "$TYPEFINCH_QA_IMPORT_REPORT" "$expected" "$layout" <<'LUA'
 local json=require("dkjson")
 local f=assert(io.open(assert(arg[1]),"rb"),"Native Wayland RTL import missing")
 local p=assert(json.decode(f:read("*a")));f:close()
-assert(p.state=="custom-import" and p.synthetic and p.script==arg[2] and p.graphemes==4,
+assert(p.state=="custom-import" and p.synthetic and p.script==arg[2]
+  and p.graphemes==(arg[3]=="mixed" and 13 or 4),
   "Native Wayland imported the wrong RTL reference")
 LUA
+  if [[ "$native_os_case" == mixed ]];then
+    # One native Wayland scored Custom session spans three XKB groups.
+    # Both Xvfb's parent layout and Weston's keyboard group are changed.
+    # No emulator, injected IME commit, physical device or global capture.
+    xdotool windowfocus "$parent" 2>/dev/null || true
+    xdotool key --clearmodifiers F5
+    sleep 0.25
+    xdotool key --clearmodifiers F2
+    sleep 0.25
+    setxkbmap -layout ara
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    sleep 0.20
+    xdotool key --clearmodifiers 38
+    sleep 0.15
+    [[ ! -s "$TYPEFINCH_QA_REPORT" ]] ||
+      { echo "Mixed Wayland RTL wrong key completed a session" >&2;exit 1; }
+    xdotool key --clearmodifiers BackSpace
+    sleep 0.12
+    for code in 39 42 43 46;do
+      xdotool key --clearmodifiers "$code"
+      sleep 0.08
+    done
+    xdotool key --clearmodifiers 65
+    sleep 0.10
+    [[ ! -s "$TYPEFINCH_QA_REPORT" ]] ||
+      { echo "Arabic segment prematurely finished mixed RTL passage" >&2;exit 1; }
+    # ara -> il -> us. Keep the same focused child Wayland session.
+    setxkbmap -layout us
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    sleep 0.20
+    for code in 38 56 54;do
+      xdotool key --clearmodifiers "$code"
+      sleep 0.08
+    done
+    xdotool key --clearmodifiers 65
+    sleep 0.10
+    [[ ! -s "$TYPEFINCH_QA_REPORT" ]] ||
+      { echo "Latin segment prematurely finished mixed RTL passage" >&2;exit 1; }
+    # us -> ara -> il. Third script, same native Wayland surface.
+    setxkbmap -layout il
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    xdotool key --clearmodifiers Alt_L+Shift_L
+    sleep 0.20
+    for code in 38 45 30 32;do
+      xdotool key --clearmodifiers "$code"
+      sleep 0.08
+    done
+    sleep 0.80
+    lua5.4 - "$TYPEFINCH_QA_REPORT" "$tmp/$layout/source.txt" <<'LUA'
+local json=require("dkjson")
+local f=assert(io.open(arg[1],"rb"),"Missing mixed RTL native Wayland OS score")
+local r=assert(json.decode(f:read("*a")));f:close()
+assert(r.synthetic and r.state=="finished" and r.entered==13
+  and r.correct==13 and r.accuracy==100,
+  string.format("Native mixed RTL Wayland OS scoring mismatch: %s/%s state=%s",
+    tostring(r.correct),tostring(r.entered),tostring(r.state)))
+local path=os.getenv("XDG_CONFIG_HOME").."/typefinch/sessions.sqlite3"
+local pipe=assert(io.popen(string.format(
+  "sqlite3 -json %q 'SELECT input_mode,test_mode,entered,correct,attempts,mistakes,corrections FROM sessions'",path),"r"))
+local rows=assert(json.decode(pipe:read("*a")));assert(pipe:close())
+assert(#rows==1 and rows[1].input_mode=="OS" and rows[1].test_mode=="custom"
+  and rows[1].entered==13 and rows[1].correct==13
+  and rows[1].attempts==14 and rows[1].mistakes==1
+  and rows[1].corrections==1,
+  "Mixed RTL Wayland OS SQLite score provenance or mistake invalid")
+local cf=assert(io.open(os.getenv("XDG_CONFIG_HOME").."/typefinch/settings.json","rb"))
+local prefs=cf:read("*a");cf:close()
+local sf=assert(io.open(arg[2],"rb"));local passage=sf:read("*a");sf:close()
+assert(not prefs:find(passage,1,true) and not prefs:find(arg[2],1,true),
+  "Mixed RTL source passage or import path persisted into preferences")
+print("Native Weston RTL mixed OS-input PASS: Arabic -> Latin -> Hebrew, 13/13 after corrected mistake")
+LUA
+    kill -0 "$weston" 2>/dev/null ||
+      { echo "Nested Weston exited after mixed RTL Wayland score" >&2;exit 1; }
+    continue
+  fi
   if [[ -n "$native_os_case" ]];then
     # X11-backed Weston may inherit the parent XKB mapping.
     # Change only this disposable Xvfb display; emit raw numeric positions.

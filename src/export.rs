@@ -2,8 +2,14 @@
 use crate::{history::{self, Record}, preferences::{base_dir, Preferences, Profile,CardTheme,CardFont,CardTemplate}};
 use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
 
+/// XML 1.0 character repertoire: persisted local profile text may contain
+/// scalars that a valid SVG document cannot encode, even when markup is escaped.
+pub(crate) fn xml_scalar_allowed(ch:char)->bool {
+    matches!(ch as u32,0x9|0xA|0xD|0x20..=0xD7FF|0xE000..=0xFFFD|0x10000..=0x10FFFF)
+}
 fn xml(s: &str) -> String {
-    s.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;")
+    let allowed=s.chars().filter(|&ch|xml_scalar_allowed(ch)).collect::<String>();
+    allowed.replace('&',"&amp;").replace('<',"&lt;").replace('>',"&gt;")
      .replace('"',"&quot;").replace('\'',"&apos;")
 }
 /// Static, approved palettes. Text ink is chosen independently from accent
@@ -333,6 +339,23 @@ mod tests {
     #[test] fn markdown_link_uses_local_svg_without_remote_fetch() {
         assert_eq!(markdown_embed(),"![Typefinch typing profile](./typefinch-profile.svg)\n");
         assert!(!markdown_embed().contains("http"));
+    }
+    #[test] fn invalid_xml_scalars_are_removed_before_escape_in_both_templates() {
+        let profile=Profile {
+            name:"A\u{0}\u{1f}\u{fffe}\u{ffff}<B & 🐦".into(),
+            ..Profile::default()
+        };
+        for template in CardTemplate::ALL {
+            let svg=card_with_template(&profile,"us\u{8}\u{fffe}<",
+                CardTheme::Dusk,CardFont::Sans,template);
+            assert!(svg.chars().all(xml_scalar_allowed));
+            assert!(svg.contains("A&lt;B &amp; 🐦"));
+            assert!(svg.contains("Layout: us&lt;"));
+            assert!(!svg.contains('\u{0}'));
+            assert!(!svg.contains('\u{1f}'));
+            assert!(!svg.contains('\u{fffe}'));
+            assert!(!svg.contains('\u{ffff}'));
+        }
     }
     #[test] fn output_escapes_untrusted_profile_text() {
         let p=Profile { name:"<script>&".into(), ..Default::default() };

@@ -114,8 +114,21 @@ fn safe_attribute(name:&str,value:&str)->bool {
         _=>false,
     }
 }
+// Only the five XML named entities are emitted by the card exporter.
+// Refuse unknown or forbidden numeric references in forged SVG rather
+// than uploading a non-well-formed public card.
+fn safe_svg_text(text:&str)->bool {
+    if text.contains("]]>") || !text.chars().all(crate::export::xml_scalar_allowed) {
+        return false;
+    }
+    let mut fragments=text.split('&');
+    fragments.next();
+    fragments.all(|tail|["amp;","lt;","gt;","quot;","apos;"]
+        .iter().any(|entity|tail.starts_with(entity)))
+}
 fn static_typefinch_svg(svg:&str)->bool {
-    if svg.len()>64*1024 || !svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
+    if svg.len()>64*1024 || !svg.chars().all(crate::export::xml_scalar_allowed)
+        || !svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\"")
         || !svg.ends_with("</svg>") {return false;}
     let mut pieces=svg.split('<');
     if pieces.next()!=Some(""){return false;}
@@ -144,7 +157,7 @@ fn static_typefinch_svg(svg:&str)->bool {
             opened=true;
         } else {
             if !opened || self_closing==(tag=="text"){return false;}
-            if tag=="text" {in_text=true;saw_text=true;}
+            if tag=="text" {if !safe_svg_text(text){return false;} in_text=true;saw_text=true;}
         }
         let mut attrs=remaining.trim();
         let mut unique=std::collections::HashSet::new();
@@ -320,6 +333,20 @@ mod tests {
                         "Valid preexisting Typefinch card must remain updateable");
                 }
             }
+        }
+    }
+    #[test] fn rejects_invalid_xml_scalars_and_entities_before_any_github_request(){
+        for unsafe_text in [
+            "\u{0}","\u{1f}","\u{fffe}","\u{ffff}",
+            "&#0;","&#x0;","&unknown;","]]>"
+        ] {
+            let forged=DEMO.replace("Typefinch</text>",
+                &format!("Typefinch{unsafe_text}</text>"));
+            assert!(!static_typefinch_svg(&forged),
+                "Invalid XML text must never identify as a publishable card");
+            let mock=Mock::new(vec![]);
+            assert!(publish_via(&mock,"alice/cards",&forged,true).is_err());
+            assert!(mock.calls.borrow().is_empty());
         }
     }
     #[test] fn uploaded_svg_markup_is_static_allowlisted_and_user_text_is_escaped(){

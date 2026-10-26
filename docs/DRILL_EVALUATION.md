@@ -214,12 +214,17 @@ non-negative finite numeric fields, reported retention within the agreed
 window and both randomized arms represented. It rejects unknown JSON
 fields (including raw passages), mismatched cohorts, partial/older exports,
 symbolic links, devices, directories, oversized inputs and repeated
-file identities (including hard-linked aliases of the same inode). A file
-is read only through an explicit pathname; no network access or automatic
-discovery is performed. Error messages do not echo private paths or data.
-Distinct files could nevertheless originate from the SAME participant or
-repeated submission; source-file identity deduplication does not prove
-human independence.
+file identities (including hard-linked aliases of the same inode).
+It also rejects **canonical duplicates of an entire schema-4 aggregate
+record**, including copied files with different JSON whitespace or key
+order. Canonicalization is memory-only; no persistent fingerprints or
+cross-app tracking identifiers are created. A file is read only through an
+explicit pathname; no network access or automatic discovery is performed.
+Error messages do not echo private paths or data. These rejection rules
+conservatively reject truly independent people whose exported aggregates
+happen to be identical, while different records could still come from the
+SAME participant or repeated submission. Neither deduplication method
+proves human independence, enrollment validity, or real-world efficacy.
 
 The JSON result contains only **arm counts, mean baseline error rates,
 mean immediate/delayed changes, practice opportunities/timing and

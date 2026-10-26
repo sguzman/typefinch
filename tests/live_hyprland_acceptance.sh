@@ -31,20 +31,25 @@ inventory_parity(){
 # Typefinch capture rectangle. This does not detect layer-shell overlays.
 window_is_clear(){
   jq -en --slurpfile data "$1" --argjson pid "$2" --argjson ws "$3" '
+    def valid_rect:
+      (.at|type)=="array" and (.size|type)=="array" and
+      (.at|length)==2 and (.size|length)==2 and
+      ([.at[],.size[]] | all(.[];type=="number" and .==floor)) and
+      .size[0]>0 and .size[1]>0;
     ($data[0] // null) as $clients |
     if ($clients|type)!="array" then false else
       ([$clients[] | select(.pid==$pid and .mapped==true)]) as $apps |
       if ($apps|length)!=1 then false else
         ($apps[0]) as $target |
-        ([$clients[] |
-          select(.pid!=$pid and .mapped==true and .hidden!=true
-            and .workspace.id==$ws and (.at|type)=="array"
-            and (.size|type)=="array" and .size[0]>0 and .size[1]>0) |
-          select(.at[0]<($target.at[0]+$target.size[0])
-            and (.at[0]+.size[0])>$target.at[0]
-            and .at[1]<($target.at[1]+$target.size[1])
-            and (.at[1]+.size[1])>$target.at[1])
-        ]|length)==0
+        ([$clients[] | select(.pid!=$pid and .mapped==true and .hidden!=true
+          and .workspace.id==$ws)]) as $others |
+        ($target.workspace.id==$ws and ($target|valid_rect) and
+         (all($others[];valid_rect)) and
+         ([$others[] | select(
+            .at[0]<($target.at[0]+$target.size[0]) and
+            (.at[0]+.size[0])>$target.at[0] and
+            .at[1]<($target.at[1]+$target.size[1]) and
+            (.at[1]+.size[1])>$target.at[1])]|length)==0)
       end
     end
   ' >/dev/null
@@ -204,6 +209,15 @@ if [[ "${1:-}" == --self-test ]];then
   jq '.[1].at=[900,900] | .[1].workspace.id=3' \
     "$fixture_dir/clients.json" >"$fixture_dir/nonoverlap.json"
   window_is_clear "$fixture_dir/nonoverlap.json" 42 3 || exit 1
+  jq '.[1].workspace.id=3 | .[1].at=null' \
+    "$fixture_dir/clients.json" >"$fixture_dir/uninspectable.json"
+  if window_is_clear "$fixture_dir/uninspectable.json" 42 3;then
+    echo "Unreadable competing window rectangle passed QA" >&2;exit 1
+  fi
+  jq '.[0].workspace.id=4' "$fixture_dir/clients.json" >"$fixture_dir/target-moved.json"
+  if window_is_clear "$fixture_dir/target-moved.json" 42 3;then
+    echo "QA target on another workspace passed capture guard" >&2;exit 1
+  fi
   jq '.[1].pid=42' "$fixture_dir/clients.json" >"$fixture_dir/ambiguous.json"
   if window_is_clear "$fixture_dir/ambiguous.json" 42 3;then
     echo "Ambiguous target window accepted for screenshot" >&2;exit 1

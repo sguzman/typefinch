@@ -319,6 +319,10 @@ pub fn control_adjusted_transfer(adaptive:&ControlledTrial,
     if adaptive.arm!=Arm::Adaptive || neutral.arm!=Arm::NonAdaptive
         || adaptive.stage!=TrialStage::Complete || neutral.stage!=TrialStage::Complete
         || adaptive.profile_id==neutral.profile_id
+        // A matched comparison must evaluate the SAME withheld source.
+        // Distinct Custom passages can have radically different script,
+        // complexity or learned familiarity despite matching language tags.
+        || adaptive.held_out.nfc().collect::<String>()!=neutral.held_out.nfc().collect::<String>()
         || adaptive.language!=neutral.language || adaptive.difficulty!=neutral.difficulty
         || adaptive.duration!=neutral.duration || adaptive.input!=neutral.input
         || adaptive.layout!=neutral.layout || adaptive.recorded_layout!=neutral.recorded_layout
@@ -597,6 +601,24 @@ mod tests {
             "my-private-layout","private-seat"] {
             assert!(!raw.contains(text),"Private source leaked into de-identified export");
         }
+    }
+    #[test] fn matched_control_rejects_different_held_out_passages_even_with_equal_counts() {
+        let adaptive=completed_synthetic_arm(Arm::Adaptive,
+            "a","axab","abab","abab","xyxy");
+        let baseline=synthetic_custom("wxyz","wxyx");
+        let mut control=ControlledTrial::begin(&baseline,"asdf",Arm::NonAdaptive,
+            "b","us","os:unknown",Mode::System).unwrap();
+        let practice=synthetic_custom("asdf","asdf");
+        let immediate=synthetic_custom("wxyz","wxyz");
+        assert!(control.record_practice(&practice,"b","us","os:unknown",Mode::System));
+        assert!(control.record_immediate(&immediate,"b","us","os:unknown",Mode::System));
+        control.immediate_at=Some(std::time::Instant::now()-Duration::from_secs(3600));
+        assert!(control.record_delayed(&immediate,"b","us","os:unknown",Mode::System));
+        assert_eq!(adaptive.baseline.opportunities.observed,control.baseline.opportunities.observed);
+        assert_eq!(adaptive.practiced.unwrap().opportunities.observed,
+            control.practiced.unwrap().opportunities.observed);
+        assert!(control_adjusted_transfer(&adaptive,&control).is_none(),
+            "Numerically matched but different held-out texts are not comparable");
     }
     #[test] fn invalid_controlled_pair_never_makes_unsupported_comparison() {
         let a=completed_synthetic_arm(Arm::Adaptive,"a","axab","abab","abab","xyxy");

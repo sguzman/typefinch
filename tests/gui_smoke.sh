@@ -42,6 +42,7 @@ cleanup() {
 trap cleanup EXIT
 export XDG_CONFIG_HOME="$tmp/config"
 export TYPEFINCH_QA_REPORT="$tmp/report.json"
+export TYPEFINCH_QA_INPUT_REPORT="$tmp/focused-input.json"
 openbox --sm-disable >"$tmp/window-manager.log" 2>&1 &
 wm_pid=$!
 sleep 0.5
@@ -90,6 +91,16 @@ if [[ ! -s "$tmp/report.json" ]]; then
   exit 1
 fi
 lua5.4 tests/smoke_assert.lua first "$tmp/report.json"
+# Real native X11 input must reach the app's actual focused typing surface
+# and emit only the first aggregate attempt. No source/key data is retained.
+[[ -s "$TYPEFINCH_QA_INPUT_REPORT" ]] ||
+  { echo "Missing production focused-input audit after native X11 typing" >&2;exit 1; }
+jq -e '.state=="focused-input" and .synthetic==true
+  and .input_mode=="OS" and .attempts==1 and .entered==1
+  and (has("key")|not) and (has("text")|not)
+  and (has("source")|not)' "$TYPEFINCH_QA_INPUT_REPORT" >/dev/null ||
+  { echo "Focused native X11 input audit schema or privacy assertion failed" >&2;exit 1; }
+echo "Production native X11 focused first-attempt audit PASS (numeric-only)"
 if [[ ! -s "$tmp/typefinch-window.png" ]]; then
   echo "GUI screenshot missing"; exit 1
 fi

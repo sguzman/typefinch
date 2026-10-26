@@ -128,4 +128,40 @@ for target in "share/typefinch/previous.version" \
 done
 [[ "$(cat "$escape_target/sentinel")" == "never-overwrite" ]] ||
   { echo "Installer overwrote external rollback target" >&2;exit 1; }
-echo "Versioned Linux packaging, three vendor notices, install/upgrade/rollback and symlink/collision tests PASS"
+# The packager itself must never overwrite an existing archive/checksum
+# or follow a linked output directory, even for an explicit custom target.
+metadata_sha="$(sed -n 's/^GIT_SHA=//p' "$root/METADATA.txt")"
+[[ "$metadata_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+# Repack the exact release into a second fresh output directory and require
+# byte-for-byte reproducibility despite independently randomized staging paths.
+repro="$tmp/reproducible-package"
+mkdir -p "$repro/.typefinch-stage"
+printf 'preexisting unrelated stage data\n' >"$repro/.typefinch-stage/sentinel"
+lua5.4 tools/package_release.lua "$version" "$metadata_sha" "$repro"
+cmp "$archive" "$repro/$(basename "$archive")"
+cmp "$archive.sha256" "$repro/$(basename "$archive").sha256"
+[[ "$(cat "$repro/.typefinch-stage/sentinel")" == "preexisting unrelated stage data" ]] ||
+  { echo "Packager destroyed old staging data" >&2;exit 1; }
+
+collision="$tmp/archive-collision"
+mkdir -p "$collision"
+printf 'independent archive data\n' >"$collision/$(basename "$archive")"
+if lua5.4 tools/package_release.lua "$version" "$metadata_sha" "$collision";then
+  echo "Packager overwrote existing release archive" >&2;exit 1
+fi
+[[ "$(cat "$collision/$(basename "$archive")")" == "independent archive data" ]] ||
+  { echo "Packager damaged collision sentinel" >&2;exit 1; }
+[[ ! -e "$collision/$(basename "$archive").sha256" ]] ||
+  { echo "Failed collision unexpectedly created a checksum" >&2;exit 1; }
+linked_target="$tmp/linked-packaging-external"
+mkdir -p "$linked_target"
+printf 'external\n' >"$linked_target/sentinel"
+ln -s "$linked_target" "$tmp/linked-package-output"
+if lua5.4 tools/package_release.lua "$version" "$metadata_sha" "$tmp/linked-package-output";then
+  echo "Packager followed symlinked output" >&2;exit 1
+fi
+[[ "$(cat "$linked_target/sentinel")" == "external" ]] ||
+  { echo "Packager touched an external target" >&2;exit 1; }
+[[ ! -e "$linked_target/$(basename "$archive")" ]] ||
+  { echo "Packager wrote into symlinked destination" >&2;exit 1; }
+echo "Versioned Linux packaging, three vendor notices, install/upgrade/rollback and protected package/installer collision tests PASS"

@@ -453,10 +453,16 @@ fi
 [[ "$#" -eq 0 ]] || exit 2
 [[ "${TYPEFINCH_QA_CONSENT:-}" == 1 ]] || { echo "Explicit QA opt-in required" >&2;exit 2; }
 [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || { echo "Live Hyprland required" >&2;exit 2; }
-for cmd in cargo hyprctl jq grim compare;do
+for cmd in cargo hyprctl jq grim compare sha256sum stat git realpath identify;do
   command -v "$cmd" >/dev/null || { echo "Missing QA dependency: $cmd" >&2;exit 2; }
 done
 [[ -f Cargo.toml && -f rust-toolchain.toml ]] || { echo "Run from Typefinch root" >&2;exit 2; }
+# The evidence receipt is tied to exact tracked source. Uncommitted source
+# modifications or new Rust/test files make that provenance ambiguous.
+source_sha="$(git rev-parse --verify HEAD)" || exit 2
+[[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || exit 2
+[[ -z "$(git status --porcelain --untracked-files=all -- src tests Cargo.toml Cargo.lock rust-toolchain.toml)" ]] ||
+  { echo "Commit Typefinch source before collecting versioned local evidence" >&2;exit 2; }
 # A no-op dispatcher probes the *active configuration's* Lua dispatch
 # interface. Hyprland 0.55 can run Lua OR legacy configs, independently of
 # compositor version. No keyboard, focus, workspace or settings are changed.
@@ -690,6 +696,18 @@ if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
   out="$TYPEFINCH_QA_OUTPUT_DIR"
   [[ -d "$out" && ! -L "$out" ]] ||
     { echo "Invalid local QA evidence destination" >&2;exit 1; }
+  # Do not put screenshots or session-sensitive evidence into a Git repo:
+  # a future recursive add could accidentally publish them.
+  out_real="$(realpath -- "$out")"
+  root_real="$(realpath -- "$(git rev-parse --show-toplevel)")"
+  [[ "$out_real" != "$root_real" && "$out_real" != "$root_real/"* ]] ||
+    { echo "Refusing to put private Hyprland screenshots inside the repository" >&2;exit 1; }
+  mode="$(stat -c '%a' -- "$out")"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] && (( (8#$mode & 0077)==0 )) ||
+    { echo "Local QA destination must be private to this user" >&2;exit 1; }
+  [[ ! -e "$out/typefinch-hyprland-receipt.json" &&
+     ! -L "$out/typefinch-hyprland-receipt.json" ]] ||
+    { echo "Refusing to overwrite existing local QA receipt" >&2;exit 1; }
   for name in help iso jis navigation keypad light dark;do
     [[ ! -e "$out/typefinch-hyprland-$name.png" &&
        ! -L "$out/typefinch-hyprland-$name.png" ]] ||
@@ -701,6 +719,38 @@ if [[ -n "${TYPEFINCH_QA_OUTPUT_DIR:-}" ]];then
     publish_evidence "$tmp/$name.png" "$out/typefinch-hyprland-$name.png" "$out" ||
       { echo "Cannot atomically publish local QA evidence without replacing a file" >&2;exit 1; }
   done
+  # Build a redacted, exact-source receipt from the already published images.
+  # No monitor coordinates, app source text, keyboard names/addresses, or
+  # timestamps are written. The receipt remains explicitly "not physical QA".
+  screenshot_hashes="$(
+    for name in help iso jis navigation keypad light dark;do
+      printf '%s\t%s\n' "$name" \
+        "$(sha256sum "$out/typefinch-hyprland-$name.png" | cut -d ' ' -f1)"
+    done | jq -Rn '[inputs | split("\t") | {key:.[0],value:.[1]}] | from_entries'
+  )"
+  jq -n --arg commit "$source_sha" --argjson images "$screenshot_hashes" \
+     --argjson connected "$connected" --argjson help_pixels "$pixels" \
+     --argjson theme_pixels "$theme_pixels" '{
+       schema:1,kind:"typefinch-local-hyprland-qa",
+       state:"passed",compositor:"real-hyprland",source_commit:$commit,
+       clean_source_tree:true,keyboard_inspection:"read-only",
+       connected_keyboard_count:$connected,
+       focused_os_input_verified:true,window_only_capture:true,
+       help_changed_pixels:$help_pixels,light_dark_changed_pixels:$theme_pixels,
+       illustrated_geometry:["ISO","JIS","navigation","keypad"],
+       theme_modes:["system","light","dark","system"],
+       system_theme_transition_verified:false,
+       physical_keyboard_routing_verified:false,
+       per_device_attribution_verified:false,
+       checks:{T001_live_window_screenshot:true,
+         T401_live_connected_keyboard_inspection:true,
+         T902_targeted_keyboard_input:true,T902_theme_layout_screenshots:true},
+       screenshots:$images
+     }' >"$tmp/receipt.json"
+  publish_evidence "$tmp/receipt.json" "$out/typefinch-hyprland-receipt.json" "$out" ||
+    { echo "Cannot safely publish local QA receipt" >&2;exit 1; }
+  bash tests/verify_hyprland_evidence.sh "$out" >/dev/null ||
+    { echo "Published Hyprland QA evidence bundle failed structural validation" >&2;exit 1; }
 fi
 jq -n --argjson help_pixels "$pixels" --argjson theme_pixels "$theme_pixels" \
   --argjson connected "$connected" \

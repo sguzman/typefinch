@@ -15,8 +15,9 @@ if [[ "${1:-}" == --self-test ]];then
     $d.capture_policy=="inspection-only" and
     $d.input_attribution=="aggregate seat; no per-device key-event attribution"
     and ($d.rows|type=="array")' >/dev/null
-  [[ "$(jq -n --argjson d "$inventory" '$d.keyboards|length')" ==
-     "$(jq -n --argjson d "$inspection" '$d.rows|length')" ]] || exit 1
+  inventory_count="$(jq -n --argjson d "$inventory" '$d.keyboards|length')"
+  inspection_count="$(jq -n --argjson d "$inspection" '$d.rows|length')"
+  [[ "$inventory_count" == "$inspection_count" ]] || exit 1
   wrong='{"schema":1,"capture_policy":"global-evdev","input_attribution":"physical","rows":[{}]}'
   if jq -en --argjson d "$wrong" '$d.capture_policy=="inspection-only"
     and $d.input_attribution=="aggregate seat; no per-device key-event attribution"' >/dev/null;then

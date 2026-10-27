@@ -213,8 +213,19 @@ publish_evidence(){
   rm -f -- "$qa_stage"
   qa_stage=''
 }
+# Never certify a stale checkout or a local-only commit as the currently
+# published application. Read-only Git query, bounded and noninteractive.
+# This does not itself prove that GitHub Actions passed for the commit.
+remote_main_matches(){
+  local output
+  output="$(GIT_TERMINAL_PROMPT=0 timeout 15s git -C "$1" ls-remote \
+    --exit-code origin refs/heads/main 2>/dev/null)" || return 1
+  [[ "$output" =~ ^([0-9a-f]{40})[[:space:]]refs/heads/main$ ]] || return 1
+  [[ "${BASH_REMATCH[1]}" == "$2" ]]
+}
 if [[ "${1:-}" == --self-test ]];then
   command -v jq >/dev/null
+  command -v timeout >/dev/null
   [[ "$(lua_focus_pid 42)" == 'hl.dsp.focus({ window = "pid:42" })' ]] || exit 1
   [[ "$(lua_focus_workspace 3)" == 'hl.dsp.focus({ workspace = "3" })' ]] || exit 1
   [[ "$(lua_shortcut 'CTRL + SHIFT' T 42)" == 'hl.dsp.send_shortcut({ mods = "CTRL + SHIFT", key = "T", window = "pid:42" })' ]] || exit 1
@@ -447,7 +458,32 @@ JSON
     echo "Unsafe global-capture claim accepted by QA validator" >&2
     exit 1
   fi
-  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry, monitor bounds, window/layer-shell occlusion self-tests PASS (no compositor accessed)"
+  # Read-only provenance preflight is tested with a local bare remote.
+  # This contacts no network and changes no existing working directory.
+  git init -q --bare "$fixture_dir/qa-origin.git"
+  git init -q -b main "$fixture_dir/qa-work"
+  git -C "$fixture_dir/qa-work" config user.name 'Typefinch QA fixture'
+  git -C "$fixture_dir/qa-work" config user.email 'qa@example.invalid'
+  printf '%s\\n' first >"$fixture_dir/qa-work/source"
+  git -C "$fixture_dir/qa-work" add source
+  git -C "$fixture_dir/qa-work" commit -qm 'initial fixture'
+  git -C "$fixture_dir/qa-work" remote add origin "$fixture_dir/qa-origin.git"
+  git -C "$fixture_dir/qa-work" push -q origin HEAD:refs/heads/main
+  expected_sha="$(git -C "$fixture_dir/qa-work" rev-parse HEAD)"
+  remote_main_matches "$fixture_dir/qa-work" "$expected_sha" || {
+    echo "Matched published main was refused" >&2;exit 1;
+  }
+  if remote_main_matches "$fixture_dir/qa-work" \
+    '0000000000000000000000000000000000000000';then
+    echo "Incorrect source SHA was accepted" >&2;exit 1
+  fi
+  printf '%s\\n' second >>"$fixture_dir/qa-work/source"
+  git -C "$fixture_dir/qa-work" commit -qam 'unpublished local fixture'
+  unpublished_sha="$(git -C "$fixture_dir/qa-work" rev-parse HEAD)"
+  if remote_main_matches "$fixture_dir/qa-work" "$unpublished_sha";then
+    echo "Unpublished local-only commit passed remote provenance" >&2;exit 1
+  fi
+  echo "Hyprland QA identity/map stability, focused-input schema, consented-focus, no-clobber evidence, desktop-lock denial, fixed-geometry, monitor bounds, window/layer-shell occlusion, remote-main provenance self-tests PASS (no compositor accessed)"
   exit 0
 fi
 [[ "$#" -eq 0 ]] || exit 2
@@ -463,6 +499,8 @@ source_sha="$(git rev-parse --verify HEAD)" || exit 2
 [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || exit 2
 [[ -z "$(git status --porcelain --untracked-files=all -- src tests Cargo.toml Cargo.lock rust-toolchain.toml)" ]] ||
   { echo "Commit Typefinch source before collecting versioned local evidence" >&2;exit 2; }
+remote_main_matches "$(git rev-parse --show-toplevel)" "$source_sha" ||
+  { echo "Source does not match current remote main (or remote unavailable); refusing live QA" >&2;exit 2; }
 # A no-op dispatcher probes the *active configuration's* Lua dispatch
 # interface. Hyprland 0.55 can run Lua OR legacy configs, independently of
 # compositor version. No keyboard, focus, workspace or settings are changed.

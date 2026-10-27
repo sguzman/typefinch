@@ -464,7 +464,7 @@ JSON
   git init -q -b main "$fixture_dir/qa-work"
   git -C "$fixture_dir/qa-work" config user.name 'Typefinch QA fixture'
   git -C "$fixture_dir/qa-work" config user.email 'qa@example.invalid'
-  printf '%s\\n' first >"$fixture_dir/qa-work/source"
+  printf '%s\n' first >"$fixture_dir/qa-work/source"
   git -C "$fixture_dir/qa-work" add source
   git -C "$fixture_dir/qa-work" commit -qm 'initial fixture'
   git -C "$fixture_dir/qa-work" remote add origin "$fixture_dir/qa-origin.git"
@@ -477,7 +477,7 @@ JSON
     '0000000000000000000000000000000000000000';then
     echo "Incorrect source SHA was accepted" >&2;exit 1
   fi
-  printf '%s\\n' second >>"$fixture_dir/qa-work/source"
+  printf '%s\n' second >>"$fixture_dir/qa-work/source"
   git -C "$fixture_dir/qa-work" commit -qam 'unpublished local fixture'
   unpublished_sha="$(git -C "$fixture_dir/qa-work" rev-parse HEAD)"
   if remote_main_matches "$fixture_dir/qa-work" "$unpublished_sha";then

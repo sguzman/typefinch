@@ -17,8 +17,12 @@ persistent Hyprland configuration changes.
    TYPEFINCH_QA_CONSENT**.
 2. The local Typefinch clone is clean in its source/test manifests and
    the full Git SHA matches the current GitHub origin/main with passing
-   CI. Do not overwrite local edits; do not assume a stale build is
-   acceptable.
+   CI. The launcher checks current remote `main` read-only with a bounded,
+   noninteractive Git query; a stale local checkout, unpushed commit,
+   unavailable network, or mismatched branch fails closed. Codex must also
+   independently confirm a successful full CI run for that exact SHA;
+   matching a remote SHA alone is not proof of green CI. Do not overwrite
+   local edits, remove this preflight, or assume a stale build is acceptable.
 3. The compositor is genuine, currently unlocked Hyprland, with native
    Wayland support. Run as the existing desktop user. If safety guards
    fail, do not modify those guards or retry with broader privileges.

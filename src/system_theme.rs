@@ -27,9 +27,13 @@ pub fn watch(ctx:egui::Context,enabled:Arc<AtomicBool>)->Receiver<Option<bool>> 
                 let mut previous:Option<Option<bool>>=None;
                 loop {
                     let Some(enabled)=owner.upgrade() else {break;};
+                    let active=enabled.load(Ordering::Relaxed);
+                    // Never retain the application's only strong reference
+                    // across sleep or a slow portal subprocess.
+                    drop(enabled);
                     // No D-Bus polling when the user has explicitly pinned
                     // Light or Dark: those modes must have zero portal work.
-                    if !enabled.load(Ordering::Relaxed) {
+                    if !active {
                         previous=None;
                         std::thread::sleep(std::time::Duration::from_millis(500));
                         continue;
@@ -137,9 +141,14 @@ mod tests {
     #[test]
     fn disabled_watcher_does_not_own_the_application_lifetime() {
         let enabled=Arc::new(AtomicBool::new(false));
+        let owner=Arc::downgrade(&enabled);
         let receiver=watch(egui::Context::default(),Arc::clone(&enabled));
-        assert_eq!(Arc::strong_count(&enabled),1,
-            "disabled theme watcher must not keep an orphaned worker alive");
         drop(receiver);
+        drop(enabled);
+        for _ in 0..100 {
+            if owner.upgrade().is_none(){return;}
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("disabled theme watcher retained its application owner");
     }
 }

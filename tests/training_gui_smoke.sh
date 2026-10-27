@@ -125,10 +125,34 @@ local settings=assert(io.open(arg[2],"rb"))
 local body=assert(settings:read("*a"));settings:close()
 local source=assert(io.open(arg[3],"rb"))
 local passage=assert(source:read("*a"));source:close()
-assert(not body:find(arg[3],1,true) and not body:find(passage,1,true),
-  "Private fixture source or local path persisted into settings")
-assert(not body:find("b b b b b b b b",1,true),
-  "Generated training text leaked into persistent preferences")
+-- The source fixture is intentionally the tiny string "aba". Raw JSON
+-- substring matching is unsound: a randomly generated profile UUID can
+-- legitimately contain those three hex digits. Audit all serialized string
+-- VALUES and exempt only structurally valid opaque UUID identity values.
+-- Never exclude ordinary names, paths, layout names or passage fields.
+local prefs=assert(json.decode(body))
+local function opaque_uuid(value)
+  return #value==36 and value:match("^[%x%-]+$") and
+    value:sub(9,9)=="-" and value:sub(14,14)=="-" and
+    value:sub(19,19)=="-" and value:sub(24,24)=="-" and
+    select(2,value:gsub("%-",""))==4
+end
+local function assert_private(value,key)
+  if type(value)=="table" then
+    for k,v in pairs(value) do assert_private(v,k) end
+  elseif type(value)=="string" then
+    if key=="id" then
+      assert(opaque_uuid(value),"Malformed persistent identity")
+    else
+      assert(not value:find(arg[3],1,true)
+        and not value:find(passage,1,true),
+        "Private fixture source or local path persisted into settings")
+      assert(not value:find("b b b b b b b b",1,true),
+        "Generated training text leaked into persistent preferences")
+    end
+  end
+end
+assert_private(prefs)
 print("Native identical-source follow-up PASS: 3 saved scores, baseline 66.7% -> retest 100%, same-size sample and no causal claim")
 LUA
 import -window "$window" typefinch-training-followup.png

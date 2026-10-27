@@ -58,10 +58,10 @@ pub fn watch(ctx:egui::Context,enabled:Arc<AtomicBool>)->Receiver<Option<bool>> 
 }
 
 /// Returns dark (true), light (false), or unavailable (None).
-/// Zero means "no preference"; for appearance, use the conventional
-/// desktop light default. Absent/unsupported portal leaves egui untouched.
+/// Zero means "no preference", not "prefer light": defer to egui's
+/// system fallback. Unknown values also mean no preference per XDG spec.
 fn parse_read_reply(reply:&str)->Option<bool> {
-    let mut found=None;
+    let mut found:Option<Option<bool>>=None;
     for line in reply.lines() {
         let words=line.split_whitespace().collect::<Vec<_>>();
         let Some(at)=words.iter().position(|part|*part=="uint32") else {continue;};
@@ -70,13 +70,14 @@ fn parse_read_reply(reply:&str)->Option<bool> {
             return None;
         }
         let current=match words[at+1] {
-            "0"|"2"=>false,
-            "1"=>true,
-            _=>return None,
+            "0"=>None,
+            "1"=>Some(true),
+            "2"=>Some(false),
+            _=>None,
         };
         if found.replace(current).is_some(){return None;}
     }
-    found
+    found.flatten()
 }
 
 #[cfg(target_os="linux")]
@@ -117,9 +118,10 @@ mod tests {
     use super::*;
     const PREFIX:&str="method return time=1 sender=:1.4 -> destination=:1.9 serial=2 reply_serial=2\n";
     #[test] fn read_only_portal_scheme_is_parsed_without_trusting_other_text() {
-        for (n,dark) in [(0,false),(1,true),(2,false)] {
+        for (n,preference) in [(0,None),(1,Some(true)),(2,Some(false)),
+            (99,None)] {
             let text=format!("{PREFIX}   variant       variant          uint32 {n}\n");
-            assert_eq!(parse_read_reply(&text),Some(dark));
+            assert_eq!(parse_read_reply(&text),preference);
         }
         assert_eq!(parse_read_reply(""),None);
         assert_eq!(parse_read_reply("error: no portal"),None);

@@ -25,7 +25,7 @@ case " $* " in
   *) exit 2;;
 esac
 read -r scheme <"$TYPEFINCH_FAKE_PORTAL_STATE"
-case "$scheme" in 1|2|99) ;; *) exit 2;; esac
+case "$scheme" in 0|1|2|99) ;; *) exit 2;; esac
 printf 'method return time=1 sender=:1.4 -> destination=:1.9 serial=2 reply_serial=2\n'
 printf '   variant       variant          uint32 %s\n' "$scheme"
 MOCK
@@ -60,6 +60,12 @@ wait_for_theme(){
 wait_for_theme true true
 printf '2\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
 wait_for_theme false false
+# 0 is XDG's "no preference" and must defer to the toolkit, not force Light.
+printf '0\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
+wait_for_theme null any
+# Re-enter a forced choice to verify unknown -> toolkit fallback is observed.
+printf '1\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
+wait_for_theme true true
 # Unsupported portal values must NOT be interpreted as forced Dark/Light.
 printf '99\n' >"$TYPEFINCH_FAKE_PORTAL_STATE"
 wait_for_theme null any

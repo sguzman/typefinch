@@ -18,10 +18,15 @@ pub fn watch(ctx:egui::Context,enabled:Arc<AtomicBool>)->Receiver<Option<bool>> 
     let (tx,rx)=mpsc::channel();
     #[cfg(target_os="linux")]
     {
+        // The application's Arc owns the worker lifetime. A Weak reference
+        // lets the worker exit even when explicit Light/Dark disables all
+        // portal reads and therefore no receiver send can detect shutdown.
+        let owner=Arc::downgrade(&enabled);
         let _=std::thread::Builder::new().name("typefinch-system-theme".into())
             .spawn(move || {
                 let mut previous:Option<Option<bool>>=None;
                 loop {
+                    let Some(enabled)=owner.upgrade() else {break;};
                     // No D-Bus polling when the user has explicitly pinned
                     // Light or Dark: those modes must have zero portal work.
                     if !enabled.load(Ordering::Relaxed) {
@@ -126,5 +131,15 @@ mod tests {
         assert_eq!(preference(None),egui::ThemePreference::System);
         assert_eq!(preference(Some(true)),egui::ThemePreference::Dark);
         assert_eq!(preference(Some(false)),egui::ThemePreference::Light);
+    }
+
+    #[cfg(target_os="linux")]
+    #[test]
+    fn disabled_watcher_does_not_own_the_application_lifetime() {
+        let enabled=Arc::new(AtomicBool::new(false));
+        let receiver=watch(egui::Context::default(),Arc::clone(&enabled));
+        assert_eq!(Arc::strong_count(&enabled),1,
+            "disabled theme watcher must not keep an orphaned worker alive");
+        drop(receiver);
     }
 }
